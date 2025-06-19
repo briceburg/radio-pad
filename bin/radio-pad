@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+
+RADIO_STATIONS = [
+    {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
+    {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
+    {"name": "gmcr", "url": "http://stream.gmcr.org:8000/gmcr"},
+    {"name": "kunm","url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3"},
+    {"name": "kmkb", "url": "http://50.19.66.66:8000/kmkb"},
+    {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
+    {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
+    {"name": "wqxr", "url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="},
+    {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
+    {"name": "lofi", "url": "https://www.youtube.com/watch?v=5qap5aO4i9A"},
+    {"name": "kboo", "url": "https://live.kboo.fm:8443/high"}
+]
+
+class RadioPad:
+    def __init__(self):
+        self.audio_channels = os.getenv(
+            "AUDIO_CHANNELS", "stereo"
+        )  # 'stereo' or 'mono'
+        self.mpv_process = None
+        self.listening = False
+
+        # stations_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/stations.json"))
+        # with open(stations_path, "r") as f:
+        #     self.stations = json.load(f)
+        self.stations = RADIO_STATIONS  # Use the predefined list for now
+
+    def play_station(self, station_name):
+        station = next((s for s in self.stations if s["name"] == station_name), None)
+        if not station:
+            print(f"Station '{station_name}' not found. Please try again.")
+            return
+
+        if self.mpv_process:
+            print("Stopping current station...")
+            self.mpv_process.terminate()
+
+        print(
+            f"Playing {station['name']} from {station['url']} on {self.audio_channels} audio channel."
+        )
+        self.mpv_process = subprocess.Popen(
+            f"mpv {station['url']} --no-video --no-cache --stream-lavf-o=reconnect_streamed=1 --profile=low-latency --audio-channels={self.audio_channels}",
+            shell=True,
+            stdout=sys.stdout,
+            stderr=subprocess.STDOUT,
+        )
+
+    def listen_for_hotkey(self, hotkey):
+        def on_press(key):
+            if key == keyboard.Key[hotkey.lower()]:
+                if not self.listening:
+                    print(
+                        f"{hotkey} pressed. Enter station name, then press {hotkey} again to submit."
+                    )
+                    self.listening = True
+                    self.input_buffer = []
+                else:
+                    station_name = "".join(self.input_buffer)
+                    self.play_station(station_name)
+                    self.listening = False
+            elif self.listening and hasattr(key, "char"):
+                self.input_buffer.append(key.char)
+
+        print(
+            f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit."
+        )
+        with keyboard.Listener(on_press=on_press) as listener:
+            try:
+                listener.join()
+            except KeyboardInterrupt:
+                print("Exiting...")
+            finally:
+                listener.stop()
+                if self.mpv_process:
+                    self.mpv_process.terminate()
+
+
+if __name__ == "__main__":
+    import sys
+    import subprocess
+    from pynput import keyboard
+    import os
+    import json
+
+    radio = RadioPad()
+    radio.listen_for_hotkey("F12")  # Match with macros/radio.py

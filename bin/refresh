@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+REFRESH_HARD=${REFRESH_HARD:-false}
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+cd /mnt/CIRCUITPY/
+
+if $REFRESH_HARD; then
+  echo "removing existing files"
+  rm -rf ./*
+fi
+
+cp -r "$PROJECT_ROOT"/src/* .
+sync
+echo "[ok] copied files"
