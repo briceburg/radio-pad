@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
+import os, subprocess
 
 RADIO_STATIONS = [
     {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
     {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
     {"name": "gmcr", "url": "http://stream.gmcr.org:8000/gmcr"},
-    {"name": "kunm","url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3"},
+    {
+        "name": "kunm",
+        "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3",
+    },
     {"name": "kmkb", "url": "http://50.19.66.66:8000/kmkb"},
     {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
     {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
     {"name": "wqxr", "url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="},
     {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
     {"name": "lofi", "url": "https://www.youtube.com/watch?v=5qap5aO4i9A"},
-    {"name": "kboo", "url": "https://live.kboo.fm:8443/high"}
+    {"name": "kboo", "url": "https://live.kboo.fm:8443/high"},
 ]
+
 
 class RadioPad:
     def __init__(self):
@@ -41,37 +46,48 @@ class RadioPad:
             f"Playing {station['name']} from {station['url']} on {self.audio_channels} audio channel."
         )
         self.mpv_process = subprocess.Popen(
-            f"sudo -Eu {os.environ['SUDO_USER']} mpv {station['url']} --no-video --no-cache --stream-lavf-o=reconnect_streamed=1 --profile=low-latency --audio-channels={self.audio_channels}",
-            shell=True,
-            stdout=sys.stdout,
-            stderr=subprocess.STDOUT,
+            [
+                "mpv",
+                station["url"],
+                "--no-video",
+                "--no-cache",
+                "--stream-lavf-o=reconnect_streamed=1",
+                "--profile=low-latency",
+                f"--audio-channels={self.audio_channels}",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
     def listen_for_station(self, hotkey):
-        import keyboard
-        print(f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit.")
+        from sshkeyboard import listen_keyboard
+
+        print(
+            f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit."
+        )
+
+        def on_key_press(key):
+            if key == hotkey:
+                if self.buffer is None:
+                    self.buffer = ""
+                else:
+                    self.play_station(self.buffer)
+                    self.buffer = None
+            elif self.buffer is not None:
+                self.buffer += key
+
         try:
-            while True:
-                keyboard.wait(hotkey)
-                events = keyboard.record(until=hotkey)
-                for station in keyboard.get_typed_strings(events):
-                    if station:
-                        self.play_station(station) 
-               
+            self.buffer = None
+            listen_keyboard(
+                on_press=on_key_press, delay_second_char=0, delay_other_chars=0
+            )
         except KeyboardInterrupt:
             print("Exiting...")
         finally:
             if self.mpv_process:
                 self.mpv_process.terminate()
 
+
 if __name__ == "__main__":
-    import sys
-    import subprocess
-    import os
-
-    if not os.getenv("SUDO_USER"):
-        print("Please run with sudo -E")
-        sys.exit(1)
-
     radio = RadioPad()
     radio.listen_for_station("f12")  # Match with macros/radio.py
