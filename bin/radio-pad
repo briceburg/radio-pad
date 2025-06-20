@@ -41,48 +41,37 @@ class RadioPad:
             f"Playing {station['name']} from {station['url']} on {self.audio_channels} audio channel."
         )
         self.mpv_process = subprocess.Popen(
-            f"mpv {station['url']} --no-video --no-cache --stream-lavf-o=reconnect_streamed=1 --profile=low-latency --audio-channels={self.audio_channels}",
+            f"sudo -Eu {os.environ['SUDO_USER']} mpv {station['url']} --no-video --no-cache --stream-lavf-o=reconnect_streamed=1 --profile=low-latency --audio-channels={self.audio_channels}",
             shell=True,
             stdout=sys.stdout,
             stderr=subprocess.STDOUT,
         )
 
-    def listen_for_hotkey(self, hotkey):
-        def on_press(key):
-            if key == keyboard.Key[hotkey.lower()]:
-                if not self.listening:
-                    print(
-                        f"{hotkey} pressed. Enter station name, then press {hotkey} again to submit."
-                    )
-                    self.listening = True
-                    self.input_buffer = []
-                else:
-                    station_name = "".join(self.input_buffer)
-                    self.play_station(station_name)
-                    self.listening = False
-            elif self.listening and hasattr(key, "char"):
-                self.input_buffer.append(key.char)
-
-        print(
-            f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit."
-        )
-        with keyboard.Listener(on_press=on_press) as listener:
-            try:
-                listener.join()
-            except KeyboardInterrupt:
-                print("Exiting...")
-            finally:
-                listener.stop()
-                if self.mpv_process:
-                    self.mpv_process.terminate()
-
+    def listen_for_station(self, hotkey):
+        import keyboard
+        print(f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit.")
+        try:
+            while True:
+                keyboard.wait(hotkey)
+                events = keyboard.record(until=hotkey)
+                for station in keyboard.get_typed_strings(events):
+                    if station:
+                        self.play_station(station) 
+               
+        except KeyboardInterrupt:
+            print("Exiting...")
+        finally:
+            if self.mpv_process:
+                self.mpv_process.terminate()
 
 if __name__ == "__main__":
     import sys
     import subprocess
-    from pynput import keyboard
     import os
-    import json
+
+    if not os.getenv("SUDO_USER"):
+        print("Please run with sudo -E")
+        sys.exit(1)
 
     radio = RadioPad()
-    radio.listen_for_hotkey("F12")  # Match with macros/radio.py
+    radio.listen_for_station("f12")  # Match with macros/radio.py

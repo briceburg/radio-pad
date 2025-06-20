@@ -1,30 +1,89 @@
 # radio-pad
 
-Use the adafruit macropad as a radio station player
+Use the Adafruit Macropad as a 🎵 radio station player 🎵.
 
-## Overview
+---
 
-The macropad should be plugged into a host, such as a raspberry pi, that has [mpv](https://mpv.io/) and python installed. A listener ( [bin/radio-pad](./bin/radio-pad)) is added to the host that will respond to keypresses by playing the requested station.
+## What is radio-pad?
 
+**radio-pad** lets you use an Adafruit Macropad as a controller for playing internet radio stations on your computer (such as a Raspberry Pi). Each Macropad button can be mapped to a different station, and the host computer will play the selected station using [mpv](https://mpv.io/).
 
-### Host Configuration
+---
 
-* ensure mpv is installed
-* ensure python3 and [pynput](https://pypi.org/project/pynput/) is available
+## How It Works
 
-  ```sh
-  pip3 install pynput
-  ```
-  
-* copy [bin/radio-pad](./bin/radio-pad) to a location in your PATH and ensure its executable.
-* start `radio-pad`
-* program the macropad
-* plug in the macropad and enjoy
+- The Macropad sends keypresses to the host computer.
+- The host runs a listener script (`bin/radio-pad`) that detects these keypresses and starts/stops playback of the corresponding radio stream.
+- Station configuration and button colors are customizable.
+
+---
+
+## Requirements
+
+- **Host computer** (Linux recommended, e.g., Raspberry Pi)
+- **Python 3**
+- **mpv** media player
+- **keyboard** Python library (for global hotkey detection)
+
+---
+
+## Installation
+
+1. **Install mpv:**
+
+   ```sh
+   sudo apt install mpv
+   ```
+
+2. **Install Python dependencies:**
+
+   ```sh
+   pip3 install keyboard
+   ```
+
+3. **Clone this repository:**
+
+   ```sh
+   git clone https://github.com/yourusername/radio-pad.git
+   cd radio-pad
+   ```
+
+---
+
+## Usage
+
+### Running the Listener
+
+> **Important:**  
+> The `keyboard` library requires root privileges to listen to keyboard devices.  
+> **Always run the listener with `sudo -E`:**
+
+```sh
+sudo -E bin/radio-pad
+```
 
 ### Programming the Macropad
 
-Programming the macropad allows you to customize the stations it supports as well as the key colors for each station. All sourecode lives under the [src](./src) directory.
+1. **Mount the Macropad storage:**
 
-* plug in the macropad and call [bin/mount](./bin/mount) to mount its storage to /mnt/CIRCUITPY for programming.
-* modify [src/macros/radio.py](./src/macros/radio.py) to your liking
-* sync your changes using [bin/refresh](./bin/refresh)
+   ```sh
+   bin/mount
+   ```
+
+2. **Customize stations and button colors:**
+
+   - Edit [`src/macros/radio.py`](./src/macros/radio.py) for button assignments.
+   - Edit [`src/config/stations.json`](./src/config/stations.json) to change the list of available stations.
+
+3. **Sync your changes to the Macropad:**
+
+   ```sh
+   bin/refresh
+   ```
+
+---
+
+## License
+
+[BSD 3-Clause "New" or "Revised" License](./LICENSE)
+
