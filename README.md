@@ -23,7 +23,7 @@ Use the Adafruit Macropad as a 🎵 radio station player 🎵.
 - **Host computer** (Linux recommended, e.g., Raspberry Pi)
 - **Python 3**
 - **mpv** media player
-- **keyboard** Python library (for global hotkey detection)
+- **sshkeyboard** Python library
 
 ---
 
@@ -38,7 +38,7 @@ Use the Adafruit Macropad as a 🎵 radio station player 🎵.
 2. **Install Python dependencies:**
 
    ```sh
-   pip3 install keyboard
+   pip3 install sshkeyboard
    ```
 
 3. **Clone this repository:**
@@ -48,18 +48,31 @@ Use the Adafruit Macropad as a 🎵 radio station player 🎵.
    cd radio-pad
    ```
 
+4. **Add radio-pad to your PATH**
+
+    ```sh
+    sudo ln -s "$PWD/bin/radio-pad" /usr/local/bin/
+    ```
+
 ---
 
 ## Usage
 
 ### Running the Listener
 
-> **Important:**  
-> The `keyboard` library requires root privileges to listen to keyboard devices.  
-> **Always run the listener with `sudo -E`:**
+```sh
+bin/radio-pad
+```
+
+on my raspberry pi I start the listener at boot in a tmux session by adding the following to my auto-logged-in user's `.bashrc` file:
 
 ```sh
-sudo -E bin/radio-pad
+if tmux has-session -t radio-pad 2>/dev/null; then
+  echo "radio-pad running. to attach:"
+  echo "  tmux attach-session -t radio-pad"
+else
+  tmux new-session -s radio-pad radio-pad
+fi
 ```
 
 ### Programming the Macropad
@@ -83,7 +96,18 @@ sudo -E bin/radio-pad
 
 ---
 
+## Troubleshooting Sound
+
+if plugging in the macropad interferes with your Alsa sound configuration, because it also is registered as a snd-usb-audio device, follow the "[How to choose a particular order for multiple installed cards](https://alsa.opensrc.org/MultipleCards#The_newer_.22slots.3D.22_method)" section of the Alsa docs. 
+
+I ended up adding the following to my `/etc/modprobe.d/soundcard-order.conf`, where I got the vendor and product IDs from `lsusb` output.
+
+```sh
+# creative labs soundblaster: vid 0x041e pid 0x324d 
+# adafruit macropad: vid 0x239a pid 0x8108
+options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
+```
+
 ## License
 
 [BSD 3-Clause "New" or "Revised" License](./LICENSE)
-

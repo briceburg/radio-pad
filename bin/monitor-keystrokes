@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+print("Monitoring keystrokes... Press Ctrl+C to stop.")
+from sshkeyboard import listen_keyboard
+
+try:
+    listen_keyboard(
+        on_press=lambda key: print(f"Key pressed: {key}"),
+        delay_second_char=0,
+        delay_other_chars=0,
+    )
+except KeyboardInterrupt:
+    print("Stopped monitoring keystrokes.")
