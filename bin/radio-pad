@@ -8,21 +8,23 @@ import json
 from time import sleep
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
+MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
+RADIO_STATIONS_FILE = "/tmp/radio-pad-stations.json"
 RADIO_STATIONS_URL = os.getenv(
     "RADIO_STATIONS_URL",
     "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/config/stations.json",
 )
 
 # cache radio stations
-if not os.path.exists("/tmp/radio-pad-stations.json"):
+if not os.path.exists(RADIO_STATIONS_FILE):
     try:
         print(f"Downloading radio stations from {RADIO_STATIONS_URL} ...")
-        urllib.request.urlretrieve(RADIO_STATIONS_URL, "/tmp/radio-pad-stations.json")
+        urllib.request.urlretrieve(RADIO_STATIONS_URL, RADIO_STATIONS_FILE)
     except Exception as e:
         print(f"Error downloading radio stations: {e}")
         sys.exit(1)
 
-with open("/tmp/radio-pad-stations.json", "r") as f:
+with open(RADIO_STATIONS_FILE, "r") as f:
     try:
         RADIO_STATIONS = json.load(f)
     except json.JSONDecodeError as e:
@@ -53,16 +55,22 @@ def stop_station():
     global mpv_sock
 
     if mpv_sock:
-        mpv_sock.stop()
-        mpv_sock = None
         try:
-            os.remove("/tmp/radio-pad-mpv.sock")
-        except:
-            pass
+            mpv_sock.stop()
+        except Exception as e:
+            print(f"error stopping ipc: {e}")
+        finally:
+            mpv_sock = None
 
     if mpv_process:
-        mpv_process.terminate()
-        mpv_process = None
+        try:
+            mpv_process.terminate()
+            if os.path.exists(MPV_SOCKET_FILE):
+                os.remove(MPV_SOCKET_FILE)
+        except Exception as e:
+            print(f"error terminating mpv: {e}")
+        finally:
+            mpv_process = None
 
 
 def play_station(station_index):
@@ -87,7 +95,7 @@ def play_station(station_index):
             "--no-input-vo-keyboard",
             "--no-input-terminal",
             "--no-audio-display",
-            "--input-ipc-server=/tmp/radio-pad-mpv.sock",
+            f"--input-ipc-server={MPV_SOCKET_FILE}",
             "--no-video",
             "--no-cache",
             "--stream-lavf-o=reconnect_streamed=1",
@@ -99,14 +107,15 @@ def play_station(station_index):
         stderr=subprocess.STDOUT,
     )
 
-    for i in range(10):
+    for i in range(20):
         try:
-            mpv_sock = MPV(start_mpv=False, ipc_socket="/tmp/radio-pad-mpv.sock")
+            mpv_sock = MPV(start_mpv=False, ipc_socket=MPV_SOCKET_FILE)
             # persist the previously set volume across mpv instances
             if mpv_volume is not None:
                 mpv_sock.volume = mpv_volume
             return
         except Exception as e:
+            print(f"foo: {e}")
             sleep(0.10)
 
     print("failed to establish mpv IPC. volume controls disabled")
