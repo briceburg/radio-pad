@@ -6,23 +6,26 @@ import os, sys, subprocess
 import urllib.request
 import json
 from time import sleep
+import asyncio
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
+MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
+RADIO_STATIONS_FILE = "/tmp/radio-pad-stations.json"
 RADIO_STATIONS_URL = os.getenv(
     "RADIO_STATIONS_URL",
     "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/config/stations.json",
 )
 
 # cache radio stations
-if not os.path.exists("/tmp/radio-pad-stations.json"):
+if not os.path.exists(RADIO_STATIONS_FILE):
     try:
         print(f"Downloading radio stations from {RADIO_STATIONS_URL} ...")
-        urllib.request.urlretrieve(RADIO_STATIONS_URL, "/tmp/radio-pad-stations.json")
+        urllib.request.urlretrieve(RADIO_STATIONS_URL, RADIO_STATIONS_FILE)
     except Exception as e:
         print(f"Error downloading radio stations: {e}")
         sys.exit(1)
 
-with open("/tmp/radio-pad-stations.json", "r") as f:
+with open(RADIO_STATIONS_FILE, "r") as f:
     try:
         RADIO_STATIONS = json.load(f)
     except json.JSONDecodeError as e:
@@ -33,6 +36,7 @@ bindings = KeyBindings()
 mpv_process = None
 mpv_sock = None
 mpv_volume = None
+mpv_sock_lock = asyncio.Lock()
 
 
 def char_to_index(ch):
@@ -53,28 +57,30 @@ def stop_station():
     global mpv_sock
 
     if mpv_sock:
-        mpv_sock.stop()
-        mpv_sock = None
         try:
-            os.remove("/tmp/radio-pad-mpv.sock")
-        except:
-            pass
+            mpv_sock.stop()
+        except Exception as e:
+            print(f"error stopping ipc: {e}")
+        finally:
+            mpv_sock = None
 
     if mpv_process:
-        mpv_process.terminate()
-        mpv_process = None
+        try:
+            mpv_process.terminate()
+            if os.path.exists(MPV_SOCKET_FILE):
+                os.remove(MPV_SOCKET_FILE)
+        except Exception as e:
+            print(f"error terminating mpv: {e}")
+        finally:
+            mpv_process = None
 
 
 def play_station(station_index):
-    global mpv_process
-    global mpv_sock
-    global mpv_volume
-
+    global mpv_process, mpv_sock
     station = RADIO_STATIONS[station_index]
     if mpv_process:
         print("Stopping current station...")
         stop_station()
-
     print(f"Playing {station['name']} from {station['url']} as {AUDIO_CHANNELS}.")
     mpv_process = subprocess.Popen(
         [
@@ -87,7 +93,7 @@ def play_station(station_index):
             "--no-input-vo-keyboard",
             "--no-input-terminal",
             "--no-audio-display",
-            "--input-ipc-server=/tmp/radio-pad-mpv.sock",
+            f"--input-ipc-server={MPV_SOCKET_FILE}",
             "--no-video",
             "--no-cache",
             "--stream-lavf-o=reconnect_streamed=1",
@@ -98,19 +104,39 @@ def play_station(station_index):
         stdout=sys.stdout,
         stderr=subprocess.STDOUT,
     )
-
-    for i in range(10):
-        try:
-            mpv_sock = MPV(start_mpv=False, ipc_socket="/tmp/radio-pad-mpv.sock")
-            # persist the previously set volume across mpv instances
-            if mpv_volume is not None:
-                mpv_sock.volume = mpv_volume
-            return
-        except Exception as e:
-            sleep(0.10)
-
-    print("failed to establish mpv IPC. volume controls disabled")
+    # Reset mpv_sock so a new one will be created for the new process
     mpv_sock = None
+    # Start IPC connection asynchronously (does not block)
+    asyncio.create_task(establish_ipc_socket())
+
+
+async def establish_ipc_socket():
+    global mpv_sock
+    async with mpv_sock_lock:
+        if mpv_sock is not None:
+            return mpv_sock
+        loop = asyncio.get_running_loop()
+        for _ in range(20):
+            try:
+                # Run the blocking MPV constructor in a thread pool
+                sock = await loop.run_in_executor(
+                    None, lambda: MPV(start_mpv=False, ipc_socket=MPV_SOCKET_FILE)
+                )
+                mpv_sock = sock
+                print("mpv IPC established.")
+                # Restore previously set volume if available
+                if mpv_volume is not None:
+                    print(f"Restoring volume to {mpv_volume}.")
+                    try:
+                        mpv_sock.volume = mpv_volume
+                    except Exception as e:
+                        print(f"Failed restoring volume: {e}")
+                return mpv_sock
+            except Exception:
+                await asyncio.sleep(0.1)
+        print("failed to establish mpv IPC. volume controls disabled")
+        mpv_sock = None
+        return None
 
 
 def volume_adjust(amt):
