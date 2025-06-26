@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+set -eo pipefail
+
 my_id=$(id -u)
 disk="/dev/disk/by-label/CIRCUITPY"
 target="/mnt/CIRCUITPY"
+[ -d "$target" ] || sudo mkdir -p "$target"
 sudo mount "$disk" "$target"  -o uid="$my_id"
 echo "[ok] mounted disk to /mnt/CIRCUITPY under uid $my_id"
