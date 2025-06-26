@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-import os, subprocess
+from prompt_toolkit import prompt
+from prompt_toolkit.key_binding import KeyBindings
+import os, sys, subprocess
 
+AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 RADIO_STATIONS = [
     {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
     {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
@@ -18,76 +21,85 @@ RADIO_STATIONS = [
     {"name": "kboo", "url": "https://live.kboo.fm:8443/high"},
 ]
 
+bindings = KeyBindings()
+mpv_process = None
 
-class RadioPad:
-    def __init__(self):
-        self.audio_channels = os.getenv(
-            "AUDIO_CHANNELS", "stereo"
-        )  # 'stereo' or 'mono'
-        self.mpv_process = None
-        self.listening = False
 
-        # stations_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/stations.json"))
-        # with open(stations_path, "r") as f:
-        #     self.stations = json.load(f)
-        self.stations = RADIO_STATIONS  # Use the predefined list for now
+def char_to_index(ch):
+    """
+    Convert a single character to an integer index:
+    '0'-'9' -> 0-9, 'a'-'z' -> 10-35.
+    """
+    if ch.isdigit():
+        return int(ch)
+    elif "a" <= ch <= "z":
+        return 10 + ord(ch) - ord("a")
+    else:
+        return None
 
-    def play_station(self, station_name):
-        station = next((s for s in self.stations if s["name"] == station_name), None)
-        if not station:
-            print(f"Station '{station_name}' not found. Please try again.")
-            return
+def play_station(station_index):
+    global mpv_process
+    station = RADIO_STATIONS[station_index]
 
-        if self.mpv_process:
-            print("Stopping current station...")
-            self.mpv_process.terminate()
+    if mpv_process:
+        print("Stopping current station...")
+        mpv_process.terminate()
 
+    print(f"Playing {station['name']} from {station['url']} as {AUDIO_CHANNELS}.")
+    mpv_process = subprocess.Popen(
+        [
+            "mpv",
+            station["url"],
+            "--no-osc",
+            "--no-osd-bar",
+            "--no-input-default-bindings",
+            "--no-input-cursor",
+            "--no-input-vo-keyboard",
+            "--no-input-terminal",
+            "--no-audio-display",
+            "--no-video",
+            "--no-cache",
+            "--stream-lavf-o=reconnect_streamed=1",
+            "--profile=low-latency",
+            f"--audio-channels={AUDIO_CHANNELS}",
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=sys.stdout,
+        stderr=subprocess.STDOUT,
+    )
+
+
+@bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
+def _(event):
+    page_char = event.key_sequence[-2].data
+    station_char = event.key_sequence[-1].data
+    page_idx = char_to_index(page_char)
+    station_idx = char_to_index(station_char)
+
+    if page_idx is None or station_idx is None:
+        print(f"Invalid input: Page: {page_char}, Station: {station_char}.")
+        return
+
+    stations_per_page = (
+        12  # Assuming 12 stations per page, align this with macropad configuration
+    )
+    station_index = page_idx * stations_per_page + station_idx
+    if station_index < 0 or station_index >= len(RADIO_STATIONS):
         print(
-            f"Playing {station['name']} from {station['url']} on {self.audio_channels} audio channel."
+            f"Invalid station index: {station_index}. Page: {page_char}, Station: {station_char}."
         )
-        self.mpv_process = subprocess.Popen(
-            [
-                "mpv",
-                station["url"],
-                "--no-video",
-                "--no-cache",
-                "--stream-lavf-o=reconnect_streamed=1",
-                "--profile=low-latency",
-                f"--audio-channels={self.audio_channels}",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        return
 
-    def listen_for_station(self, hotkey):
-        from sshkeyboard import listen_keyboard
-
-        print(
-            f"Press {hotkey} to start entering a station name. Press {hotkey} again to submit."
-        )
-
-        def on_key_press(key):
-            if key == hotkey:
-                if self.buffer is None:
-                    self.buffer = ""
-                else:
-                    self.play_station(self.buffer)
-                    self.buffer = None
-            elif self.buffer is not None:
-                self.buffer += key
-
-        try:
-            self.buffer = None
-            listen_keyboard(
-                on_press=on_key_press, delay_second_char=0, delay_other_chars=0
-            )
-        except KeyboardInterrupt:
-            print("Exiting...")
-        finally:
-            if self.mpv_process:
-                self.mpv_process.terminate()
+    play_station(station_index)
 
 
-if __name__ == "__main__":
-    radio = RadioPad()
-    radio.listen_for_station("f12")  # Match with macros/radio.py
+while True:
+    try:
+        print("Press 'Control + @' followed by the radio page and station id.")
+        print("Press 'Control + C' or 'Control + D' to exit.")
+        prompt(key_bindings=bindings)
+    except (KeyboardInterrupt, EOFError):
+        print("Exiting...")
+        if mpv_process:
+            mpv_process.terminate()
+        sys.exit(0)
