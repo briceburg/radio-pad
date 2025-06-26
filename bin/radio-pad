@@ -64,6 +64,7 @@ def play_station(station_index):
             "--no-input-vo-keyboard",
             "--no-input-terminal",
             "--no-audio-display",
+            "--input-ipc-server=/tmp/radio-pad-mpv.sock",
             "--no-video",
             "--no-cache",
             "--stream-lavf-o=reconnect_streamed=1",
