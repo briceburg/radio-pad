@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eo pipefail
 
 REFRESH_HARD=${REFRESH_HARD:-false}
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
