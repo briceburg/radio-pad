@@ -46,6 +46,7 @@ class App:
 macropad = MacroPad()
 macropad.display.auto_refresh = False
 macropad.pixels.auto_write = False
+macropad.pixels.brightness = 0.10  # Dim the LEDs
 
 # Set up displayio group with all the labels
 group = displayio.Group()
@@ -106,7 +107,9 @@ if not apps:
     while True:
         pass
 
+pressed_color = 0x015C01
 last_position = None
+last_pressed = None
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
 app_index = 0
 apps[app_index].switch()
@@ -154,8 +157,20 @@ while True:
         # List []: one or more Consumer Control codes (can also do float delay)
         # Dict {}: mouse buttons/motion (might extend in future)
         if key_number < 12:  # No pixel for encoder button
-            macropad.pixels[key_number] = 0xFFFFFF
+            macropad.pixels[key_number] = pressed_color
             macropad.pixels.show()
+
+            # highlight they key pressed on the OLED display
+            if last_pressed != key_number:
+                group[key_number].color = 0x000000
+                group[key_number].background_color = 0xFFFFFF
+                group[13].text = apps[app_index].macros[key_number][1]
+
+                if last_pressed is not None:
+                    group[last_pressed].color = 0xFFFFFF
+                    group[last_pressed].background_color = 0x000000
+
+                macropad.display.refresh()
         for item in sequence:
             if isinstance(item, int):
                 if item >= 0:
@@ -209,6 +224,10 @@ while True:
                 elif "tone" in item:
                     macropad.stop_tone()
         macropad.consumer_control.release()
+
         if key_number < 12:  # No pixel for encoder button
-            macropad.pixels[key_number] = apps[app_index].macros[key_number][0]
-            macropad.pixels.show()
+            # reset previously highlighted key to its original color
+            if last_pressed is not None and last_pressed != key_number:
+                macropad.pixels[last_pressed] = apps[app_index].macros[last_pressed][0]
+                macropad.pixels.show()
+            last_pressed = key_number
