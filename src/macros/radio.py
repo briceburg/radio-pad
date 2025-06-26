@@ -1,28 +1,10 @@
 from adafruit_hid.keycode import Keycode  # REQUIRED if using Keycode.* values
 import json
-import os
-
-RADIO_STATIONS = [
-    {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
-    {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
-    {"name": "gmcr", "url": "http://stream.gmcr.org:8000/gmcr"},
-    {
-        "name": "kunm",
-        "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3",
-    },
-    {"name": "kmkb", "url": "http://50.19.66.66:8000/kmkb"},
-    {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
-    {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
-    {"name": "wqxr", "url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="},
-    {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
-    {"name": "lofi", "url": "https://www.youtube.com/watch?v=5qap5aO4i9A"},
-    {"name": "kboo", "url": "https://live.kboo.fm:8443/high"},
-]
 
 # Load stations from ../config/stations.json
-# stations_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/stations.json"))
-# with open(stations_path, "r") as f:
-#     RADIO_STATIONS = json.load(f)
+stations_path = "config/stations.json"
+with open(stations_path, "r") as f:
+    RADIO_STATIONS = json.load(f)
 
 default_color = 0x000077  # Default color for station buttons.
 default_tuple = (

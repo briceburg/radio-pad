@@ -2,24 +2,30 @@
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
 import os, sys, subprocess
+import urllib.request
+import json
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
-RADIO_STATIONS = [
-    {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
-    {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
-    {"name": "gmcr", "url": "http://stream.gmcr.org:8000/gmcr"},
-    {
-        "name": "kunm",
-        "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3",
-    },
-    {"name": "kmkb", "url": "http://50.19.66.66:8000/kmkb"},
-    {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
-    {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
-    {"name": "wqxr", "url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="},
-    {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
-    {"name": "lofi", "url": "https://www.youtube.com/watch?v=5qap5aO4i9A"},
-    {"name": "kboo", "url": "https://live.kboo.fm:8443/high"},
-]
+RADIO_STATIONS_URL = os.getenv(
+    "RADIO_STATIONS_URL",
+    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/config/stations.json",
+)
+
+# cache radio stations
+if not os.path.exists("/tmp/radio-pad-stations.json"):
+    try:
+        print(f"Downloading radio stations from {RADIO_STATIONS_URL} ...")
+        urllib.request.urlretrieve(RADIO_STATIONS_URL, "/tmp/radio-pad-stations.json")
+    except Exception as e:
+        print(f"Error downloading radio stations: {e}")
+        sys.exit(1)
+
+with open("/tmp/radio-pad-stations.json", "r") as f:
+    try:
+        RADIO_STATIONS = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing radio stations JSON: {e}")
+        sys.exit(1)
 
 bindings = KeyBindings()
 mpv_process = None
@@ -36,6 +42,7 @@ def char_to_index(ch):
         return 10 + ord(ch) - ord("a")
     else:
         return None
+
 
 def play_station(station_index):
     global mpv_process

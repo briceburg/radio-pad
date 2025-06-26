@@ -1,6 +1,6 @@
 # radio-pad
 
-Use the Adafruit Macropad as a 🎵 radio station player 🎵.
+Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-rp2040/overview) as a 🎵 radio station player 🎵.
 
 ---
 
@@ -20,10 +20,9 @@ Use the Adafruit Macropad as a 🎵 radio station player 🎵.
 
 ## Requirements
 
-- **Host computer** (Linux recommended, e.g., Raspberry Pi)
-- **Python 3**
-- **mpv** media player
-- **sshkeyboard** Python library
+- **Host computer** (Linux recommended, e.g. a Raspberry Pi)
+  - **Python 3** with the [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/en/master/) library.
+  - **mpv** media player
 
 ---
 
@@ -38,7 +37,7 @@ Use the Adafruit Macropad as a 🎵 radio station player 🎵.
 2. **Install Python dependencies:**
 
    ```sh
-   pip3 install sshkeyboard
+   pip3 install prompt_toolkit
    ```
 
 3. **Clone this repository:**
@@ -74,6 +73,8 @@ else
   tmux new-session -s radio-pad radio-pad
 fi
 ```
+
+> tmux maintains the tty1 attachment whereas screen drops it if you attach via ssh.
 
 ### Programming the Macropad
 
