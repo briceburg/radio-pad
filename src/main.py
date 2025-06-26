@@ -6,6 +6,7 @@ from adafruit_display_shapes.rect import Rect
 from adafruit_display_text import label
 from adafruit_macropad import MacroPad
 from adafruit_hid.keycode import Keycode
+import time
 
 MACRO_FOLDER = "/macros"
 
@@ -115,8 +116,8 @@ last_encoder_switch = macropad.encoder_switch_debounced.pressed
 app_index = 0
 apps[app_index].switch()
 
-
-def radio_volume(key):
+def radio_control(key):
+    """Send a control command follwed by key to the radio-pad application."""
     macropad.keyboard.press(Keycode.CONTROL)
     macropad.keyboard.press(Keycode.SIX)
     macropad.keyboard.release(Keycode.CONTROL)
@@ -124,36 +125,48 @@ def radio_volume(key):
     macropad.keyboard.press(key)
     macropad.keyboard.release(key)
 
-
 # MAIN LOOP ----------------------------
 
 while True:
-    # Read encoder position. If it's changed, switch apps.
-    # position = macropad.encoder
-    # if position != last_position:
-    #     app_index = position % len(apps)
-    #     apps[app_index].switch()
-    #     last_position = position
-
     # Read encoder position. If it's changed, adjust volume.
     position = macropad.encoder
     if last_position is not None and position != last_position:
-        radio_volume(
+        radio_control(
             Keycode.UP_ARROW if position > last_position else Keycode.DOWN_ARROW
         )
     last_position = position
 
-    # Handle encoder button. If state has changed, and if there's a
-    # corresponding macro, set up variables to act on this just like
-    # the keypad keys, as if it were a 13th key/macro.
+    # Handle encoder button. If it's pressed, stop radio. 
     macropad.encoder_switch_debounced.update()
     encoder_switch = macropad.encoder_switch_debounced.pressed
     if encoder_switch != last_encoder_switch:
         last_encoder_switch = encoder_switch
-        if len(apps[app_index].macros) < 13:
-            continue  # No 13th macro, just resume main loop
-        key_number = 12  # else process below as 13th macro
-        pressed = encoder_switch
+        if last_pressed is not None:
+            # stop radio
+            radio_control(Keycode.LEFT_ARROW)
+
+            # reset radio display and highlighted key to its original
+            group[last_pressed].color = 0xFFFFFF
+            group[last_pressed].background_color = 0x000000
+            group[13].text = apps[app_index].name
+            macropad.display.refresh()
+            last_pressed = None
+
+            # flash the pixels
+            for i in range(12):
+                macropad.pixels[i] = 0x990909
+            macropad.pixels.show()
+            time.sleep(0.66)
+
+            # restore the pixels
+            for i in range(12):
+                try:
+                    macropad.pixels[i] = apps[app_index].macros[i][0]
+                except IndexError:
+                    macropad.pixels[i] = 0
+            macropad.pixels.show()
+            
+        continue
     else:
         event = macropad.keys.events.get()
         if not event or event.key_number >= len(apps[app_index].macros):
@@ -161,10 +174,7 @@ while True:
         key_number = event.key_number
         pressed = event.pressed
 
-    # If code reaches here, a key or the encoder button WAS pressed/released
-    # and there IS a corresponding macro available for it...other situations
-    # are avoided by 'continue' statements above which resume the loop.
-
+    # If code reaches here, a key WAS pressed/released and there's a corresponding macro.
     sequence = apps[app_index].macros[key_number][2]
     if pressed:
         # 'sequence' is an arbitrary-length list, each item is one of:
@@ -178,12 +188,13 @@ while True:
             macropad.pixels[key_number] = pressed_color
             macropad.pixels.show()
 
-            # highlight they key pressed on the OLED display
+            # highlight the station pressed on the OLED display
             if last_pressed != key_number:
                 group[key_number].color = 0x000000
                 group[key_number].background_color = 0xFFFFFF
                 group[13].text = apps[app_index].macros[key_number][1]
 
+                # reset highlight on the previously selected station
                 if last_pressed is not None:
                     group[last_pressed].color = 0xFFFFFF
                     group[last_pressed].background_color = 0x000000
