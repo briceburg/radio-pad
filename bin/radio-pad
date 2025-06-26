@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
+from python_mpv_jsonipc import MPV
 import os, sys, subprocess
 import urllib.request
 import json
+from time import sleep
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 RADIO_STATIONS_URL = os.getenv(
@@ -29,6 +31,8 @@ with open("/tmp/radio-pad-stations.json", "r") as f:
 
 bindings = KeyBindings()
 mpv_process = None
+mpv_sock = None
+mpv_volume = None
 
 
 def char_to_index(ch):
@@ -44,13 +48,32 @@ def char_to_index(ch):
         return None
 
 
-def play_station(station_index):
+def stop_station():
     global mpv_process
-    station = RADIO_STATIONS[station_index]
+    global mpv_sock
+
+    if mpv_sock:
+        mpv_sock.stop()
+        mpv_sock = None
+        try:
+            os.remove("/tmp/radio-pad-mpv.sock")
+        except:
+            pass
 
     if mpv_process:
-        print("Stopping current station...")
         mpv_process.terminate()
+        mpv_process = None
+
+
+def play_station(station_index):
+    global mpv_process
+    global mpv_sock
+    global mpv_volume
+
+    station = RADIO_STATIONS[station_index]
+    if mpv_process:
+        print("Stopping current station...")
+        stop_station()
 
     print(f"Playing {station['name']} from {station['url']} as {AUDIO_CHANNELS}.")
     mpv_process = subprocess.Popen(
@@ -75,6 +98,51 @@ def play_station(station_index):
         stdout=sys.stdout,
         stderr=subprocess.STDOUT,
     )
+
+    for i in range(10):
+        try:
+            mpv_sock = MPV(start_mpv=False, ipc_socket="/tmp/radio-pad-mpv.sock")
+            # persist the previously set volume across mpv instances
+            if mpv_volume is not None:
+                mpv_sock.volume = mpv_volume
+            return
+        except Exception as e:
+            sleep(0.10)
+
+    print("failed to establish mpv IPC. volume controls disabled")
+    mpv_sock = None
+
+
+def volume_adjust(amt):
+    global mpv_sock
+    global mpv_volume
+    if mpv_sock is None:
+        return
+
+    if mpv_volume is None:
+        mpv_volume = mpv_sock.volume
+
+    volume = mpv_volume + amt
+
+    # keep volume from getting too high or too low
+    if volume > 100:
+        volume = 100
+    elif volume < 50:
+        volume = 50
+
+    mpv_volume = volume
+    mpv_sock.volume = mpv_volume
+    print(f"  Adjusted Volume: {mpv_volume}")
+
+
+@bindings.add("c-^", "up", record_in_macro=False)
+def _(event):
+    volume_adjust(5)
+
+
+@bindings.add("c-^", "down", record_in_macro=False)
+def _(event):
+    volume_adjust(-5)
 
 
 @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
@@ -108,6 +176,5 @@ while True:
         prompt(key_bindings=bindings)
     except (KeyboardInterrupt, EOFError):
         print("Exiting...")
-        if mpv_process:
-            mpv_process.terminate()
+        stop_station()
         sys.exit(0)

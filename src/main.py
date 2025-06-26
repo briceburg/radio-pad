@@ -5,6 +5,7 @@ import terminalio
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_text import label
 from adafruit_macropad import MacroPad
+from adafruit_hid.keycode import Keycode
 
 MACRO_FOLDER = "/macros"
 
@@ -115,15 +116,32 @@ app_index = 0
 apps[app_index].switch()
 
 
+def radio_volume(key):
+    macropad.keyboard.press(Keycode.CONTROL)
+    macropad.keyboard.press(Keycode.SIX)
+    macropad.keyboard.release(Keycode.CONTROL)
+    macropad.keyboard.release(Keycode.SIX)
+    macropad.keyboard.press(key)
+    macropad.keyboard.release(key)
+
+
 # MAIN LOOP ----------------------------
 
 while True:
     # Read encoder position. If it's changed, switch apps.
+    # position = macropad.encoder
+    # if position != last_position:
+    #     app_index = position % len(apps)
+    #     apps[app_index].switch()
+    #     last_position = position
+
+    # Read encoder position. If it's changed, adjust volume.
     position = macropad.encoder
-    if position != last_position:
-        app_index = position % len(apps)
-        apps[app_index].switch()
-        last_position = position
+    if last_position is not None and position != last_position:
+        radio_volume(
+            Keycode.UP_ARROW if position > last_position else Keycode.DOWN_ARROW
+        )
+    last_position = position
 
     # Handle encoder button. If state has changed, and if there's a
     # corresponding macro, set up variables to act on this just like
