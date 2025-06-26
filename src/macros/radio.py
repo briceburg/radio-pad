@@ -24,7 +24,7 @@ RADIO_STATIONS = [
 # with open(stations_path, "r") as f:
 #     RADIO_STATIONS = json.load(f)
 
-default_color = 0x202000  # Default color for station buttons.
+default_color = 0x000077  # Default color for station buttons.
 default_tuple = (
     0x000000,
     "",
