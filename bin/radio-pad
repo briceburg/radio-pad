@@ -171,6 +171,11 @@ def _(event):
     volume_adjust(-5)
 
 
+@bindings.add("c-^", "left", record_in_macro=False)
+def _(event):
+    stop_station()
+
+
 @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
 def _(event):
     page_char = event.key_sequence[-2].data
