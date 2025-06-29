@@ -48,12 +48,12 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 
 ## Example Station Configuration
 
-Edit [`src/config/stations.json`](./src/config/stations.json):
+Edit [`src/stations.json`](./src/stations.json):
 
 ```json
 [
   {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
-  {"name": "KEXP", "url": "https://kexp.org/stream"}
+  {"name": "KEXP", "url": "https://kexp.org/stream", "color": 0x770077}
 ]
 ```
 
@@ -68,8 +68,8 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    ```
 
 2. **Customize stations and button colors:**
-   - Edit [`src/macros/radio.py`](./src/macros/radio.py) for button assignments.
-   - Edit [`src/config/stations.json`](./src/config/stations.json) to change the list of available stations.
+   - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
+   - Edit [`src/stations.json`](./src/stations.json) to change list of available stations.
 3. **Sync your changes to the Macropad:**
 
    ```sh
@@ -115,9 +115,15 @@ For example, add the following to `/etc/modprobe.d/soundcard-order.conf`, where 
 options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
 ```
 
-## Contributing
+## Development
+
+### Contributing
 
 Pull requests and bug reports are welcome! Please [open an issue](https://github.com/yourusername/radio-pad/issues) or submit a PR.
+
+### TODO
+
+* use MIDI control sequences instead of keypresses for radio control?
 
 ## Support
 
