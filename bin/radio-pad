@@ -13,8 +13,9 @@ MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 RADIO_STATIONS_FILE = "/tmp/radio-pad-stations.json"
 RADIO_STATIONS_URL = os.getenv(
     "RADIO_STATIONS_URL",
-    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/config/stations.json",
+    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/stations.json",
 )
+STATIONS_PER_PAGE = 12  # align this with MACROPAD_KEY_COUNT
 
 # cache radio stations
 if not os.path.exists(RADIO_STATIONS_FILE):
@@ -161,43 +162,31 @@ def volume_adjust(amt):
     print(f"  Adjusted Volume: {mpv_volume}")
 
 
-@bindings.add("c-^", "up", record_in_macro=False)
-def _(event):
-    volume_adjust(5)
-
-
-@bindings.add("c-^", "down", record_in_macro=False)
-def _(event):
-    volume_adjust(-5)
-
-
-@bindings.add("c-^", "left", record_in_macro=False)
-def _(event):
-    stop_station()
-
-
+#
+#
+#
+#
 @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
 def _(event):
-    page_char = event.key_sequence[-2].data
-    station_char = event.key_sequence[-1].data
-    page_idx = char_to_index(page_char)
-    station_idx = char_to_index(station_char)
+    """
+    listen for control events, control character is Ctrl+@ followed by 2 keypresses.
+      [Ctrl+@, V, +] increase volume
+      [Ctrl+@, V, -] decrease volume
+      [Ctrl+@, X, *] stop station
+      [Ctrl+@, 0, 3] play 4th station
+    """
+    cmd_char = event.key_sequence[-2].data
+    arg_char = event.key_sequence[-1].data
 
-    if page_idx is None or station_idx is None:
-        print(f"Invalid input: Page: {page_char}, Station: {station_char}.")
-        return
-
-    stations_per_page = (
-        12  # Assuming 12 stations per page, align this with macropad configuration
-    )
-    station_index = page_idx * stations_per_page + station_idx
-    if station_index < 0 or station_index >= len(RADIO_STATIONS):
-        print(
-            f"Invalid station index: {station_index}. Page: {page_char}, Station: {station_char}."
-        )
-        return
-
-    play_station(station_index)
+    match cmd_char:
+        case "V":
+            volume_adjust(-5) if arg_char == "-" else volume_adjust(5)
+        case "X":
+            stop_station()
+        case _:
+            page_idx = char_to_index(cmd_char)
+            station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
+            play_station(station_idx)
 
 
 while True:
