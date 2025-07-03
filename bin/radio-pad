@@ -7,6 +7,7 @@ import urllib.request
 import json
 from time import sleep
 import asyncio
+import threading
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
@@ -38,7 +39,6 @@ mpv_process = None
 mpv_sock = None
 mpv_volume = None
 mpv_sock_lock = asyncio.Lock()
-
 
 def char_to_index(ch):
     """
@@ -161,11 +161,6 @@ def volume_adjust(amt):
     mpv_sock.volume = mpv_volume
     print(f"  Adjusted Volume: {mpv_volume}")
 
-
-#
-#
-#
-#
 @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
 def _(event):
     """
@@ -188,6 +183,26 @@ def _(event):
             station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
             play_station(station_idx)
 
+import mido
+def periodic_midi_message():
+    """
+    periodically send a midi message to the macropad.
+    this is a POC enabling the radio-pad script to talk to the macropad, e.g.
+    to remotely set it to a state, such as selecting radio stations from web interface.
+    """
+    while True:
+        try:
+            msg = mido.Message('note_on', note=60)
+            midi_port.send(msg)
+        except Exception as e:
+            print(f"failed to send midi message")
+        sleep(10)
+
+# midi_output = next((port for port in mido.get_output_names() if "Macropad RP2040" in port), None)
+# if midi_output:
+#   print(f"sending midi messages to {midi_output} every 10s")
+#   midi_port = mido.open_output(midi_output)
+#   threading.Thread(target=periodic_midi_message, daemon=True).start()
 
 while True:
     try:
@@ -198,3 +213,6 @@ while True:
         print("Exiting...")
         stop_station()
         sys.exit(0)
+    except Exception as e:
+        print(f"Unhandled exception: {e}")
+        continue

@@ -130,8 +130,29 @@ def index_to_char(idx):
         raise ValueError("Index out of supported range (0-35)")
 
 
+
+# setup midi
+import usb_midi
+import adafruit_midi
+from adafruit_midi.control_change import ControlChange
+from adafruit_midi.note_off import NoteOff
+from adafruit_midi.note_on import NoteOn
+from adafruit_midi.pitch_bend import PitchBend
+print("configuring midi")
+print(usb_midi.ports)
+midi = adafruit_midi.MIDI(
+    midi_in=usb_midi.ports[0], in_channel=0, midi_out=usb_midi.ports[1], out_channel=0
+)
+
+def listen_for_midi():
+    msg = midi.receive()
+    if msg is not None:
+        print(f"got midi message of type: {type(msg)}")
+
 # MAIN LOOP ----------------------------
 while True:
+    # listen_for_midi()
+
     # Read encoder position.
     position = macropad.encoder
     if last_position is not None and position != last_position:
