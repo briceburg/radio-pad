@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -eo pipefail
-
-REFRESH_HARD=${REFRESH_HARD:-false}
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
 cd /mnt/CIRCUITPY/
 
-if $REFRESH_HARD; then
+if [ "$1" -eq 1 ]; then
   echo "removing existing files"
   rm -rf ./*
 fi
