@@ -4,7 +4,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
 cd /mnt/CIRCUITPY/
 
-if [ "$1" -eq 1 ]; then
+if [ "${1:-}" = "--hard" ]; then
   echo "removing existing files"
   rm -rf ./*
 fi
