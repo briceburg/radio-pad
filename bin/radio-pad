@@ -162,10 +162,6 @@ def volume_adjust(amt):
     print(f"  Adjusted Volume: {mpv_volume}")
 
 
-#
-#
-#
-#
 @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
 def _(event):
     """
@@ -198,3 +194,6 @@ while True:
         print("Exiting...")
         stop_station()
         sys.exit(0)
+    except Exception as e:
+        print(f"Unhandled exception: {e}")
+        continue
