@@ -7,6 +7,7 @@ import urllib.request
 import json
 from time import sleep
 import asyncio
+import redis
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
@@ -184,6 +185,12 @@ def _(event):
             station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
             play_station(station_idx)
 
+
+r = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+p = r.pubsub()
+p.subscribe("now-playing")
+for message in p.listen():
+    print(f"Received message: {message['data']}")
 
 while True:
     try:

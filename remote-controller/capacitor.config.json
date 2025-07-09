@@ -1,0 +1,10 @@
+{
+  "appId": "net.iceburg.radio",
+  "appName": "radio-pad-control",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

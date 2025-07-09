@@ -1,134 +1,80 @@
-# radio-pad
+# radio-pad 
 
-Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-rp2040/overview) as a 🎵 radio station player 🎵.
+A 🎵 radio station player 🎵 with real-time syncing controllers.
 
-**radio-pad** lets you use an Adafruit Macropad as a controller for playing internet radio stations on your computer (such as a Raspberry Pi). Each Macropad button can be mapped to a different station, and the host computer will play the selected station using [mpv](https://mpv.io/).
+## overview
 
-![ai-enhanced-macropad-image](./docs/img/radio-macropad-ai-image.webp)
+* radio-pad runs on a host, such as a raspberry pi, connected to a stereo/speakers.
+* controllers, such as a USB-connected macropad, request the station to play.
+* stations are configurable by editting [stations.json](./player/stations.json).
 
-## Features
+### local control
 
-- Map each Macropad key to a different internet radio station
-- Stop playback with a single press of the encoder (knob)
-- Adjust volume by turning the encoder
-- Easily customize stations and button colors
+**radio-pad** lets you use a USB-connected [macropad](./macropad-controller/) as a controller for playing internet radio stations on your computer (such as a Raspberry Pi).
 
-## How It Works
+* each Macropad button is mapped to a different station.
+* the encoder knob adjusts volume if a station is playing, or switches station pages if there are more than 12 stations.
+* pressing the encoder knob will stop playing.
 
-- The Macropad sends coded keypresses to a host.
-- The host runs a listener script ([bin/radio-pad](bin/radio-pad)) that detects these keypresses and starts/stops playback of the corresponding radio stream(s).
+![ai-enhanced-macropad-image](./macropad-controller/docs/img/radio-macropad-ai-image.webp)
 
-## Macropad Controls
+### remote control
 
-- **Key Buttons:**  
-  Each key on the Macropad is mapped to a specific radio station. Pressing a key will start streaming the corresponding station.
-- **Encoder Button (Knob Press):**  
-  Pressing the encoder (the knob) will stop the currently playing radio station.
-- **Encoder Position (Knob Turn):**  
-  Turning the encoder knob adjusts the playback volume up or down.
+**radio-pad** is optionally controlled through a [switchboard](./switchboard/) of connected [clients](./remote-controller/), such as mobile apps or web browsers.
 
-## Quick Start
+* clients and the radio-pad player connect to the switchboard to request and broadcast station changes.
+* the switchboard can run on the local network, or as an internet available service.
+* websockets are used for real-time syncing of clients, such as updating the currently playing station.
 
-1. **Install dependencies:**
+## getting started
 
-   ```sh
-   sudo apt install mpv
-   pip3 install prompt_toolkit python-mpv-jsonipc
-   ```
+there are four components that makeup radio-pad. each is broken out into a folder which _may_ become a git repository. visit this folder for details/installation/use.
 
-2. **Clone the repository and run the listener:**
-
-   ```sh
-   git clone https://github.com/yourusername/radio-pad.git
-   cd radio-pad
-   ./bin/radio-pad
-   ```
-
-3. **Program your Macropad as described below.**
-
-## Example Station Configuration
-
-Edit [`src/stations.json`](./src/stations.json):
-
-```json
-[
-  {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
-  {"name": "KEXP", "url": "https://kexp.org/stream", "color": 0x770077}
-]
-```
-
-## Programming the Macropad
-
-A linux host is assumed, with the macropad plugged into it. It must have python3 installed.
-
-1. **Mount the Macropad storage:**
-
-   ```sh
-   bin/mount
-   ```
-
-2. **Customize stations and button colors:**
-   - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
-   - Edit [`src/stations.json`](./src/stations.json) to change list of available stations.
-3. **Sync your changes to the Macropad:**
-
-   ```sh
-   bin/refresh
-   ```
-
-## Usage
-
-### Host Dependencies
-
-- [mpv](https://mpv.io/)
-- [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/en/master/)
-- [python-mpv-jsonipc](https://github.com/iwalton3/python-mpv-jsonipc)
-
-### Running the Listener
-
-```sh
-./bin/radio-pad
-```
-
-On a Raspberry Pi, you can start the listener at boot in a tmux session by adding the following to your auto-logged-in user's `.bashrc` file:
-
-```sh
-if tmux has-session -t radio-pad 2>/dev/null; then
-  echo "radio-pad running. to attach:"
-  echo "  tmux attach-session -t radio-pad"
-else
-  tmux new-session -s radio-pad radio-pad
-fi
-```
-
-> tmux maintains the tty1 attachment whereas screen drops it if you attach via ssh.
-
-## Troubleshooting Sound
-
-If plugging in the Macropad interferes with your Alsa sound configuration (because it is also registered as a snd-usb-audio device), follow the "[How to choose a particular order for multiple installed cards](https://alsa.opensrc.org/MultipleCards#The_newer_.22slots.3D.22_method)" section of the Alsa docs.
-
-For example, add the following to `/etc/modprobe.d/soundcard-order.conf`, where you get the vendor and product IDs from `lsusb` output:
-
-```sh
-# creative labs soundblaster: vid 0x041e pid 0x324d 
-# adafruit macropad: vid 0x239a pid 0x8108
-options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
-```
+* the [player](./player/), this runs on a host and defines [stations](./player/README.md#editing-stations).
+* the [macropad-controller](./macropad-controller/), this connects to the host over USB.
+* the [switchboard](./switchboard/), this is _optional_ and needed to support remote-control.
+* the [remote-control](./remote-controller/), used to create mobile and web clients for controlling the player.
 
 ## Development
 
+### Reference
+
+```mermaid
+flowchart TD
+    subgraph Host
+        Player["Player<br/>(runs on host,<br/>plays stations)"]
+    end
+
+    subgraph Controllers
+        Macropad["Macropad Controller<br/>(USB, local control)"]
+        Remote["Remote Controller<br/>(Web/Mobile client)"]
+    end
+
+    subgraph Optional
+        Switchboard["Switchboard<br/>(WebSocket server,<br/>syncs clients & player)"]
+    end
+
+    Macropad -- USB --> Player
+    Remote -- WebSocket --> Switchboard
+    Player -- WebSocket --> Switchboard
+    Switchboard -- WebSocket --> Remote
+    Switchboard -- WebSocket --> Player
+
+    %% Notes
+    Macropad -.->|Each button maps to a station\nEncoder knob for volume/page\nPress to stop| Player
+    Remote -.->|Mobile/web app\nControls player remotely| Switchboard
+    Switchboard -.->|Optional for remote control\nSyncs state between clients and player| Player
+```
+
 ### Contributing
 
-Pull requests and bug reports are welcome! Please [open an issue](https://github.com/yourusername/radio-pad/issues) or submit a PR.
-
-### TODO
-
-* use MIDI control sequences instead of keypresses for radio control?
+Pull requests and bug reports are welcome! Please [open an issue](https://github.com/briceburg/radio-pad/issues) or submit a PR.
 
 ## Support
 
-For questions or help, please open an issue on the [GitHub repository](https://github.com/yourusername/radio-pad/issues).
+For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
 
-## License
+### TODO
 
-[BSD 3-Clause "New" or "Revised" License](./LICENSE)
+* use MIDI control sequences or usb-cdc instead of keypresses for radio control. this is necessary to support bi-directial communication, e.g. to notify macropad of station changes from remote controls.
+* pass the list of stations to macropad (via usb connection) and controllers (via switchboard). we can thus handle live station updates, as well as defer startup until communication with the player has been established.

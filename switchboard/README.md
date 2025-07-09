@@ -1,0 +1,22 @@
+# radio-pad switchboard
+
+websockets octopus enabling event driven communication between the [radio-pad player](../player/) and connected [controllers](../remote-controller/).
+
+
+## Usage
+
+TBD
+
+## Development
+
+### Contributing
+
+Pull requests and bug reports are welcome! Please [open an issue](https://github.com/briceburg/radio-pad/issues) or submit a PR.
+
+## Support
+
+For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
+
+## License
+
+[BSD 3-Clause "New" or "Revised" License](./LICENSE)
