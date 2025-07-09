@@ -1,3 +1,4 @@
 prompt_toolkit==3.0.51
 python-mpv-jsonipc==1.2.1
 wcwidth==0.2.13
+websockets==15.0.1

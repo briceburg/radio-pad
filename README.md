@@ -4,9 +4,9 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 ## overview
 
-* radio-pad runs on a host, such as a raspberry pi, connected to a stereo/speakers.
-* controllers, such as a USB-connected macropad, request the station to play.
-* stations are configurable by editting [stations.json](./player/stations.json).
+* the radio-pad [player](./player/) runs on a host, such as a raspberry pi, connected to a stereo/speakers.
+* controllers, such as a USB-connected [macropad](./macropad-controller/), request the station to play.
+* [stations](./player/stations.json) are configurable.
 
 ### local control
 
@@ -41,29 +41,25 @@ there are four components that makeup radio-pad. each is broken out into a folde
 
 ```mermaid
 flowchart TD
-    subgraph Host
-        Player["Player<br/>(runs on host,<br/>plays stations)"]
-    end
+    %% Nodes
+    Macropad["Macropad Controller"]
+    Player["Player<br/>🎵🎵🎵"]
+    Switchboard["Switchboard<br/>(Syncs Player and Controls)"]
+    RemoteMobile["Remote Controller<br/>(Mobile App)"]
+    RemoteWeb["Remote Controller<br/>(Web App)"]
 
-    subgraph Controllers
-        Macropad["Macropad Controller<br/>(USB, local control)"]
-        Remote["Remote Controller<br/>(Web/Mobile client)"]
-    end
+    %% Connections
+    Macropad <-- USB --> Player
+    Player -- ws:station_playing --> Switchboard
+    Switchboard -- ws:station_request --> Player
+    Switchboard -- ws:station_playing --> RemoteMobile
+    Switchboard -- ws:station_playing --> RemoteWeb
+    RemoteMobile -- ws:station_request --> Switchboard
+    RemoteWeb -- ws:station_request --> Switchboard
 
-    subgraph Optional
-        Switchboard["Switchboard<br/>(WebSocket server,<br/>syncs clients & player)"]
-    end
-
-    Macropad -- USB --> Player
-    Remote -- WebSocket --> Switchboard
-    Player -- WebSocket --> Switchboard
-    Switchboard -- WebSocket --> Remote
-    Switchboard -- WebSocket --> Player
-
-    %% Notes
-    Macropad -.->|Each button maps to a station\nEncoder knob for volume/page\nPress to stop| Player
-    Remote -.->|Mobile/web app\nControls player remotely| Switchboard
-    Switchboard -.->|Optional for remote control\nSyncs state between clients and player| Player
+    %% Highlight Player and Switchboard
+    style Player stroke:#f9f,stroke-width:3px
+    style Switchboard stroke:#bbf,stroke-width:3px
 ```
 
 ### Contributing
@@ -78,3 +74,5 @@ For questions or help, please open an issue on the [GitHub repository](https://g
 
 * use MIDI control sequences or usb-cdc instead of keypresses for radio control. this is necessary to support bi-directial communication, e.g. to notify macropad of station changes from remote controls.
 * pass the list of stations to macropad (via usb connection) and controllers (via switchboard). we can thus handle live station updates, as well as defer startup until communication with the player has been established.
+
+

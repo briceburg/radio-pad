@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/player"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/switchboard"
 
 [[ "$VIRTUAL_ENV" = "$PROJECT_ROOT/"* ]] || {
     echo "Please run this script from within the virtual environment:" >&2
@@ -8,4 +8,4 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel)/player"
     exit 1
 }
 
-exec python3 "$PROJECT_ROOT"/src/radio-pad.py "$@"
+exec python3 "$PROJECT_ROOT"/src/switchboard.py "$@"
