@@ -8,14 +8,13 @@ import os
 from websockets.asyncio.server import broadcast, serve
 
 CURRENT_STATION = None
-SERVER = None
+
 
 def kv(key, data):
     return json.dumps({"key": key, "data": data})
 
 
-def client_count_event():
-    count = len(SERVER.connections) if SERVER else 0
+def client_count_event(count):
     return kv("client_count", count)
 
 
@@ -30,7 +29,10 @@ def station_request_event(station):
 async def switchboard(websocket):
     global CURRENT_STATION
     try:
-        broadcast(SERVER.connections, client_count_event())
+        broadcast(
+            websocket.server.connections,
+            client_count_event(len(websocket.server.connections)),
+        )
 
         # Send current station to connecting client
         await websocket.send(station_playing_event())
@@ -47,32 +49,38 @@ async def switchboard(websocket):
                 )
             if key == "station_playing":
                 CURRENT_STATION = value
-                broadcast(SERVER.connections, station_playing_event())
+                broadcast(websocket.server.connections, station_playing_event())
             elif key == "station_request":
-                broadcast(SERVER.connections, station_request_event(value))
+                broadcast(websocket.server.connections, station_request_event(value))
             else:
                 return await websocket.close(
                     code=1007,
                     reason=f"Unknown key in message: {key}",
                 )
-    except Exception as e:
-        logging.error(f"Closing connection, exception: {e}")
-        await websocket.close(
-            code=1011,
-            reason=f"Internal server error: {str(e)}",
-        )
     finally:
-        broadcast(SERVER.connections, client_count_event())
+        broadcast(
+            websocket.server.connections,
+            client_count_event(len(websocket.server.connections)),
+        )
+        if websocket.is_radio_pad:
+            CURRENT_STATION = None
+            broadcast(websocket.server.connections, station_playing_event())
+
+
+async def switchboard_connect(connection, request):
+    connection.is_radio_pad = request.headers.get("User-Agent", "").startswith(
+        "RadioPad/"
+    )
+    return None
 
 
 async def main():
-    global SERVER
     async with serve(
         switchboard,
         os.environ.get("SWITCHBOARD_HOST", "localhost"),
         int(os.environ.get("SWITCHBOARD_PORT", 1980)),
+        process_request=switchboard_connect,
     ) as server:
-        SERVER = server
         await server.serve_forever()
 
 
