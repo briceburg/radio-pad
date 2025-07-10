@@ -10,67 +10,52 @@ from websockets.asyncio.server import broadcast, serve
 CURRENT_STATION = None
 
 
-def kv(key, data):
-    return json.dumps({"key": key, "data": data})
-
-
-def client_count_event(count):
-    return kv("client_count", count)
-
-
-def station_playing_event():
-    return kv("station_playing", CURRENT_STATION)
-
-
-def station_request_event(station):
-    return kv("station_request", station)
+def mkevent(event: str, data) -> str:
+    """Create a JSON event message."""
+    return json.dumps({"event": event, "data": data})
 
 
 async def switchboard(websocket):
     global CURRENT_STATION
+
+    def broadcast_all(event: str, data):
+        broadcast(websocket.server.connections, mkevent(event, data))
+
     try:
-        broadcast(
-            websocket.server.connections,
-            client_count_event(len(websocket.server.connections)),
-        )
+        broadcast_all("client_count", len(websocket.server.connections))
+        await websocket.send(mkevent("station_playing", CURRENT_STATION))
 
-        # Send current station to connecting client
-        await websocket.send(station_playing_event())
-
-        # Manage state changes
         async for message in websocket:
             try:
-                event = json.loads(message)
-                key, value = event.get("key"), event.get("data")
+                msg = json.loads(message)
+                event, data = msg.get("event"), msg.get("data")
             except json.JSONDecodeError:
                 return await websocket.close(
                     code=1007,
-                    reason='Invalid message format. Expect JSON {"key": ..., "data": ...}',
+                    reason='Invalid message format. Expect JSON {"event": ..., "data": ...}',
                 )
-            if key == "station_playing":
-                CURRENT_STATION = value
-                broadcast(websocket.server.connections, station_playing_event())
-            elif key == "station_request":
-                broadcast(websocket.server.connections, station_request_event(value))
+            if event == "station_playing":
+                CURRENT_STATION = data
+                broadcast_all("station_playing", CURRENT_STATION)
+            elif event == "station_request":
+                broadcast_all("station_request", data)
             else:
                 return await websocket.close(
                     code=1007,
-                    reason=f"Unknown key in message: {key}",
+                    reason=f"Unknown event in message: {event}",
                 )
     finally:
-        broadcast(
-            websocket.server.connections,
-            client_count_event(len(websocket.server.connections)),
-        )
-        if websocket.is_radio_pad:
+        broadcast_all("client_count", len(websocket.server.connections))
+
+        # if the disconnected client is the RadioPad Player, reset the current station
+        if getattr(websocket, "is_radio_pad", False):
             CURRENT_STATION = None
-            broadcast(websocket.server.connections, station_playing_event())
+            broadcast_all("station_playing", CURRENT_STATION)
 
 
 async def switchboard_connect(connection, request):
-    connection.is_radio_pad = request.headers.get("User-Agent", "").startswith(
-        "RadioPad/"
-    )
+    if request.headers.get("User-Agent", "").startswith("RadioPad/"):
+        setattr(connection, "is_radio_pad", True)
     return None
 
 
