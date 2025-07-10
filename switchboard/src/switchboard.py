@@ -7,16 +7,16 @@ import os
 
 from websockets.asyncio.server import broadcast, serve
 
-CLIENTS = set()
 CURRENT_STATION = None
-
+SERVER = None
 
 def kv(key, data):
     return json.dumps({"key": key, "data": data})
 
 
 def client_count_event():
-    return kv("client_count", len(CLIENTS))
+    count = len(SERVER.connections) if SERVER else 0
+    return kv("client_count", count)
 
 
 def station_playing_event():
@@ -26,11 +26,11 @@ def station_playing_event():
 def station_request_event(station):
     return kv("station_request", station)
 
+
 async def switchboard(websocket):
-    global CLIENTS, CURRENT_STATION
+    global CURRENT_STATION
     try:
-        CLIENTS.add(websocket)
-        await broadcast(CLIENTS, client_count_event())
+        broadcast(SERVER.connections, client_count_event())
 
         # Send current station to connecting client
         await websocket.send(station_playing_event())
@@ -47,33 +47,39 @@ async def switchboard(websocket):
                 )
             if key == "station_playing":
                 CURRENT_STATION = value
-                await broadcast(CLIENTS, station_playing_event())
+                broadcast(SERVER.connections, station_playing_event())
             elif key == "station_request":
-                broadcast(CLIENTS, station_request_event(value))
+                broadcast(SERVER.connections, station_request_event(value))
             else:
                 return await websocket.close(
                     code=1007,
                     reason=f"Unknown key in message: {key}",
                 )
+    except Exception as e:
+        logging.error(f"Closing connection, exception: {e}")
+        await websocket.close(
+            code=1011,
+            reason=f"Internal server error: {str(e)}",
+        )
     finally:
-        # Unregister client
-        CLIENTS.remove(websocket)
-        await broadcast(CLIENTS, client_count_event())
+        broadcast(SERVER.connections, client_count_event())
 
 
 async def main():
+    global SERVER
     async with serve(
         switchboard,
         os.environ.get("SWITCHBOARD_HOST", "localhost"),
         int(os.environ.get("SWITCHBOARD_PORT", 1980)),
     ) as server:
+        SERVER = server
         await server.serve_forever()
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     try:
-        logging.info("Starting switchboard server... Press Ctrl+C to stop.")
+        logging.info("Starting switchboard... Press Ctrl+C to stop.")
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Switchboard server stopped by user.")
+        logging.info("...switchboard stopped.")
