@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -eo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/switchboard"
+
+zrok share reserved radioswitchboard
