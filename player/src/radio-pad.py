@@ -114,7 +114,7 @@ def play_station(station_index):
 
     # send station playing event to switchboard
     if "switchboard_ws" in globals() and switchboard_ws is not None:
-        msg = json.dumps({"key": "station_playing", "data": station["name"]})
+        msg = json.dumps({"event": "station_playing", "data": station["name"]})
         asyncio.create_task(switchboard_ws.send(msg))
 
 
