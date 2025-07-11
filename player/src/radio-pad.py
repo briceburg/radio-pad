@@ -198,28 +198,31 @@ async def start_switchboard(url):
         global switchboard_ws
         switchboard_ws = ws
 
+        print(f"Connected to switchboard at {url}")
+        # Send initial station playing event
+        msg = json.dumps({"event": "station_playing", "data": None})
+        asyncio.create_task(switchboard_ws.send(msg))
+
         # Listen for station requests
         async for message in ws:
             try:
-                print(f"Received message from switchboard: {message}")
-                # event = json.loads(message)
-                # key, value = event.get("key"), event.get("data")
-                # if key == "station_request":
-                #     print(f"Received remote station request: {value}")
-                #     # Find and play the requested station by name
-                #     for idx, station in enumerate(RADIO_STATIONS):
-                #         if station["name"] == value:
-                #             play_station(idx)
-                #             break
-                #     else:
-                #         print(f"Station '{value}' not found.")
+                msg = json.loads(message)
+                event, data = msg.get("event"), msg.get("data")
+                if event == "station_request":
+                    print(f"Received remote station request: {data}")
+                    # Find and play the requested station by name
+                    for idx, station in enumerate(RADIO_STATIONS):
+                        if station["name"] == data:
+                            play_station(idx)
+                            break
+                    else:
+                        print(f"Station '{data}' not found.")
             except Exception as e:
                 print(f"Error handling switchboard message: {e}")
 
-
 async def main():
     switchboard_task = asyncio.create_task(
-        start_switchboard("wss://radioswitchboard.share.zrok.io")
+        start_switchboard("wss://radioswitchboard.loca.lt")
     )
     while True:
         try:

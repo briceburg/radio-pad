@@ -21,14 +21,14 @@
   </head>
   <body>
     <ion-app>
-      <ion-header translucent="true">
-          <ion-toolbar>
-            <ion-title size="large">Now Playing: 
-              <span id="now-playing">None</span>
-            </ion-title>
-          </ion-toolbar>
-        </ion-header>
-      <ion-content fullscreen="true" class="ion-no-padding">
+      <ion-header slot="fixed" translucent="true">
+        <ion-toolbar>
+          <ion-title size="large">
+            Now Playing: <span id="now-playing">...</span>
+          </ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content fullscreen="true" class="ion-padding">
         <ion-grid id="station-grid" fixed="true"></ion-grid>
       </ion-content>
     </ion-app>
