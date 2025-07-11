@@ -1,8 +1,14 @@
 const stationGrid = document.getElementById('station-grid');
 const nowPlaying = document.getElementById('now-playing');
 
-const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/stations.json';
-const broadcastUrl = 'https://radio-pad-v0-broadcast-2609704817.us-central1.run.app/?station=';
+const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
+const switchboardUrl = 'wss://radioswitchboard.loca.lt';
+
+let ws;
+let wsConnectTimeout;
+
+// Keep a map of station name to button for easy highlighting
+const stationButtons = {};
 
 async function loadStations() {
   try {
@@ -21,14 +27,11 @@ async function loadStations() {
       ionButton.innerText = station.name;
       ionButton.expand = 'block';
       ionButton.addEventListener('click', () => {
-        // Remove color attribute from all buttons
-        document.querySelectorAll('ion-button').forEach(btn => {
-          btn.removeAttribute('color');
-        });
-        // Set color attribute to "success" for the clicked button
-        ionButton.setAttribute('color', 'success');
-        playStation(station.name);
+        playStation(station.name, ionButton);
       });
+
+      // Store button reference for highlighting
+      stationButtons[station.name] = ionButton;
 
       ionCol.appendChild(ionButton);
       ionRow.appendChild(ionCol);
@@ -38,17 +41,62 @@ async function loadStations() {
   }
 }
 
-function playStation(stationName) {
-  nowPlaying.innerText = stationName;
-  fetch(`${broadcastUrl}${stationName}`)
-    .then(response => {
-      if (!response.ok) {
-        console.error(`Error: Received status ${response.status} from player API`);
+function highlightStationButton(stationName) {
+  // Remove highlight from all buttons
+  Object.values(stationButtons).forEach(btn => btn.removeAttribute('color'));
+  // Highlight the button for the given station
+  if (stationButtons[stationName]) {
+    stationButtons[stationName].setAttribute('color', 'success');
+  }
+}
+
+function connectWebSocket() {
+  console.log('Connecting to WebSocket:', switchboardUrl);
+  ws = new WebSocket(switchboardUrl);
+
+  // Set a 5s timeout for connection
+  wsConnectTimeout = setTimeout(() => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket connection timeout. Closing socket.');
+      ws.close();
+    }
+  }, 5000);
+
+  ws.onopen = () => {
+    clearTimeout(wsConnectTimeout);
+    console.log('WebSocket connected');
+  };
+  ws.onerror = (err) => {
+    clearTimeout(wsConnectTimeout);
+    console.error('WebSocket error:', err);
+  };
+  ws.onclose = () => {
+    clearTimeout(wsConnectTimeout);
+    console.log('WebSocket closed, reconnecting in 2s...');
+    setTimeout(connectWebSocket, 2000);
+  };
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.event === "station_playing") {
+        nowPlaying.innerText = msg.data || "...";
+        highlightStationButton(msg.data);
       }
-    })
-    .catch(error => {
-      console.error('Fetch error:', error);
-    });
+    } catch (e) {
+      console.error('Error parsing WebSocket message:', e);
+    }
+  };
+}
+connectWebSocket();
+
+function playStation(stationName, button) {
+  button.setAttribute('color', 'light');
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ event: "station_request", data: stationName }));
+  } else {
+    console.error('WebSocket not connected. Cannot send station request.');
+  }
 }
 
 loadStations();

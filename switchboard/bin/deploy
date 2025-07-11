@@ -2,4 +2,8 @@
 set -eo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel)/switchboard"
 
-zrok share reserved radioswitchboard
+lt --port 1980 --subdomain radioswitchboard || {
+    echo "Localtunnel failed to start. Please check your network connection or Localtunnel service status."
+    echo "install Localtunnel (lt) globally with: npm install -g localtunnel"
+    exit 1
+}
