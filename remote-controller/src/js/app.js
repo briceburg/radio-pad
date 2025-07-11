@@ -69,12 +69,17 @@ function connectWebSocket() {
   ws.onerror = (err) => {
     clearTimeout(wsConnectTimeout);
     console.error('WebSocket error:', err);
+    scheduleReconnect();
   };
   ws.onclose = () => {
     clearTimeout(wsConnectTimeout);
     console.log('WebSocket closed, reconnecting in 2s...');
-    setTimeout(connectWebSocket, 2000);
+    scheduleReconnect();
   };
+
+  function scheduleReconnect() {
+    setTimeout(connectWebSocket, 2000);
+  }
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
