@@ -4,7 +4,9 @@ import asyncio
 import json
 import logging
 import os
+import signal
 
+import websockets
 from websockets.asyncio.server import broadcast, serve
 
 CURRENT_STATION = None
@@ -44,6 +46,9 @@ async def switchboard(websocket):
                     code=1007,
                     reason=f"Unknown event in message: {event}",
                 )
+    except websockets.exceptions.ConnectionClosedError:
+        # Suppress expected disconnect errors
+        pass
     finally:
         broadcast_all("client_count", len(websocket.server.connections))
 
@@ -60,13 +65,24 @@ async def switchboard_connect(connection, request):
 
 
 async def main():
+    stop_event = asyncio.Event()
+
+    def ask_exit():
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT, ask_exit)
+    loop.add_signal_handler(signal.SIGTERM, ask_exit)
+
     async with serve(
         switchboard,
         os.environ.get("SWITCHBOARD_HOST", "localhost"),
         int(os.environ.get("SWITCHBOARD_PORT", 1980)),
         process_request=switchboard_connect,
     ) as server:
-        await server.serve_forever()
+        logging.info("Switchboard running. Press Ctrl+C to stop.")
+        await stop_event.wait()
+        logging.info("Switchboard shutting down...")
 
 
 if __name__ == "__main__":
@@ -74,5 +90,5 @@ if __name__ == "__main__":
     try:
         logging.info("Starting switchboard... Press Ctrl+C to stop.")
         asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("...switchboard stopped.")
+    except Exception as e:
+        logging.error(f"Switchboard exited with error: {e}")
