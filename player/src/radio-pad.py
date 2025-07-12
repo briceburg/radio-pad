@@ -80,7 +80,7 @@ def cleanup():
     if mpv_process or mpv_sock:
         stop_station()
 
-def play_station(station_name):
+async def play_station(station_name):
     global mpv_process, mpv_sock, STATION
     try:
         # Find the station by name
@@ -122,7 +122,7 @@ def play_station(station_name):
         )
         # Reset mpv_sock so a new one will be created for the new process
         mpv_sock = None
-        asyncio.create_task(establish_ipc_socket())
+        await establish_ipc_socket()
 
         # broadcast station
         broadcast("station_playing")
@@ -179,7 +179,7 @@ async def establish_ipc_socket():
         if mpv_sock is not None:
             return mpv_sock
         loop = asyncio.get_running_loop()
-        for _ in range(20):
+        for i in range(20):
             try:
                 # Run the blocking MPV constructor in a thread pool
                 sock = await loop.run_in_executor(
@@ -195,7 +195,9 @@ async def establish_ipc_socket():
                     except Exception as e:
                         print(f"Failed restoring volume: {e}")
                 return mpv_sock
-            except Exception:
+            except Exception as e:
+                if i == 19:
+                    print(f"Failed to connect to mpv IPC socket: {e}")
                 await asyncio.sleep(0.1)
         print("failed to establish mpv IPC. volume controls disabled")
         mpv_sock = None
@@ -221,7 +223,7 @@ async def switchboard_connect_and_listen(url):
                 event, data = msg.get("event"), msg.get("data")
                 if event == "station_request":
                     print(f"SWITCHBOARD: station request: {data}")
-                    play_station(data)
+                    asyncio.create_task(play_station(data))
                 if event == "station_playing":
                     # TODO: support multiple players by player_id/UA 
                     continue  # Ignore this event
@@ -232,8 +234,7 @@ async def switchboard_connect_and_listen(url):
             except Exception as e:
                 print(f"SWITCHBOARD: error: {e}")
 
-
-def macropad_connect_and_listen():
+def macropad_connect_and_listen(loop):
     """Connect to the macropad serial port."""
     global MACROPAD
     MACROPAD = None
@@ -254,22 +255,24 @@ def macropad_connect_and_listen():
     while True:
         if MACROPAD.in_waiting > 0:
             msg = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8').strip()
-            event, data = msg.split(":", 1) if ":" in msg else (data, None)
+            event, data = msg.split(":", 1) if ":" in msg else (msg, None)
             match event:
                 case "volume":
                     volume_adjust(5 if data == "up" else -5)
                 case "stop":
                     stop_station()
                 case "play":
-                    play_station(data)
+                    if data:
+                        asyncio.run_coroutine_threadsafe(play_station(data), loop)
                 case _:
                     print(f"MACROPAD: unknown event: {event}")
 
 async def macropad_loop():
     global MACROPAD
+    loop = asyncio.get_running_loop()
     while True:
         try:
-            await asyncio.get_running_loop().run_in_executor(None, macropad_connect_and_listen)
+            await loop.run_in_executor(None, macropad_connect_and_listen, loop)
         except Exception as e:
             print(f"Macropad error: {e}")
         finally:
