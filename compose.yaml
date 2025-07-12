@@ -4,23 +4,27 @@ services:
       context: ./player
     environment:
       SWITCHBOARD_URL: "ws://switchboard:1980/"
+      PULSE_SERVER: "unix:/run/user/${UID:-1000}/pulse/native"
     tty: true
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./player:/app
+      - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
+
   switchboard:
     build:
       context: ./switchboard
     ports:
       - "1980:1980"
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./switchboard:/app
-    
+
   remote-controller:
     build:
       context: ./remote-controller
-    environment:
-      VITE_SWITCHBOARD_URL: "ws://localhost:1980/"
     ports:
       - "5173:5173"
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./remote-controller:/app
