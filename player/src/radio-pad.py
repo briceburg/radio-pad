@@ -18,7 +18,7 @@ RADIO_STATIONS_URL = os.getenv(
     "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json",
 )
 MACROPAD = None
-SWITCHBOARD =None
+SWITCHBOARD = None
 STATION = None
 
 # cache radio stations
@@ -42,6 +42,7 @@ mpv_sock = None
 mpv_volume = None
 mpv_sock_lock = asyncio.Lock()
 
+
 def broadcast(event, data=None, audience="all"):
     """
     Broadcast an event to the macropad and/or switchboard.
@@ -59,8 +60,9 @@ def broadcast(event, data=None, audience="all"):
         print(f"BROADCAST: switchboard: {event}")
         asyncio.create_task(SWITCHBOARD.send(msg))
 
+
 def cleanup():
-    global  mpv_process, mpv_sock, SWITCHBOARD, MACROPAD
+    global mpv_process, mpv_sock, SWITCHBOARD, MACROPAD
     if SWITCHBOARD:
         try:
             asyncio.get_event_loop().run_until_complete(SWITCHBOARD.close())
@@ -79,6 +81,7 @@ def cleanup():
     if mpv_process or mpv_sock:
         stop_station()
 
+
 async def play_station(station_name):
     global mpv_process, mpv_sock, STATION
     try:
@@ -96,7 +99,9 @@ async def play_station(station_name):
         if mpv_process:
             stop_station()
 
-        print(f"PLAYER: playing: {STATION['name']} @ {STATION['url']} ({AUDIO_CHANNELS})")
+        print(
+            f"PLAYER: playing: {STATION['name']} @ {STATION['url']} ({AUDIO_CHANNELS})"
+        )
         mpv_process = subprocess.Popen(
             [
                 "mpv",
@@ -128,6 +133,7 @@ async def play_station(station_name):
     except Exception as e:
         print(f"PLAYER: error starting station: {e}")
 
+
 def stop_station():
     global mpv_process
     global mpv_sock
@@ -150,6 +156,7 @@ def stop_station():
         finally:
             mpv_process = None
 
+
 def volume_adjust(amt):
     global mpv_sock
     global mpv_volume
@@ -171,6 +178,7 @@ def volume_adjust(amt):
     mpv_volume = volume
     mpv_sock.volume = mpv_volume
     print(f"  Adjusted Volume: {mpv_volume}")
+
 
 async def establish_ipc_socket():
     global mpv_sock
@@ -209,7 +217,7 @@ async def switchboard_connect_and_listen(url):
         # expose the switchboard websocket globally (so play_station can send messages)
         global SWITCHBOARD
         SWITCHBOARD = ws
-        
+
         print(f"SWITCHBOARD: connected to: {url}")
 
         # Send initial station playing event
@@ -224,7 +232,7 @@ async def switchboard_connect_and_listen(url):
                     print(f"SWITCHBOARD: station request: {data}")
                     asyncio.create_task(play_station(data))
                 if event == "station_playing":
-                    # TODO: support multiple players by player_id/UA 
+                    # TODO: support multiple players by player_id/UA
                     continue  # Ignore this event
                 if event == "client_count":
                     continue
@@ -232,6 +240,7 @@ async def switchboard_connect_and_listen(url):
                     print(f"SWITCHBOARD: unknown event: {event}")
             except Exception as e:
                 print(f"SWITCHBOARD: error: {e}")
+
 
 def macropad_connect_and_listen(loop):
     """Connect to the macropad serial port."""
@@ -241,7 +250,7 @@ def macropad_connect_and_listen(loop):
     for port, desc, _ in sorted(ports):
         if "Macropad" in desc:
             try:
-                MACROPAD = serial.Serial(port, 115200, timeout=1) 
+                MACROPAD = serial.Serial(port, 115200, timeout=1)
             except serial.SerialException as e:
                 if e.errno != 16:  # Device or resource busy
                     print(f"Serial error on {port}: {e}")
@@ -256,7 +265,7 @@ def macropad_connect_and_listen(loop):
 
     while True:
         if MACROPAD.in_waiting > 0:
-            msg = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8').strip()
+            msg = MACROPAD.read(MACROPAD.in_waiting).decode("utf-8").strip()
             event, data = msg.split(":", 1) if ":" in msg else (msg, None)
             match event:
                 case "volume":
@@ -268,6 +277,7 @@ def macropad_connect_and_listen(loop):
                         asyncio.run_coroutine_threadsafe(play_station(data), loop)
                 case _:
                     print(f"MACROPAD: unknown event: {event}")
+
 
 async def macropad_loop():
     global MACROPAD
@@ -288,6 +298,7 @@ async def macropad_loop():
         print("PLAYER: reconnecting to macropad in 10s...")
         await asyncio.sleep(10)
 
+
 async def switchboard_loop(url):
     if url == "":
         print("SWITCHBOARD: URL is empty, skipping switchboard connection.")
@@ -300,7 +311,9 @@ async def switchboard_loop(url):
         except (ConnectionRefusedError, OSError) as e:
             # Handle connection failures
             if first_connection_attempt:
-                print(f"SWITCHBOARD: Unable to connect to {url} (switchboard not available)")
+                print(
+                    f"SWITCHBOARD: Unable to connect to {url} (switchboard not available)"
+                )
                 first_connection_attempt = False
         except Exception as e:
             print(f"SWITCHBOARD: Unexpected error: {e}")
@@ -315,13 +328,16 @@ async def switchboard_loop(url):
         print("PLAYER: reconnecting to switchboard in 5s...")
         await asyncio.sleep(5)
 
+
 async def main():
     await asyncio.gather(
         macropad_loop(),
         switchboard_loop(os.getenv("SWITCHBOARD_URL", "ws://localhost:1980/")),
     )
 
+
 if __name__ == "__main__":
+
     def handle_exit(signum=None, frame=None, code=0):
         print("\nPLAYER: exiting...")
         cleanup()
