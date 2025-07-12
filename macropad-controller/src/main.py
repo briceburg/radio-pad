@@ -131,7 +131,16 @@ def index_to_char(idx):
 
 
 # MAIN LOOP ----------------------------
+import usb_cdc
+data_stream = usb_cdc.data
+
 while True:
+    if data_stream.in_waiting > 0:
+        received_data = data_stream.readline().decode().strip()
+        print(f"Received data from player: {received_data}")
+        time.sleep(0.1)
+    
+
     # Read encoder position.
     position = macropad.encoder
     if last_position is not None and position != last_position:

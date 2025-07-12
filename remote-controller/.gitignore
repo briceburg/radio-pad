@@ -6,3 +6,4 @@ node_modules/
 .sourcemaps
 .vite
 dist/
+.vite/
