@@ -107,49 +107,55 @@ if not apps:
         pass
 
 last_position = None
-station_app_index = None
 station_index = None
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
 app_index = 0
 apps[app_index].switch()
 
+
 def radio_control(event, data=None):
     PLAYER.write(f"{event}:{data}\n".encode())
+
 
 def highlight_playing(app_index, station_index):
     """Highlight the currently playing station."""
 
-    group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].stations[station_index].get("name", "?")
+    group[MACROPAD_KEY_COUNT + 1].text = (
+        apps[app_index].stations[station_index].get("name", "?")
+    )
     for i in range(MACROPAD_KEY_COUNT):
         try:
-            macropad.pixels[i] = HIGHLIGHT_COLOR if i == station_index else apps[app_index].stations[i].get("color", DEFAULT_COLOR)
+            macropad.pixels[i] = (
+                HIGHLIGHT_COLOR
+                if i == station_index
+                else apps[app_index].stations[i].get("color", DEFAULT_COLOR)
+            )
         except IndexError:
             macropad.pixels[i] = 0
 
         group[i].color = 0x000000 if i == station_index else 0xFFFFFF
         group[i].background_color = 0xFFFFFF if i == station_index else 0x000000
 
-    
     macropad.pixels.show()
     macropad.display.refresh()
+
 
 # MAIN LOOP ----------------------------
 while True:
     if PLAYER.in_waiting > 0:
-        msg = PLAYER.read(PLAYER.in_waiting).decode('utf-8').strip()
+        msg = PLAYER.read(PLAYER.in_waiting).decode("utf-8").strip()
         event, data = msg.split(":", 1) if ":" in msg else (msg, None)
         if event == "station_playing":
             station_index = None
             for aidx, app in enumerate(apps):
                 for idx, station in enumerate(app.stations):
                     if station.get("name") == data:
-                        station_app_index = aidx
                         station_index = idx
 
                         # If the app index has changed, switch to the correct app
-                        if app_index != station_app_index:
+                        if app_index != aidx:
                             apps[aidx].switch()
-                            app_index = station_app_index
+                            app_index = aidx
 
                         highlight_playing(app_index, station_index)
                         break
