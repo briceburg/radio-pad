@@ -54,7 +54,7 @@ def broadcast(event, data=None, audience="all"):
 
     if audience in ["macropad", "all"] and MACROPAD:
         print(f"BROADCAST: macropad: {event}")
-        MACROPAD.write(msg.encode())
+        MACROPAD.write((msg + "\n").encode())  # <-- Add newline here
 
     if audience in ["switchboard", "all"] and SWITCHBOARD:
         print(f"BROADCAST: switchboard: {event}")
@@ -155,6 +155,7 @@ def volume_adjust(amt):
     global mpv_sock
     global mpv_volume
     if mpv_sock is None:
+        print("PLAYER: mpv IPC socket not established, cannot adjust volume.")
         return
 
     if mpv_volume is None:
@@ -199,29 +200,6 @@ async def establish_ipc_socket():
         print("failed to establish mpv IPC. volume controls disabled")
         mpv_sock = None
         return None
-
-
-# @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
-# def _(event):
-#     """
-#     listen for control events, control character is Ctrl+@ followed by 2 keypresses.
-#       [Ctrl+@, V, +] increase volume
-#       [Ctrl+@, V, -] decrease volume
-#       [Ctrl+@, X, *] stop station
-#       [Ctrl+@, 0, 3] play 4th station
-#     """
-#     cmd_char = event.key_sequence[-2].data
-#     arg_char = event.key_sequence[-1].data
-
-#     match cmd_char:
-#         case "V":
-#             volume_adjust(-5) if arg_char == "-" else volume_adjust(5)
-#         case "X":
-#             stop_station()
-#         case _:
-#             page_idx = char_to_index(cmd_char)
-#             station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
-#             play_station(station_idx)
 
 
 async def switchboard_connect_and_listen(url):
@@ -275,8 +253,17 @@ def macropad_connect_and_listen():
 
     while True:
         if MACROPAD.in_waiting > 0:
-            data = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8')
-            print(f"MACROPAD: data: {data}")
+            msg = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8').strip()
+            event, data = msg.split(":", 1) if ":" in msg else (data, None)
+            match event:
+                case "volume":
+                    volume_adjust(5 if data == "up" else -5)
+                case "stop":
+                    stop_station()
+                case "play":
+                    play_station(data)
+                case _:
+                    print(f"MACROPAD: unknown event: {event}")
 
 async def macropad_loop():
     global MACROPAD
@@ -297,6 +284,9 @@ async def macropad_loop():
         await asyncio.sleep(10)
 
 async def switchboard_loop(url):
+    if url == "":
+        print("SWITCHBOARD: URL is empty, skipping switchboard connection.")
+        return
     global SWITCHBOARD
     while True:
         try:

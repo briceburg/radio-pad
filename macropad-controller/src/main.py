@@ -6,12 +6,18 @@ from adafruit_display_shapes.rect import Rect
 from adafruit_display_text import label
 from adafruit_macropad import MacroPad
 from adafruit_hid.keycode import Keycode
+import usb_cdc
+
 
 DEFAULT_KEY_COLOR = 0x000077
 HIGHLIGHT_COLOR = 0x015C01
 LED_BRIGHTNESS = 0.10  # Dim the LEDs, 1 is full brightness
 MACROPAD_KEY_COUNT = 12  # Number of keys on the MacroPad
 RADIO_STATIONS_FILE = "stations.json"
+PLAYER = usb_cdc.data
+
+if not PLAYER:
+    raise RuntimeError("No USB CDC data port found.")
 
 # Display Setup -----------------------
 # each group displays the station 'name' corresponding to the key number.
@@ -105,39 +111,14 @@ last_encoder_switch = macropad.encoder_switch_debounced.pressed
 app_index = 0
 apps[app_index].switch()
 
-
-def radio_control(cmd_char, arg_char):
-    """Sends a command and argument to the bin/radio-pad listener. Escape sequence is Ctrl+@"""
-    macropad.keyboard.press(Keycode.CONTROL)
-    macropad.keyboard.press(Keycode.TWO)
-    macropad.keyboard.release(Keycode.CONTROL)
-    macropad.keyboard.release(Keycode.TWO)
-    macropad.keyboard_layout.write(cmd_char)
-    macropad.keyboard_layout.write(arg_char)
-
-
-def index_to_char(idx):
-    """
-    Convert an integer index to a single character.
-    Allows up to 35 pages of stations to be represented by a single keypress.
-    0-9 -> '0'-'9', 10-35 -> 'a'-'z'.
-    """
-    if 0 <= idx <= 9:
-        return str(idx)
-    elif 10 <= idx <= 35:
-        return chr(ord("a") + (idx - 10))
-    else:
-        raise ValueError("Index out of supported range (0-35)")
-
+def radio_control(event, data=None):
+    PLAYER.write(f"{event}:{data}\n".encode())
 
 # MAIN LOOP ----------------------------
-import usb_cdc
-data_stream = usb_cdc.data
-
 while True:
-    if data_stream.in_waiting > 0:
-        received_data = data_stream.readline().decode().strip()
-        print(f"Received data from player: {received_data}")
+    if PLAYER.in_waiting > 0:
+        received_data = PLAYER.readline().decode().strip()
+        print(f"PLAYER: {received_data}")
         time.sleep(0.1)
     
 
@@ -146,12 +127,12 @@ while True:
     if last_position is not None and position != last_position:
         if last_pressed is not None:
             # if a station is playing, change volume
-            radio_control("V", "+" if position > last_position else "-")
+            radio_control("volume", "up" if position > last_position else "down")
         else:
 
             # else, change station page
             # we cannot use app_index = position % len(apps) -- because the encoder value is linked to volume as well
-            # TODO: investiagate ability to reset the macropad.encoder value when switching apps
+            # TODO: investiagate ability to reset the macropad.encoder value when switching apps so the number doesn't get huge over time.
             if position > last_position:
                 app_index += 1
                 if app_index > len(apps) - 1:
@@ -171,7 +152,7 @@ while True:
         last_encoder_switch = encoder_switch
         if last_pressed is not None:
             # stop radio
-            radio_control("X", "*")
+            radio_control("stop")
 
             # reset radio display and highlighted key to its original
             group[last_pressed].color = 0xFFFFFF
@@ -223,7 +204,7 @@ while True:
             group[last_pressed].background_color = 0x000000
 
         # play station
-        radio_control(index_to_char(app_index), index_to_char(key_number))
+        radio_control("play", apps[app_index].stations[key_number].get("name", "?"))
 
         macropad.pixels.show()
         macropad.display.refresh()
