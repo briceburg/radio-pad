@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/macropad-controller"
 
 mount | grep -q /mnt/CIRCUITPY || {
   echo "macropad not mounted, please run bin/mount and try again." >&2
@@ -14,7 +14,7 @@ if [ "${1:-}" = "--hard" ]; then
   rm -rf ./*
 fi
 
-cp -r "$PROJECT_ROOT"/macropad-controller/src/* .
-cp -r "$PROJECT_ROOT"/stations.json .
+cp -r "$PROJECT_ROOT"/src/* .
+cp -r "$PROJECT_ROOT"/../player/stations.json .
 sync
 echo "[ok] copied files"
