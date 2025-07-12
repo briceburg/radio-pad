@@ -1,0 +1,26 @@
+services:
+  player:
+    build:
+      context: ./player
+    environment:
+      SWITCHBOARD_URL: "ws://switchboard:1980/"
+    tty: true
+    volumes:
+      - ./player:/app
+  switchboard:
+    build:
+      context: ./switchboard
+    ports:
+      - "1980:1980"
+    volumes:
+      - ./switchboard:/app
+    
+  remote-controller:
+    build:
+      context: ./remote-controller
+    environment:
+      VITE_SWITCHBOARD_URL: "ws://localhost:1980/"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./remote-controller:/app
