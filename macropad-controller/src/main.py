@@ -12,7 +12,7 @@ import usb_cdc
 DEFAULT_KEY_COLOR = 0x000077
 HIGHLIGHT_COLOR = 0x015C01
 LED_BRIGHTNESS = 0.10  # Dim the LEDs, 1 is full brightness
-MACROPAD_KEY_COUNT = 12  # Number of keys on the MacroPad
+MACROPAD_KEY_COUNT = 6  # Number of keys on the MacroPad
 RADIO_STATIONS_FILE = "stations.json"
 PLAYER = usb_cdc.data
 
@@ -62,7 +62,7 @@ class App:
         self.title = appdata["title"]
 
     def switch(self):
-        group[13].text = self.title
+        group[MACROPAD_KEY_COUNT + 1].text = self.title
         rect.fill = 0xFFFFFF
         for i in range(MACROPAD_KEY_COUNT):
             if i < len(self.stations):
@@ -100,7 +100,7 @@ with open(RADIO_STATIONS_FILE, "r") as f:
     del stations_list
 
 if not apps:
-    group[13].text = "NO STATIONS DEFINED"
+    group[MACROPAD_KEY_COUNT + 1].text = "NO STATIONS DEFINED"
     macropad.display.refresh()
     while True:
         pass
@@ -157,7 +157,7 @@ while True:
             # reset radio display and highlighted key to its original
             group[last_pressed].color = 0xFFFFFF
             group[last_pressed].background_color = 0x000000
-            group[13].text = apps[app_index].title
+            group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].title
             macropad.display.refresh()
 
             last_pressed = None
@@ -193,7 +193,7 @@ while True:
         macropad.pixels[key_number] = HIGHLIGHT_COLOR
         group[key_number].color = 0x000000
         group[key_number].background_color = 0xFFFFFF
-        group[13].text = apps[app_index].stations[key_number].get("name", "?")
+        group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].stations[key_number].get("name", "?")
 
         # remove highlighting from previous key and label
         if last_pressed is not None and last_pressed != key_number:
