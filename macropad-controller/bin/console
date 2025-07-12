@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-
-dev=$(find /dev -maxdepth 1 -name 'ttyACM*' 2>/dev/null | sort | head -n1)
+dev=$(find /dev/serial/by-id/ -type l -name '*Macropad*' | sort | head -n1)
 if [ -z "$dev" ]; then
-  echo "No /dev/ttyACM* device found."
+  echo "No Macropad device found."
   exit 1
 fi
 
