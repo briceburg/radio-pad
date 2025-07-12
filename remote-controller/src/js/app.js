@@ -42,16 +42,11 @@ async function loadStations() {
   }
 }
 
-function highlightStationButton(stationName) {
-  // Remove highlight from all buttons
-  Object.values(stationButtons).forEach(btn => btn.removeAttribute('color'));
-  // Highlight the button for the given station
-  if (stationButtons[stationName]) {
-    stationButtons[stationName].setAttribute('color', 'success');
-  }
-}
-
 function connectWebSocket() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
   console.log('Connecting to WebSocket:', switchboardUrl);
   ws = new WebSocket(switchboardUrl);
 
@@ -71,11 +66,6 @@ function connectWebSocket() {
     reconnectDelay = 2000; // Reset delay after successful connection
   };
 
-  ws.onerror = (err) => {
-    clearTimeout(connectTimeout);
-    console.error('WebSocket error:', err);
-    scheduleReconnect();
-  };
   ws.onclose = () => {
     clearTimeout(connectTimeout);
     console.log('WebSocket closed, reconnecting in', reconnectDelay / 1000, 's...');
@@ -90,9 +80,18 @@ function connectWebSocket() {
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
-      if (msg.event === "station_playing") {
-        nowPlaying.innerText = msg.data || "...";
-        highlightStationButton(msg.data);
+      switch (msg.event) {
+        case "station_playing":
+          nowPlaying.innerText = msg.data || "...";
+          Object.entries(stationButtons).forEach(([name, btn]) =>
+            btn.setAttribute('color', name === msg.data ? 'success' : 'primary')
+          );
+          break;
+        case "station_request":
+        case "client_count":
+          break;
+        default:
+          console.warn('Unhandled WebSocket event:', msg.event, msg.data);
       }
     } catch (e) {
       console.error('Error parsing WebSocket message:', e);
