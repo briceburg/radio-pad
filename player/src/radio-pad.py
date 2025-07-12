@@ -50,13 +50,12 @@ def broadcast(event, data=None, audience="all"):
         if event == "station_playing":
             data = STATION["name"] if STATION else None
 
-    msg = json.dumps({"event": event, "data": data})
-
     if audience in ["macropad", "all"] and MACROPAD:
         print(f"BROADCAST: macropad: {event}")
-        MACROPAD.write((msg + "\n").encode())  # <-- Add newline here
+        MACROPAD.write((f"{event}:{data}\n").encode())
 
     if audience in ["switchboard", "all"] and SWITCHBOARD:
+        msg = json.dumps({"event": event, "data": data})
         print(f"BROADCAST: switchboard: {event}")
         asyncio.create_task(SWITCHBOARD.send(msg))
 
@@ -252,6 +251,9 @@ def macropad_connect_and_listen(loop):
     print(f"MACROPAD: connected to: {MACROPAD.portstr}")
     broadcast("station_playing", audience="macropad")
 
+    # beofre starting read loop clear stale data / input buffer
+    MACROPAD.reset_input_buffer()
+
     while True:
         if MACROPAD.in_waiting > 0:
             msg = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8').strip()
@@ -291,11 +293,17 @@ async def switchboard_loop(url):
         print("SWITCHBOARD: URL is empty, skipping switchboard connection.")
         return
     global SWITCHBOARD
+    first_connection_attempt = True
     while True:
         try:
             await switchboard_connect_and_listen(url)
+        except (ConnectionRefusedError, OSError) as e:
+            # Handle connection failures
+            if first_connection_attempt:
+                print(f"SWITCHBOARD: Unable to connect to {url} (switchboard not available)")
+                first_connection_attempt = False
         except Exception as e:
-            print(f"Switchboard error: {e}")
+            print(f"SWITCHBOARD: Unexpected error: {e}")
         finally:
             if SWITCHBOARD:
                 try:

@@ -7,7 +7,7 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 ### Host Dependencies
 
 - [mpv](https://mpv.io/)
-- [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/en/master/)
+- [python-websockets](https://websockets.readthedocs.io/en/stable/)
 - [python-mpv-jsonipc](https://github.com/iwalton3/python-mpv-jsonipc)
 - [python-websockets](https://github.com/python-websockets/websockets)
 
