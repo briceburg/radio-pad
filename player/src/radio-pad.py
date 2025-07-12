@@ -7,6 +7,7 @@ from time import sleep
 import asyncio
 import websockets
 import serial
+import signal
 import serial.tools.list_ports
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
@@ -320,13 +321,16 @@ async def main():
     )
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, EOFError):
+    def handle_exit(signum=None, frame=None, code=0):
         print("\nPLAYER: exiting...")
         cleanup()
-        sys.exit(0)
+        sys.exit(code)
+        
+    try:
+        signal.signal(signal.SIGTERM, handle_exit)
+        asyncio.run(main())
+    except (KeyboardInterrupt, EOFError):
+        handle_exit()
     except Exception as e:
         print(f"Unexpected error: {e}")
-        cleanup()
-        sys.exit(1)
+        handle_exit(code=1)
