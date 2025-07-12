@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-from prompt_toolkit import prompt
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit import PromptSession
 from python_mpv_jsonipc import MPV
 import os, sys, subprocess
 import urllib.request
@@ -9,15 +6,19 @@ import json
 from time import sleep
 import asyncio
 import websockets
+import serial
+import serial.tools.list_ports
 
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 RADIO_STATIONS_FILE = "/tmp/radio-pad-stations.json"
 RADIO_STATIONS_URL = os.getenv(
     "RADIO_STATIONS_URL",
-    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/src/stations.json",
+    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json",
 )
-STATIONS_PER_PAGE = 12  # align this with MACROPAD_KEY_COUNT
+MACROPAD = None
+SWITCHBOARD =None
+STATION = None
 
 # cache radio stations
 if not os.path.exists(RADIO_STATIONS_FILE):
@@ -35,25 +36,97 @@ with open(RADIO_STATIONS_FILE, "r") as f:
         print(f"Error parsing radio stations JSON: {e}")
         sys.exit(1)
 
-bindings = KeyBindings()
 mpv_process = None
 mpv_sock = None
 mpv_volume = None
 mpv_sock_lock = asyncio.Lock()
 
-
-def char_to_index(ch):
+def broadcast(event, data=None, audience="all"):
     """
-    Convert a single character to an integer index:
-    '0'-'9' -> 0-9, 'a'-'z' -> 10-35.
+    Broadcast an event to the macropad and/or switchboard.
     """
-    if ch.isdigit():
-        return int(ch)
-    elif "a" <= ch <= "z":
-        return 10 + ord(ch) - ord("a")
-    else:
-        return None
+    if not data:
+        if event == "station_playing":
+            data = STATION["name"] if STATION else None
 
+    msg = json.dumps({"event": event, "data": data})
+
+    if audience in ["macropad", "all"] and MACROPAD:
+        print(f"BROADCAST: macropad: {event}")
+        MACROPAD.write(msg.encode())
+
+    if audience in ["switchboard", "all"] and SWITCHBOARD:
+        print(f"BROADCAST: switchboard: {event}")
+        asyncio.create_task(SWITCHBOARD.send(msg))
+
+def cleanup():
+    global  mpv_process, mpv_sock, SWITCHBOARD, MACROPAD
+    if SWITCHBOARD:
+        try:
+            asyncio.get_event_loop().run_until_complete(SWITCHBOARD.close())
+            print("SWITCHBOARD: websocket connection closed.")
+        except Exception as e:
+            print(f"Error closing SWITCHBOARD: {e}")
+        SWITCHBOARD = None
+    if MACROPAD:
+        try:
+            MACROPAD.close()
+            print("MACROPAD: serial connection closed.")
+        except Exception as e:
+            print(f"Error closing MACROPAD: {e}")
+        MACROPAD = None
+
+    if mpv_process or mpv_sock:
+        stop_station()
+
+def play_station(station_name):
+    global mpv_process, mpv_sock, STATION
+    try:
+        # Find the station by name
+        for station in RADIO_STATIONS:
+            if station["name"] == station_name:
+                STATION = station
+                break
+
+        if not STATION:
+            print(f"PLAYER: station not found: {station_name}")
+            return
+
+        # Stop any currently playing station
+        if mpv_process:
+            stop_station()
+
+        print(f"PLAYER: playing: {STATION['name']} @ {STATION['url']} ({AUDIO_CHANNELS})")
+        mpv_process = subprocess.Popen(
+            [
+                "mpv",
+                STATION["url"],
+                "--no-osc",
+                "--no-osd-bar",
+                "--no-input-default-bindings",
+                "--no-input-cursor",
+                "--no-input-vo-keyboard",
+                "--no-input-terminal",
+                "--no-audio-display",
+                f"--input-ipc-server={MPV_SOCKET_FILE}",
+                "--no-video",
+                "--no-cache",
+                "--stream-lavf-o=reconnect_streamed=1",
+                "--profile=low-latency",
+                f"--audio-channels={AUDIO_CHANNELS}",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stdout,
+            stderr=subprocess.STDOUT,
+        )
+        # Reset mpv_sock so a new one will be created for the new process
+        mpv_sock = None
+        asyncio.create_task(establish_ipc_socket())
+
+        # broadcast station
+        broadcast("station_playing")
+    except Exception as e:
+        print(f"PLAYER: error starting station: {e}")
 
 def stop_station():
     global mpv_process
@@ -63,7 +136,7 @@ def stop_station():
         try:
             mpv_sock.stop()
         except Exception as e:
-            print(f"error stopping ipc: {e}")
+            pass
         finally:
             mpv_sock = None
 
@@ -73,50 +146,30 @@ def stop_station():
             if os.path.exists(MPV_SOCKET_FILE):
                 os.remove(MPV_SOCKET_FILE)
         except Exception as e:
-            print(f"error terminating mpv: {e}")
+            pass
         finally:
             mpv_process = None
 
+def volume_adjust(amt):
+    global mpv_sock
+    global mpv_volume
+    if mpv_sock is None:
+        return
 
-def play_station(station_index):
-    global mpv_process, mpv_sock
-    station = RADIO_STATIONS[station_index]
-    if mpv_process:
-        print("Stopping current station...")
-        stop_station()
-    print(f"Playing {station['name']} from {station['url']} as {AUDIO_CHANNELS}.")
-    mpv_process = subprocess.Popen(
-        [
-            "mpv",
-            station["url"],
-            "--no-osc",
-            "--no-osd-bar",
-            "--no-input-default-bindings",
-            "--no-input-cursor",
-            "--no-input-vo-keyboard",
-            "--no-input-terminal",
-            "--no-audio-display",
-            f"--input-ipc-server={MPV_SOCKET_FILE}",
-            "--no-video",
-            "--no-cache",
-            "--stream-lavf-o=reconnect_streamed=1",
-            "--profile=low-latency",
-            f"--audio-channels={AUDIO_CHANNELS}",
-        ],
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stdout,
-        stderr=subprocess.STDOUT,
-    )
-    # Reset mpv_sock so a new one will be created for the new process
-    mpv_sock = None
-    # Start IPC connection asynchronously (does not block)
-    asyncio.create_task(establish_ipc_socket())
+    if mpv_volume is None:
+        mpv_volume = mpv_sock.volume
 
-    # send station playing event to switchboard
-    if "switchboard_ws" in globals() and switchboard_ws is not None:
-        msg = json.dumps({"event": "station_playing", "data": station["name"]})
-        asyncio.create_task(switchboard_ws.send(msg))
+    volume = mpv_volume + amt
 
+    # keep volume from getting too high or too low
+    if volume > 100:
+        volume = 100
+    elif volume < 50:
+        volume = 50
+
+    mpv_volume = volume
+    mpv_sock.volume = mpv_volume
+    print(f"  Adjusted Volume: {mpv_volume}")
 
 async def establish_ipc_socket():
     global mpv_sock
@@ -147,61 +200,40 @@ async def establish_ipc_socket():
         return None
 
 
-def volume_adjust(amt):
-    global mpv_sock
-    global mpv_volume
-    if mpv_sock is None:
-        return
+# @bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
+# def _(event):
+#     """
+#     listen for control events, control character is Ctrl+@ followed by 2 keypresses.
+#       [Ctrl+@, V, +] increase volume
+#       [Ctrl+@, V, -] decrease volume
+#       [Ctrl+@, X, *] stop station
+#       [Ctrl+@, 0, 3] play 4th station
+#     """
+#     cmd_char = event.key_sequence[-2].data
+#     arg_char = event.key_sequence[-1].data
 
-    if mpv_volume is None:
-        mpv_volume = mpv_sock.volume
-
-    volume = mpv_volume + amt
-
-    # keep volume from getting too high or too low
-    if volume > 100:
-        volume = 100
-    elif volume < 50:
-        volume = 50
-
-    mpv_volume = volume
-    mpv_sock.volume = mpv_volume
-    print(f"  Adjusted Volume: {mpv_volume}")
-
-
-@bindings.add("c-@", "<any>", "<any>", record_in_macro=False)
-def _(event):
-    """
-    listen for control events, control character is Ctrl+@ followed by 2 keypresses.
-      [Ctrl+@, V, +] increase volume
-      [Ctrl+@, V, -] decrease volume
-      [Ctrl+@, X, *] stop station
-      [Ctrl+@, 0, 3] play 4th station
-    """
-    cmd_char = event.key_sequence[-2].data
-    arg_char = event.key_sequence[-1].data
-
-    match cmd_char:
-        case "V":
-            volume_adjust(-5) if arg_char == "-" else volume_adjust(5)
-        case "X":
-            stop_station()
-        case _:
-            page_idx = char_to_index(cmd_char)
-            station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
-            play_station(station_idx)
+#     match cmd_char:
+#         case "V":
+#             volume_adjust(-5) if arg_char == "-" else volume_adjust(5)
+#         case "X":
+#             stop_station()
+#         case _:
+#             page_idx = char_to_index(cmd_char)
+#             station_idx = page_idx * STATIONS_PER_PAGE + char_to_index(arg_char)
+#             play_station(station_idx)
 
 
-async def start_switchboard(url):
+async def switchboard_connect_and_listen(url):
+    print(f"Connecting to switchboard at {url} ...")
     async with websockets.connect(url, user_agent_header="RadioPad/1.0") as ws:
         # expose the switchboard websocket globally (so play_station can send messages)
-        global switchboard_ws
-        switchboard_ws = ws
+        global SWITCHBOARD
+        SWITCHBOARD = ws
+        
+        print(f"SWITCHBOARD: connected to: {url}")
 
-        print(f"Connected to switchboard at {url}")
         # Send initial station playing event
-        msg = json.dumps({"event": "station_playing", "data": None})
-        asyncio.create_task(switchboard_ws.send(msg))
+        broadcast("station_playing", audience="switchboard")
 
         # Listen for station requests
         async for message in ws:
@@ -209,35 +241,92 @@ async def start_switchboard(url):
                 msg = json.loads(message)
                 event, data = msg.get("event"), msg.get("data")
                 if event == "station_request":
-                    print(f"Received remote station request: {data}")
-                    # Find and play the requested station by name
-                    for idx, station in enumerate(RADIO_STATIONS):
-                        if station["name"] == data:
-                            play_station(idx)
-                            break
-                    else:
-                        print(f"Station '{data}' not found.")
+                    print(f"SWITCHBOARD: station request: {data}")
+                    play_station(data)
+                if event == "station_playing":
+                    # TODO: support multiple players by player_id/UA 
+                    continue  # Ignore this event
+                if event == "client_count":
+                    continue
+                else:
+                    print(f"SWITCHBOARD: unknown event: {event}")
             except Exception as e:
-                print(f"Error handling switchboard message: {e}")
+                print(f"SWITCHBOARD: error: {e}")
 
-async def main():
-    switchboard_task = asyncio.create_task(
-        start_switchboard("wss://radioswitchboard.loca.lt")
-    )
+
+def macropad_connect_and_listen():
+    """Connect to the macropad serial port."""
+    global MACROPAD
+    MACROPAD = None
+    ports = serial.tools.list_ports.comports()
+    for port, desc, _ in sorted(ports):
+        if "Macropad" in desc:
+            try:
+                MACROPAD = serial.Serial(port, 115200, timeout=1) 
+            except serial.SerialException as e:
+                if e.errno != 16:  # Device or resource busy
+                    print(f"Serial error on {port}: {e}")
+    if MACROPAD is None:
+        return False
+
+    print(f"MACROPAD: connected to: {MACROPAD.portstr}")
+    broadcast("station_playing", audience="macropad")
+
+    while True:
+        if MACROPAD.in_waiting > 0:
+            data = MACROPAD.read(MACROPAD.in_waiting).decode('utf-8')
+            print(f"MACROPAD: data: {data}")
+
+async def macropad_loop():
+    global MACROPAD
     while True:
         try:
-            print("Press 'Control + @' followed by the radio page and station id.")
-            print("Press 'Control + C' or 'Control + D' to exit.")
-            await session.prompt_async()
-        except (KeyboardInterrupt, EOFError):
-            print("Exiting...")
-            stop_station()
-            sys.exit(0)
+            await asyncio.get_running_loop().run_in_executor(None, macropad_connect_and_listen)
         except Exception as e:
-            print(f"Unhandled exception: {e}")
-            continue
+            print(f"Macropad error: {e}")
+        finally:
+            if MACROPAD:
+                try:
+                    MACROPAD.close()
+                    print("MACROPAD: serial connection closed.")
+                except Exception as e:
+                    print(f"Error closing MACROPAD: {e}")
+                MACROPAD = None
+        print("PLAYER: reconnecting to macropad in 10s...")
+        await asyncio.sleep(10)
 
+async def switchboard_loop(url):
+    global SWITCHBOARD
+    while True:
+        try:
+            await switchboard_connect_and_listen(url)
+        except Exception as e:
+            print(f"Switchboard error: {e}")
+        finally:
+            if SWITCHBOARD:
+                try:
+                    await SWITCHBOARD.close()
+                    print("SWITCHBOARD: websocket connection closed.")
+                except Exception as e:
+                    print(f"Error closing SWITCHBOARD: {e}")
+                SWITCHBOARD = None
+        print("PLAYER: reconnecting to switchboard in 5s...")
+        await asyncio.sleep(5)
+
+async def main():
+    await asyncio.gather(
+        macropad_loop(),
+        switchboard_loop(os.getenv("SWITCHBOARD_URL", "wss://radioswitchboard.loca.lt")),
+    )
 
 if __name__ == "__main__":
-    session = PromptSession(key_bindings=bindings)
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, EOFError):
+        print("\nPLAYER: exiting...")
+        cleanup()
+        sys.exit(0)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        cleanup()
+        sys.exit(1)
