@@ -5,7 +5,8 @@ const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/
 const switchboardUrl = 'wss://radioswitchboard.loca.lt';
 
 let ws;
-let wsConnectTimeout;
+let reconnectTimer = null;
+let reconnectDelay = 2000; // Start with 2 seconds
 
 // Keep a map of station name to button for easy highlighting
 const stationButtons = {};
@@ -54,32 +55,38 @@ function connectWebSocket() {
   console.log('Connecting to WebSocket:', switchboardUrl);
   ws = new WebSocket(switchboardUrl);
 
-  // Set a 5s timeout for connection
-  wsConnectTimeout = setTimeout(() => {
+  // Add a 3-second timeout for the connection attempt
+  const connectTimeout = setTimeout(() => {
     if (ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket connection timeout. Closing socket.');
+      console.warn('WebSocket connection timed out after 3s, closing socket.');
       ws.close();
     }
-  }, 5000);
+  }, 3000);
 
   ws.onopen = () => {
-    clearTimeout(wsConnectTimeout);
     console.log('WebSocket connected');
+    clearTimeout(connectTimeout);
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    reconnectDelay = 2000; // Reset delay after successful connection
   };
+
   ws.onerror = (err) => {
-    clearTimeout(wsConnectTimeout);
+    clearTimeout(connectTimeout);
     console.error('WebSocket error:', err);
     scheduleReconnect();
   };
   ws.onclose = () => {
-    clearTimeout(wsConnectTimeout);
-    console.log('WebSocket closed, reconnecting in 2s...');
+    clearTimeout(connectTimeout);
+    console.log('WebSocket closed, reconnecting in', reconnectDelay / 1000, 's...');
     scheduleReconnect();
   };
 
-  function scheduleReconnect() {
-    setTimeout(connectWebSocket, 2000);
-  }
+  ws.onerror = (err) => {
+    clearTimeout(connectTimeout);
+    console.error('WebSocket error:', err);
+  };
+
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
@@ -92,7 +99,15 @@ function connectWebSocket() {
     }
   };
 }
-connectWebSocket();
+
+function scheduleReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    connectWebSocket();
+    // Exponential backoff, max 30s
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+  }, reconnectDelay);
+}
 
 function playStation(stationName, button) {
   button.setAttribute('color', 'light');
@@ -105,3 +120,4 @@ function playStation(stationName, button) {
 }
 
 loadStations();
+connectWebSocket();
