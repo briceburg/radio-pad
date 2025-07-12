@@ -2,7 +2,7 @@ const stationGrid = document.getElementById('station-grid');
 const nowPlaying = document.getElementById('now-playing');
 
 const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
-const switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'wss://radioswitchboard.loca.lt';
+const switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'ws://localhost:1980/';
 
 let ws;
 let reconnectTimer = null;

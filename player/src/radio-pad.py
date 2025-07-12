@@ -317,7 +317,7 @@ async def switchboard_loop(url):
 async def main():
     await asyncio.gather(
         macropad_loop(),
-        switchboard_loop(os.getenv("SWITCHBOARD_URL", "wss://radioswitchboard.loca.lt")),
+        switchboard_loop(os.getenv("SWITCHBOARD_URL", "ws://localhost:1980/")),
     )
 
 if __name__ == "__main__":
@@ -325,7 +325,7 @@ if __name__ == "__main__":
         print("\nPLAYER: exiting...")
         cleanup()
         sys.exit(code)
-        
+
     try:
         signal.signal(signal.SIGTERM, handle_exit)
         asyncio.run(main())
