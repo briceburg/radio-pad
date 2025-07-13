@@ -13,8 +13,8 @@ CURRENT_STATION = None
 
 
 def mkevent(event: str, data) -> str:
-    """Create a JSON event message."""
-    return json.dumps({"event": event, "data": data})
+    """Create an event message in event:data format."""
+    return f"{event}:{data}"
 
 
 async def switchboard(websocket):
@@ -28,13 +28,11 @@ async def switchboard(websocket):
         await websocket.send(mkevent("station_playing", CURRENT_STATION))
 
         async for message in websocket:
-            try:
-                msg = json.loads(message)
-                event, data = msg.get("event"), msg.get("data")
-            except json.JSONDecodeError:
+            event, _, data = message.partition(":")
+            if not event:
                 return await websocket.close(
                     code=1007,
-                    reason='Invalid message format. Expect JSON {"event": ..., "data": ...}',
+                    reason='Invalid message format. Expect "event:data"',
                 )
             if event == "station_playing":
                 CURRENT_STATION = data
@@ -44,7 +42,7 @@ async def switchboard(websocket):
             else:
                 return await websocket.close(
                     code=1007,
-                    reason=f"Unknown event in message: {event}",
+                    reason=f"Unknown event: {event}",
                 )
     except websockets.exceptions.ConnectionClosedError:
         # Suppress expected disconnect errors

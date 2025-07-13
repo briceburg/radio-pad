@@ -77,21 +77,22 @@ function connectWebSocket() {
     console.error('WebSocket error:', err);
   };
 
-  ws.onmessage = (event) => {
+  ws.onmessage = (msg) => {
     try {
-      const msg = JSON.parse(event.data);
-      switch (msg.event) {
+      const [event, data] = msg.data.split(':', 2);
+
+      switch (event) {
         case "station_playing":
-          nowPlaying.innerText = msg.data || "...";
+          nowPlaying.innerText = data || "...";
           Object.entries(stationButtons).forEach(([name, btn]) =>
-            btn.setAttribute('color', name === msg.data ? 'success' : 'primary')
+            btn.setAttribute('color', name === data ? 'success' : 'primary')
           );
           break;
         case "station_request":
         case "client_count":
           break;
         default:
-          console.warn('Unhandled WebSocket event:', msg.event, msg.data);
+          console.warn('Unhandled WebSocket event:', event, data);
       }
     } catch (e) {
       console.error('Error parsing WebSocket message:', e);
@@ -112,7 +113,7 @@ function playStation(stationName, button) {
   button.setAttribute('color', 'light');
 
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ event: "station_request", data: stationName }));
+    ws.send(`station_request:${stationName}`);
   } else {
     console.error('WebSocket not connected. Cannot send station request.');
   }
