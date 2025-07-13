@@ -25,8 +25,12 @@
         <ion-toolbar>
           <ion-title size="large">
             Now Playing: <span id="now-playing">...</span>
-            <ion-range aria-label="Volume"></ion-range>
           </ion-title>
+          <ion-buttons slot="end">
+            <ion-button shape="round" size="small" color="danger" disabled="true" id="stop-button">
+              <ion-icon slot="icon-only" name="stop"></ion-icon>
+            </ion-button>
+          </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content fullscreen="true" class="ion-padding">
