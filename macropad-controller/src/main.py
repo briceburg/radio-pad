@@ -5,16 +5,9 @@ import terminalio
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_text import label
 from adafruit_macropad import MacroPad
-from adafruit_hid.keycode import Keycode
 import usb_cdc
 
-
-DEFAULT_COLOR = 0x000077
-HIGHLIGHT_COLOR = 0x015C01
-PRESSED_COLOR = 0x999999
-LED_BRIGHTNESS = 0.10  # Dim the LEDs, 1 is full brightness
-MACROPAD_KEY_COUNT = 12  # Number of keys on the MacroPad
-RADIO_STATIONS_FILE = "stations.json"
+from radio_config import DEFAULT_COLOR, HIGHLIGHT_COLOR, PRESSED_COLOR, LED_BRIGHTNESS, MACROPAD_KEY_COUNT, RADIO_STATIONS_FILE, EVENTS
 PLAYER = usb_cdc.data
 
 if not PLAYER:
@@ -115,9 +108,10 @@ current_station_index = None
 
 
 def radio_control(event, data=None):
+    """Send control message to player."""
     message = json.dumps({"event": event, "data": data})
     PLAYER.write(f"{message}\n".encode())
-    time.sleep(0.1) # backpressure handling, wait for the player to process the command
+    time.sleep(0.1)  # backpressure handling
 
 
 def highlight_playing(app_index, station_index):
@@ -178,7 +172,7 @@ while True:
             except Exception as e:
                 print(f"PLAYER: failed to parse event: {e}")
                 continue
-            if event == "station_playing":
+            if event == EVENTS["STATION_PLAYING"]:
                 current_station_index = None
                 for aidx, app in enumerate(apps):
                     for idx, station in enumerate(app.stations):
@@ -205,7 +199,7 @@ while True:
     if last_position is not None and position != last_position:
         if current_station_index is not None:
             # if a station is playing, change volume
-            radio_control("volume", "up" if position > last_position else "down")
+            radio_control(EVENTS["VOLUME"], "up" if position > last_position else "down")
         else:
 
             # else, change station page
@@ -229,7 +223,7 @@ while True:
     if encoder_switch != last_encoder_switch:
         last_encoder_switch = encoder_switch
         if current_station_index is not None:
-            radio_control("station_request", None) # Stop the current station
+            radio_control(EVENTS["STATION_REQUEST"], None)  # Stop the current station
     else:
         event = macropad.keys.events.get()
         if not event or event.key_number >= len(apps[app_index].stations):
@@ -241,6 +235,6 @@ while True:
     if pressed and key_number < MACROPAD_KEY_COUNT:  # No pixel for encoder button
         macropad.pixels[key_number] = PRESSED_COLOR
         macropad.pixels.show()
-        radio_control("station_request", apps[app_index].stations[key_number].get("name", "?"))
+        radio_control(EVENTS["STATION_REQUEST"], apps[app_index].stations[key_number].get("name", "?"))
     else:
         macropad.consumer_control.release()
