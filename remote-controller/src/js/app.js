@@ -1,5 +1,6 @@
 const stationGrid = document.getElementById('station-grid');
 const nowPlaying = document.getElementById('now-playing');
+const stopButton = document.getElementById('stop-button');
 
 const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
 const switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'ws://localhost:1980/';
@@ -36,6 +37,10 @@ async function loadStations() {
 
       ionCol.appendChild(ionButton);
       ionRow.appendChild(ionCol);
+    });
+
+    stopButton.addEventListener('click', (ev) => {
+      stopStation();
     });
   } catch (error) {
     console.error('Error loading stations:', error);
@@ -83,6 +88,8 @@ function connectWebSocket() {
       switch (event) {
         case "station_playing":
           nowPlaying.innerText = data || "...";
+          // Enable/disable stop button based on whether a station is playing
+          stopButton.disabled = !data;
           Object.entries(stationButtons).forEach(([name, btn]) =>
             btn.setAttribute('color', name === data ? 'success' : 'primary')
           );
@@ -108,14 +115,21 @@ function scheduleReconnect() {
   }, reconnectDelay);
 }
 
-function playStation(stationName, button) {
-  button.setAttribute('color', 'light');
-
+function sendStationRequest(stationName) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ event: "station_request", data: stationName }));
   } else {
     console.error('WebSocket not connected. Cannot send station request.');
   }
+}
+
+function playStation(stationName, button) {
+  button.setAttribute('color', 'light');
+  sendStationRequest(stationName);
+}
+
+function stopStation() {
+  sendStationRequest(null);
 }
 
 loadStations();
