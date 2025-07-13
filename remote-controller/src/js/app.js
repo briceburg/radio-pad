@@ -77,21 +77,21 @@ function connectWebSocket() {
     console.error('WebSocket error:', err);
   };
 
-  ws.onmessage = (event) => {
+  ws.onmessage = (msg) => {
     try {
-      const msg = JSON.parse(event.data);
-      switch (msg.event) {
+      const { event, data } = JSON.parse(msg.data);
+      switch (event) {
         case "station_playing":
-          nowPlaying.innerText = msg.data || "...";
+          nowPlaying.innerText = data || "...";
           Object.entries(stationButtons).forEach(([name, btn]) =>
-            btn.setAttribute('color', name === msg.data ? 'success' : 'primary')
+            btn.setAttribute('color', name === data ? 'success' : 'primary')
           );
           break;
         case "station_request":
         case "client_count":
           break;
         default:
-          console.warn('Unhandled WebSocket event:', msg.event, msg.data);
+          console.warn('Unknown WebSocket event:', event);
       }
     } catch (e) {
       console.error('Error parsing WebSocket message:', e);

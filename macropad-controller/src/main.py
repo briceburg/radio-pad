@@ -106,15 +106,18 @@ if not apps:
     while True:
         pass
 
+
 last_position = None
-station_index = None
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
 app_index = 0
 apps[app_index].switch()
+current_station_index = None
 
 
 def radio_control(event, data=None):
-    PLAYER.write(f"{event}:{data}\n".encode())
+    message = json.dumps({"event": event, "data": data})
+    PLAYER.write(f"{message}\n".encode())
+    time.sleep(0.1) # backpressure handling, wait for the player to process the command
 
 
 def highlight_playing(app_index, station_index):
@@ -139,35 +142,68 @@ def highlight_playing(app_index, station_index):
     macropad.pixels.show()
     macropad.display.refresh()
 
+def reset_playing(app_index, flash=False):
+   
+    if flash:
+        # flash the pixels
+        for i in range(MACROPAD_KEY_COUNT):
+            macropad.pixels[i] = 0x990909
+        macropad.pixels.show()
+        time.sleep(0.66)
+
+    # reset radio display and keys
+    group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].title
+    for i in range(MACROPAD_KEY_COUNT):
+        group[i].color = 0xFFFFFF
+        group[i].background_color = 0x000000
+        try:
+            macropad.pixels[i] = (
+                apps[app_index].stations[i].get("color", DEFAULT_COLOR)
+            )
+        except IndexError:
+            macropad.pixels[i] = 0
+    macropad.display.refresh()
+    macropad.pixels.show()
+
 
 # MAIN LOOP ----------------------------
 while True:
     if PLAYER.in_waiting > 0:
-        msg = PLAYER.read(PLAYER.in_waiting).decode("utf-8").strip()
-        event, data = msg.split(":", 1) if ":" in msg else (msg, None)
-        if event == "station_playing":
-            station_index = None
-            for aidx, app in enumerate(apps):
-                for idx, station in enumerate(app.stations):
-                    if station.get("name") == data:
-                        station_index = idx
+        lines = PLAYER.read(PLAYER.in_waiting).decode("utf-8").strip().splitlines()
+        if lines:
+            try:
+                msg = json.loads(lines[-1])
+                event = msg.get("event")
+                data = msg.get("data")
+            except Exception as e:
+                print(f"PLAYER: failed to parse event: {e}")
+                continue
+            if event == "station_playing":
+                current_station_index = None
+                for aidx, app in enumerate(apps):
+                    for idx, station in enumerate(app.stations):
+                        if station.get("name") == data:
+                            # If the app index has changed, switch to the correct app page.
+                            if app_index != aidx:
+                                apps[aidx].switch()
+                                app_index = aidx
 
-                        # If the app index has changed, switch to the correct app
-                        if app_index != aidx:
-                            apps[aidx].switch()
-                            app_index = aidx
-
-                        highlight_playing(app_index, station_index)
+                            current_station_index = idx
+                            break
+                    if current_station_index is not None:
                         break
-                if station_index is not None:
-                    break
-        else:
-            print(f"PLAYER: ignored event: {event}")
+                
+                if current_station_index is None:
+                    reset_playing(app_index)
+                else:
+                    highlight_playing(app_index, current_station_index)
+            else:
+                print(f"PLAYER: ignored event: {event}")
 
     # Read encoder position.
     position = macropad.encoder
     if last_position is not None and position != last_position:
-        if station_index is not None:
+        if current_station_index is not None:
             # if a station is playing, change volume
             radio_control("volume", "up" if position > last_position else "down")
         else:
@@ -192,37 +228,8 @@ while True:
     encoder_switch = macropad.encoder_switch_debounced.pressed
     if encoder_switch != last_encoder_switch:
         last_encoder_switch = encoder_switch
-        if station_index is not None:
-            # stop radio
-            radio_control("stop")
-
-            # TODO: the below should happen on event from player and not immediately?
-            # reset radio display and keys
-            for i in range(MACROPAD_KEY_COUNT):
-                group[i].color = 0xFFFFFF
-                group[i].background_color = 0x000000
-            group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].title
-            macropad.display.refresh()
-
-            station_index = None
-
-            # flash the pixels
-            for i in range(MACROPAD_KEY_COUNT):
-                macropad.pixels[i] = 0x990909
-            macropad.pixels.show()
-            time.sleep(0.66)
-
-            # restore the pixels
-            for i in range(MACROPAD_KEY_COUNT):
-                try:
-                    macropad.pixels[i] = (
-                        apps[app_index].stations[i].get("color", DEFAULT_COLOR)
-                    )
-                except IndexError:
-                    macropad.pixels[i] = 0
-            macropad.pixels.show()
-
-        continue
+        if current_station_index is not None:
+            radio_control("station_request", None) # Stop the current station
     else:
         event = macropad.keys.events.get()
         if not event or event.key_number >= len(apps[app_index].stations):
@@ -234,6 +241,6 @@ while True:
     if pressed and key_number < MACROPAD_KEY_COUNT:  # No pixel for encoder button
         macropad.pixels[key_number] = PRESSED_COLOR
         macropad.pixels.show()
-        radio_control("play", apps[app_index].stations[key_number].get("name", "?"))
+        radio_control("station_request", apps[app_index].stations[key_number].get("name", "?"))
     else:
         macropad.consumer_control.release()
