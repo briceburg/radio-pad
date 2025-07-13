@@ -1,51 +1,44 @@
 #!/usr/bin/env python
 
 import asyncio
-import json
 import logging
 import os
 import signal
+import sys
 
 import websockets
 from websockets.asyncio.server import broadcast, serve
 
+# Add shared module to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+from protocol import MessageProtocol, Events
+from config import Config
+
 CURRENT_STATION = None
-
-
-def mkmsg(event: str, data) -> str:
-    return json.dumps({"event": event, "data": data})
 
 
 async def switchboard(websocket):
     global CURRENT_STATION
 
     def broadcast_all(event: str, data):
-        broadcast(websocket.server.connections, mkmsg(event, data))
+        broadcast(websocket.server.connections, MessageProtocol.create_message(event, data))
 
     try:
-        broadcast_all("client_count", len(websocket.server.connections))
-        await websocket.send(mkmsg("station_playing", CURRENT_STATION))
+        broadcast_all(Events.CLIENT_COUNT, len(websocket.server.connections))
+        await websocket.send(MessageProtocol.create_message(Events.STATION_PLAYING, CURRENT_STATION))
 
         async for msg in websocket:
-            try:
-                event, data = (lambda m: (m.get("event"), m.get("data")))(json.loads(msg))
+            is_valid, error_reason = MessageProtocol.validate_message(msg)
+            if not is_valid:
+                return await websocket.close(code=1007, reason=error_reason)
+            
+            event, data = MessageProtocol.parse_message(msg)
 
-                if not event:
-                    return await websocket.close(
-                        code=1007,
-                        reason='Invalid message format. Missing "event" field.',
-                    )
-            except json.JSONDecodeError:
-                return await websocket.close(
-                    code=1007,
-                    reason='Invalid message format. Expected JSON with "event" and "data" fields.',
-                )
-
-            if event == "station_playing":
+            if event == Events.STATION_PLAYING:
                 CURRENT_STATION = data
-                broadcast_all("station_playing", CURRENT_STATION)
-            elif event == "station_request":
-                broadcast_all("station_request", data)
+                broadcast_all(Events.STATION_PLAYING, CURRENT_STATION)
+            elif event == Events.STATION_REQUEST:
+                broadcast_all(Events.STATION_REQUEST, data)
             else:
                 return await websocket.close(
                     code=1007,
@@ -55,12 +48,12 @@ async def switchboard(websocket):
         # Suppress expected disconnect errors
         pass
     finally:
-        broadcast_all("client_count", len(websocket.server.connections))
+        broadcast_all(Events.CLIENT_COUNT, len(websocket.server.connections))
 
         # if the disconnected client is the RadioPad Player, reset the current station
         if getattr(websocket, "is_radio_pad", False):
             CURRENT_STATION = None
-            broadcast_all("station_playing", CURRENT_STATION)
+            broadcast_all(Events.STATION_PLAYING, CURRENT_STATION)
 
 
 async def switchboard_connect(connection, request):
@@ -81,8 +74,8 @@ async def main():
 
     async with serve(
         switchboard,
-        os.environ.get("SWITCHBOARD_HOST", "localhost"),
-        int(os.environ.get("SWITCHBOARD_PORT", 1980)),
+        Config.SWITCHBOARD_HOST,
+        Config.SWITCHBOARD_PORT,
         process_request=switchboard_connect,
     ) as server:
         logging.info("Switchboard running. Press Ctrl+C to stop.")
