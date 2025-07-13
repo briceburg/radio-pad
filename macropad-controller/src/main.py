@@ -5,7 +5,6 @@ import terminalio
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_text import label
 from adafruit_macropad import MacroPad
-from adafruit_hid.keycode import Keycode
 import usb_cdc
 
 
@@ -55,192 +54,170 @@ group.append(
 )
 macropad.display.root_group = group
 
+class RadioPadApp:
+    def __init__(self):
+        self.current_page_index = None
+        self.current_station_index = None
+        self.last_position = macropad.encoder
+        self.last_encoder_switch = macropad.encoder_switch_debounced.pressed
+        self.pages = []
+        try:
+            self._load_stations()
+        except Exception as e:
+            print(f"Error loading stations: {e}")
+            self.set_title("STATION LOADING ERROR")
+            macropad.display.refresh()
+            while True:
+                pass
 
-# INITIALIZATION -----------------------
-class App:
-    def __init__(self, appdata):
-        self.stations = appdata["stations"]
-        self.title = appdata["title"]
+    def _load_stations(self):
+        """Load station configurations from a JSON file."""
+        with open(RADIO_STATIONS_FILE, "r") as f:
+            stations_list = json.load(f)
+        if len(stations_list) == 0:
+            raise ValueError("No stations found in the configuration file.")
+        for i in range(0, len(stations_list), MACROPAD_KEY_COUNT):
+            self.pages.append({
+                "stations": stations_list[i : i + MACROPAD_KEY_COUNT],
+                "title": (
+                    "iCEBURG Radio"
+                    if len(stations_list) <= MACROPAD_KEY_COUNT
+                    else f"iCEBURG Radio {int(i / MACROPAD_KEY_COUNT) + 1}"
+                ),
+            })
 
-    def switch(self):
-        group[MACROPAD_KEY_COUNT + 1].text = self.title
-        rect.fill = 0xFFFFFF
+    def radio_control(self, event, data=None):
+        """Send a command to the host player."""
+        message = json.dumps({"event": event, "data": data})
+        PLAYER.write(f"{message}\n".encode())
+        time.sleep(0.1)  # Handle backpressure
+
+    def set_title(self, title=None):
+        if not title:
+            if self.current_station_index is not None:
+                title = self.pages[self.current_page_index]['stations'][self.current_station_index].get("name", "?")
+            else:
+                title = self.pages[self.current_page_index]['title']
+        group[MACROPAD_KEY_COUNT + 1].text = title
+
+    def update_display(self, flash=False):
+        """Update the entire display, including LEDs and text."""
+        if flash:
+            for i in range(MACROPAD_KEY_COUNT):
+                macropad.pixels[i] = 0x990909
+            macropad.pixels.show()
+            time.sleep(0.66)
+
+        page = self.pages[self.current_page_index]
+        self.set_title()
         for i in range(MACROPAD_KEY_COUNT):
-            if i < len(self.stations):
-                macropad.pixels[i] = self.stations[i].get("color", DEFAULT_COLOR)
-                group[i].text = self.stations[i].get("name", "?")
-            else:  # no station assigned to this key, disable LED and label.
+            if i < len(page['stations']):
+                station = page['stations'][i]
+                if i == self.current_station_index:
+                    macropad.pixels[i] = HIGHLIGHT_COLOR
+                    group[i].color = 0x000000
+                    group[i].background_color = 0xFFFFFF
+                else:
+                    macropad.pixels[i] = station.get("color", DEFAULT_COLOR)
+                    group[i].color = 0xFFFFFF
+                    group[i].background_color = 0x000000
+                group[i].text = station.get("name", "?")
+            else:
                 macropad.pixels[i] = 0
                 group[i].text = ""
 
+        macropad.pixels.show()
+        macropad.display.refresh()
+
+    def switch_page(self, idx=None):
+        """Switch to a new page of stations."""
+        if idx is not None:
+            self.current_page_index = idx
         macropad.keyboard.release_all()
         macropad.consumer_control.release()
         macropad.mouse.release_all()
         macropad.stop_tone()
-        macropad.pixels.show()
-        macropad.display.refresh()
+        self.update_display()
 
-
-# add an application for each page of stations, page length is MACROPAD_KEY_COUNT
-apps = []
-with open(RADIO_STATIONS_FILE, "r") as f:
-    stations_list = json.load(f)
-    for i in range(0, len(stations_list), MACROPAD_KEY_COUNT):
-        apps.append(
-            App(
-                {
-                    "stations": stations_list[i : i + MACROPAD_KEY_COUNT],
-                    "title": (
-                        "iCEBURG Radio"
-                        if len(stations_list) <= MACROPAD_KEY_COUNT
-                        else f"iCEBURG Radio {int(i / MACROPAD_KEY_COUNT) + 1}"
-                    ),
-                }
-            )
-        )
-    del stations_list
-
-if not apps:
-    group[MACROPAD_KEY_COUNT + 1].text = "NO STATIONS DEFINED"
-    macropad.display.refresh()
-    while True:
-        pass
-
-
-last_position = None
-last_encoder_switch = macropad.encoder_switch_debounced.pressed
-app_index = 0
-apps[app_index].switch()
-current_station_index = None
-
-
-def radio_control(event, data=None):
-    message = json.dumps({"event": event, "data": data})
-    PLAYER.write(f"{message}\n".encode())
-    time.sleep(0.1) # backpressure handling, wait for the player to process the command
-
-
-def highlight_playing(app_index, station_index):
-    """Highlight the currently playing station."""
-
-    group[MACROPAD_KEY_COUNT + 1].text = (
-        apps[app_index].stations[station_index].get("name", "?")
-    )
-    for i in range(MACROPAD_KEY_COUNT):
-        try:
-            macropad.pixels[i] = (
-                HIGHLIGHT_COLOR
-                if i == station_index
-                else apps[app_index].stations[i].get("color", DEFAULT_COLOR)
-            )
-        except IndexError:
-            macropad.pixels[i] = 0
-
-        group[i].color = 0x000000 if i == station_index else 0xFFFFFF
-        group[i].background_color = 0xFFFFFF if i == station_index else 0x000000
-
-    macropad.pixels.show()
-    macropad.display.refresh()
-
-def reset_playing(app_index, flash=False):
-   
-    if flash:
-        # flash the pixels
-        for i in range(MACROPAD_KEY_COUNT):
-            macropad.pixels[i] = 0x990909
-        macropad.pixels.show()
-        time.sleep(0.66)
-
-    # reset radio display and keys
-    group[MACROPAD_KEY_COUNT + 1].text = apps[app_index].title
-    for i in range(MACROPAD_KEY_COUNT):
-        group[i].color = 0xFFFFFF
-        group[i].background_color = 0x000000
-        try:
-            macropad.pixels[i] = (
-                apps[app_index].stations[i].get("color", DEFAULT_COLOR)
-            )
-        except IndexError:
-            macropad.pixels[i] = 0
-    macropad.display.refresh()
-    macropad.pixels.show()
-
-
-# MAIN LOOP ----------------------------
-while True:
-    if PLAYER.in_waiting > 0:
-        lines = PLAYER.read(PLAYER.in_waiting).decode("utf-8").strip().splitlines()
-        if lines:
+    def handle_player_events(self):
+        """Check for and process incoming messages from the player."""
+        if PLAYER.in_waiting > 0:
+            lines = PLAYER.read(PLAYER.in_waiting).decode("utf-8").strip().splitlines()
+            if not lines:
+                return
             try:
                 msg = json.loads(lines[-1])
                 event = msg.get("event")
                 data = msg.get("data")
-            except Exception as e:
+            except (ValueError, IndexError) as e:
                 print(f"PLAYER: failed to parse event: {e}")
-                continue
-            if event == "station_playing":
-                current_station_index = None
-                for aidx, app in enumerate(apps):
-                    for idx, station in enumerate(app.stations):
-                        if station.get("name") == data:
-                            # If the app index has changed, switch to the correct app page.
-                            if app_index != aidx:
-                                apps[aidx].switch()
-                                app_index = aidx
+                return
 
-                            current_station_index = idx
-                            break
-                    if current_station_index is not None:
-                        break
-                
-                if current_station_index is None:
-                    reset_playing(app_index)
+            if event == "station_playing":
+                self.current_station_index = None
+                if not data:
+                    self.update_display()
                 else:
-                    highlight_playing(app_index, current_station_index)
+                    for pidx, page in enumerate(self.pages):
+                        for sidx, station in enumerate(page['stations']):
+                            if station.get("name") == data:
+                                self.current_station_index = sidx
+                                self.switch_page(pidx)
+                                break
+                        if self.current_station_index is not None:
+                            break
             else:
                 print(f"PLAYER: ignored event: {event}")
 
-    # Read encoder position.
-    position = macropad.encoder
-    if last_position is not None and position != last_position:
-        if current_station_index is not None:
-            # if a station is playing, change volume
-            radio_control("volume", "up" if position > last_position else "down")
-        else:
-
-            # else, change station page
-            # we cannot use app_index = position % len(apps) -- because the encoder value is linked to volume as well
-            # TODO: investiagate ability to reset the macropad.encoder value when switching apps so the number doesn't get huge over time.
-            if position > last_position:
-                app_index += 1
-                if app_index > len(apps) - 1:
-                    app_index = 0
+    def handle_encoder_rotation(self):
+        """Handle the rotary encoder for volume or page switching."""
+        position = macropad.encoder
+        if position != self.last_position:
+            if self.current_station_index is not None:
+                direction = "up" if position > self.last_position else "down"
+                self.radio_control("volume", direction)
             else:
-                app_index -= 1
-                if app_index < 0:
-                    app_index = len(apps) - 1
-            apps[app_index].switch()
+                if position > self.last_position:
+                    self.switch_page((self.current_page_index + 1) % len(self.pages))
+                else:
+                    self.switch_page((self.current_page_index - 1 + len(self.pages)) % len(self.pages))
+            self.last_position = position
 
-    last_position = position
+    def handle_encoder_press(self):
+        """Handle the encoder button press to stop playback."""
+        macropad.encoder_switch_debounced.update()
+        pressed = macropad.encoder_switch_debounced.pressed
+        if pressed != self.last_encoder_switch:
+            self.last_encoder_switch = pressed
+            if pressed and self.current_station_index is not None:
+                self.radio_control("station_request", None)
 
-    # Handle encoder button. If it's pressed, stop radio.
-    macropad.encoder_switch_debounced.update()
-    encoder_switch = macropad.encoder_switch_debounced.pressed
-    if encoder_switch != last_encoder_switch:
-        last_encoder_switch = encoder_switch
-        if current_station_index is not None:
-            radio_control("station_request", None) # Stop the current station
-    else:
+    def handle_key_events(self):
+        """Handle key presses to select a station."""
         event = macropad.keys.events.get()
-        if not event or event.key_number >= len(apps[app_index].stations):
-            continue  # No key events, or no corresponding station, resume loop
-        key_number = event.key_number
-        pressed = event.pressed
+        if not event:
+            return
 
-    # If code reaches here, a key WAS pressed/released and there's a corresponding station.
-    if pressed and key_number < MACROPAD_KEY_COUNT:  # No pixel for encoder button
-        macropad.pixels[key_number] = PRESSED_COLOR
-        macropad.pixels.show()
-        radio_control("station_request", apps[app_index].stations[key_number].get("name", "?"))
-    else:
-        macropad.consumer_control.release()
+        page = self.pages[self.current_page_index]
+        key_number = event.key_number
+        if key_number >= len(page['stations']):
+            return
+
+        if event.pressed:
+            macropad.pixels[key_number] = PRESSED_COLOR
+            macropad.pixels.show()
+            station_name = page['stations'][key_number].get("name", "?")
+            self.radio_control("station_request", station_name)
+
+    def run(self):
+        """The main application loop."""
+        self.switch_page(0)
+        while True:
+            self.handle_player_events()
+            self.handle_encoder_rotation()
+            self.handle_encoder_press()
+            self.handle_key_events()
+
+if __name__ == "__main__":
+    app = RadioPadApp()
+    app.run()
