@@ -12,8 +12,7 @@ from websockets.asyncio.server import broadcast, serve
 CURRENT_STATION = None
 
 
-def mkevent(event: str, data) -> str:
-    """Create a JSON event message."""
+def mkmsg(event: str, data) -> str:
     return json.dumps({"event": event, "data": data})
 
 
@@ -21,21 +20,27 @@ async def switchboard(websocket):
     global CURRENT_STATION
 
     def broadcast_all(event: str, data):
-        broadcast(websocket.server.connections, mkevent(event, data))
+        broadcast(websocket.server.connections, mkmsg(event, data))
 
     try:
         broadcast_all("client_count", len(websocket.server.connections))
-        await websocket.send(mkevent("station_playing", CURRENT_STATION))
+        await websocket.send(mkmsg("station_playing", CURRENT_STATION))
 
-        async for message in websocket:
+        async for msg in websocket:
             try:
-                msg = json.loads(message)
-                event, data = msg.get("event"), msg.get("data")
+                event, data = (lambda m: (m.get("event"), m.get("data")))(json.loads(msg))
+
+                if not event:
+                    return await websocket.close(
+                        code=1007,
+                        reason='Invalid message format. Missing "event" field.',
+                    )
             except json.JSONDecodeError:
                 return await websocket.close(
                     code=1007,
-                    reason='Invalid message format. Expect JSON {"event": ..., "data": ...}',
+                    reason='Invalid message format. Expected JSON with "event" and "data" fields.',
                 )
+
             if event == "station_playing":
                 CURRENT_STATION = data
                 broadcast_all("station_playing", CURRENT_STATION)
