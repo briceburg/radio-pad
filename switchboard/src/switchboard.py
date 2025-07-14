@@ -8,6 +8,7 @@ import signal
 
 import websockets
 from websockets.asyncio.server import broadcast, serve
+from http import HTTPStatus
 
 CURRENT_STATION = None
 
@@ -28,7 +29,9 @@ async def switchboard(websocket):
 
         async for msg in websocket:
             try:
-                event, data = (lambda m: (m.get("event"), m.get("data")))(json.loads(msg))
+                event, data = (lambda m: (m.get("event"), m.get("data")))(
+                    json.loads(msg)
+                )
 
                 if not event:
                     return await websocket.close(
@@ -63,7 +66,13 @@ async def switchboard(websocket):
             broadcast_all("station_playing", CURRENT_STATION)
 
 
-async def switchboard_connect(connection, request):
+async def switchboard_connect(
+    connection: websockets.asyncio.server.ServerConnection,
+    request: websockets.http11.Request,
+) -> None | websockets.http11.Response:
+    if request.path == "/health":
+        return connection.respond(HTTPStatus.OK, "OK\n")
+
     if request.headers.get("User-Agent", "").startswith("RadioPad/"):
         setattr(connection, "is_radio_pad", True)
     return None
@@ -79,6 +88,10 @@ async def main():
     loop.add_signal_handler(signal.SIGINT, ask_exit)
     loop.add_signal_handler(signal.SIGTERM, ask_exit)
 
+    # Suppress websocket healthcheck, connection logs.
+    # https://websockets.readthedocs.io/en/stable/topics/logging.html#log-levels
+    logging.getLogger("websockets.server").setLevel(logging.WARNING)
+
     async with serve(
         switchboard,
         os.environ.get("SWITCHBOARD_HOST", "localhost"),
@@ -86,6 +99,9 @@ async def main():
         process_request=switchboard_connect,
     ) as server:
         logging.info("Switchboard running. Press Ctrl+C to stop.")
+        logging.info(
+            f"Listening on {server.sockets[0].getsockname()[0]}:{server.sockets[0].getsockname()[1]}"
+        )
         await stop_event.wait()
         logging.info("Switchboard shutting down...")
 
