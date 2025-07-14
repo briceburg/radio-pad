@@ -29,7 +29,9 @@ async def switchboard(websocket):
 
         async for msg in websocket:
             try:
-                event, data = (lambda m: (m.get("event"), m.get("data")))(json.loads(msg))
+                event, data = (lambda m: (m.get("event"), m.get("data")))(
+                    json.loads(msg)
+                )
 
                 if not event:
                     return await websocket.close(
@@ -64,12 +66,21 @@ async def switchboard(websocket):
             broadcast_all("station_playing", CURRENT_STATION)
 
 
-async def switchboard_connect(connection: websockets.asyncio.server.ServerConnection, request: websockets.http11.Request):
+async def switchboard_connect(
+    connection: websockets.asyncio.server.ServerConnection,
+    request: websockets.http11.Request,
+):
     if request.path == "/health":
         return connection.respond(HTTPStatus.OK, "OK\n")
 
+    if request.headers.get("Upgrade") is None:
+        return connection.respond(
+            HTTPStatus.BAD_REQUEST, "Missing websocket Upgrade header\n"
+        )
+
     if request.headers.get("User-Agent", "").startswith("RadioPad/"):
         setattr(connection, "is_radio_pad", True)
+
     return None
 
 
@@ -83,21 +94,28 @@ async def main():
     loop.add_signal_handler(signal.SIGINT, ask_exit)
     loop.add_signal_handler(signal.SIGTERM, ask_exit)
 
+    host = os.environ.get("SWITCHBOARD_HOST", "localhost")
+    port = int(os.environ.get("SWITCHBOARD_PORT", 1980))
+
     async with serve(
         switchboard,
-        os.environ.get("SWITCHBOARD_HOST", "localhost"),
-        int(os.environ.get("SWITCHBOARD_PORT", 1980)),
+        host,
+        port,
         process_request=switchboard_connect,
     ) as server:
         logging.info("Switchboard running. Press Ctrl+C to stop.")
+        logging.info(f"listening on {host}:{port}")
         await stop_event.wait()
         logging.info("Switchboard shutting down...")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    # websockets 14.0+? logs an error if a connection is opened and closed
+    # before data is sent. e.g. when platforms send HEAD requests.
+    # Suppress these warnings.
+    logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
     try:
-        logging.info("Starting switchboard... Press Ctrl+C to stop.")
         asyncio.run(main())
     except Exception as e:
         logging.error(f"Switchboard exited with error: {e}")
