@@ -7,6 +7,7 @@ import os
 import signal
 
 import websockets
+from http import HTTPStatus
 from websockets.asyncio.server import broadcast, serve
 
 CURRENT_STATION = None
@@ -63,7 +64,10 @@ async def switchboard(websocket):
             broadcast_all("station_playing", CURRENT_STATION)
 
 
-async def switchboard_connect(connection, request):
+async def switchboard_connect(connection: websockets.asyncio.server.ServerConnection, request: websockets.http11.Request):
+    if request.path == "/health":
+        return connection.respond(HTTPStatus.OK, "OK\n")
+
     if request.headers.get("User-Agent", "").startswith("RadioPad/"):
         setattr(connection, "is_radio_pad", True)
     return None
