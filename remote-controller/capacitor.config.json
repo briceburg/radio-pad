@@ -4,7 +4,9 @@
   "webDir": "dist",
   "plugins": {
     "SplashScreen": {
-      "launchAutoHide": false
+      "launchAutoHide": true,
+      "launchShowDuration": 777,
+      "androidSplashResourceName": "splash"
     }
   }
 }

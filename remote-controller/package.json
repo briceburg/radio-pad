@@ -12,10 +12,11 @@
     "@capacitor/android": "^7.4.1",
     "@capacitor/camera": "latest",
     "@capacitor/core": "latest",
-    "@capacitor/splash-screen": "latest",
+    "@capacitor/splash-screen": "^7.0.1",
     "@ionic/core": "^8.6.3"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "latest",
     "vite": "^5.4.2"
   },
