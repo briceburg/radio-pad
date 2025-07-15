@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="160mm"
+   height="160mm"
+   viewBox="0 0 160 160.00001"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   sodipodi:docname="icon-fancy-bg.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.1278199"
+     inkscape:cx="70.933314"
+     inkscape:cy="411.41322"
+     inkscape:window-width="2560"
+     inkscape:window-height="2880"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer2"
+     showgrid="false">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="160"
+       height="160"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <linearGradient
+       id="linearGradient3"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#7cff7c;stop-opacity:1;"
+         offset="0.31835344"
+         id="stop3" />
+      <stop
+         style="stop-color:#537553;stop-opacity:0;"
+         offset="1"
+         id="stop4" />
+    </linearGradient>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3"
+       id="radialGradient4"
+       cx="79.198807"
+       cy="114.09976"
+       fx="79.198807"
+       fy="114.09976"
+       r="32.69371"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.133829,0,0,1.133829,-9.7108546,-8.0433687)" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-38.145969,-67.733331)">
+    <g
+       id="layer1-5"
+       transform="matrix(2.4127974,0,0,2.4127974,-72.888428,-127.50999)">
+      <g
+         inkscape:groupmode="layer"
+         id="layer2"
+         inkscape:label="Layer 2">
+        <circle
+           style="fill:url(#radialGradient4);stroke-width:0.113392"
+           id="path3"
+           cx="80.08699"
+           cy="121.32623"
+           r="37.069077" />
+      </g>
+    </g>
+  </g>
+</svg>
