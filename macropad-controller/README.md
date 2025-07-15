@@ -4,7 +4,7 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 
 **radio-pad** lets you use an Adafruit Macropad as a controller for playing internet radio stations on your computer (such as a Raspberry Pi). Each Macropad button can be mapped to a different station, and the host computer will play the selected station using [mpv](https://mpv.io/).
 
-![ai-enhanced-macropad-image](./docs/img/radio-macropad-ai-image.webp)
+![macropad-image](../shared/assets/radio-macropad-ai-image.webp)
 
 ## How It Works
 

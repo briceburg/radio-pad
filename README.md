@@ -2,6 +2,8 @@
 
 A 🎵 radio station player 🎵 with real-time syncing controllers.
 
+![radio-pad-logo](./shared/assets/logo-dark.svg)
+
 ## overview
 
 * the radio-pad [player](./player/) runs on a host, such as a raspberry pi, connected to a stereo/speakers.
@@ -16,7 +18,7 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 * the encoder knob adjusts volume if a station is playing, or switches station pages if there are more than 12 stations.
 * pressing the encoder knob will stop playing.
 
-![ai-enhanced-macropad-image](./macropad-controller/docs/img/radio-macropad-ai-image.webp)
+![ai-enhanced-macropad-image](./shared/assets/radio-macropad-ai-image.webp)
 
 ### remote control
 
@@ -34,6 +36,10 @@ there are four components that makeup radio-pad. each is broken out into a folde
 * the [macropad-controller](./macropad-controller/), this connects to the host over USB.
 * the [switchboard](./switchboard/), this is _optional_ and needed to support remote-control.
 * the [remote-control](./remote-controller/), used to create mobile and web clients for controlling the player.
+
+<p align="center" width="100%">
+  <img src="./shared/assets/icon-fancy-bg.svg" />
+</p>
 
 ## Development
 
