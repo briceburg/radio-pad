@@ -20,11 +20,11 @@ services:
     volumes:
       - ./switchboard:/app
 
-  remote-controller:
+  remote-control:
     build:
-      context: ./remote-controller
+      context: ./remote-control
     ports:
       - "5173:5173"
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./remote-controller:/app
+      - ./remote-control:/app

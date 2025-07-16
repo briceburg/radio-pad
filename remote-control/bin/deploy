@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/remote-controller"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/remote-control"
 
 export VITE_SWITCHBOARD_URL="wss://$(cd $PROJECT_ROOT/../switchboard && fly status --deployment -j | jq -r '.Hostname')"
 echo "Switchboard URL: $VITE_SWITCHBOARD_URL"

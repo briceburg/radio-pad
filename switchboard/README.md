@@ -1,6 +1,6 @@
 # radio-pad switchboard
 
-websockets :octopus: enabling event driven communication between the [radio-pad player](../player/) and connected [controllers](../remote-controller/).
+websockets :octopus: enabling event driven communication between the [radio-pad player](../player/) and connected [controllers](../remote-control/).
 
 ## Usage
 

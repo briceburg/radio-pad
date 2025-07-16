@@ -1,4 +1,4 @@
-# radio-pad macropad-controller
+# radio-pad macropad-control
 
 Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-rp2040/overview) as a 🎵 radio station player 🎵.
 

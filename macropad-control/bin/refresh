@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/macropad-controller"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/macropad-control"
 
 mount | grep -q /mnt/CIRCUITPY || {
   echo "macropad not mounted, please run bin/mount and try again." >&2

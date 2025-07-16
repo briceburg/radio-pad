@@ -1,4 +1,4 @@
-# radio-pad remote-controller
+# radio-pad remote-control
 
 Remotely control [radio-pad](https://github.com/briceburg/radio-pad) through a simple web and/or mobile application.
 
