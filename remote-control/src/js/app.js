@@ -16,13 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const stationGrid = document.getElementById("station-grid");
+const debugInfo = document.getElementById('debug-info');
 const nowPlaying = document.getElementById("now-playing");
+const stationGrid = document.getElementById("station-grid");
 const stopButton = document.getElementById("stop-button");
 
 let playerId = import.meta.env.VITE_PLAYER_ID || "briceburg";
-let registryUrl =
-  import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev";
+let registryUrl = import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev";
 let stationsUrl = import.meta.env.VITE_STATIONS_URL || null;
 let switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || null;
 
@@ -110,15 +110,19 @@ async function loadStations() {
   }
 }
 
-function connectWebSocket() {
-  if (
-    ws &&
-    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
-  ) {
+async function connectWebSocket() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     return;
   }
 
-  console.log("Connecting to WebSocket:", switchboardUrl);
+  // TODO: use registry discovered switchboardUrl...
+  // const result = await Preferences.get({ key: 'switchboardUrl' });
+  // if (result.value) {
+  //   switchboardUrl = result.value;
+  // }
+
+  console.log('Connecting to WebSocket:', switchboardUrl);
+  debugInfo.innerText = "🔄 Connecting to " + switchboardUrl;
   ws = new WebSocket(switchboardUrl);
 
   // Add a 3-second timeout for the connection attempt
@@ -130,7 +134,8 @@ function connectWebSocket() {
   }, 3000);
 
   ws.onopen = () => {
-    console.log("WebSocket connected");
+    debugInfo.innerText = "✅ Connected to " + switchboardUrl; 
+    console.log('WebSocket connected');
     clearTimeout(connectTimeout);
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -231,3 +236,19 @@ async function initialize() {
 }
 
 initialize();
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('settings-save').addEventListener('click', async () => {
+    const key = document.getElementById('settings-key').value;
+    const value = document.getElementById('settings-value').value;
+    if (key) {
+      await Preferences.set({ key, value });
+      alert(`Saved: ${key} = ${value}`);
+    } else {
+      alert('Please enter a key.');
+    }
+  });
+
+  const result = await Preferences.keys();
+  console.log('Stored keys:', result.keys);
+});
