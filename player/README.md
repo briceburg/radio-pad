@@ -74,4 +74,4 @@ For questions or help, please open an issue on the [GitHub repository](https://g
 
 ## License
 
-[BSD 3-Clause "New" or "Revised" License](./LICENSE)
+[GNU General Public License v3.0](./LICENSE)
