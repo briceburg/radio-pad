@@ -7,4 +7,6 @@ echo "Switchboard URL: $VITE_SWITCHBOARD_URL"
 
 cd "$PROJECT_ROOT"
 npm run build
+npx cap sync android
+echo "TBD: deploy android app? trigger apk build?"
 wrangler pages deploy
