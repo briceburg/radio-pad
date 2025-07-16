@@ -16,12 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const stationGrid = document.getElementById('station-grid');
+import { Preferences } from '@capacitor/preferences';
+
+const debugInfo = document.getElementById('debug-info');
 const nowPlaying = document.getElementById('now-playing');
+const stationGrid = document.getElementById('station-grid');
 const stopButton = document.getElementById('stop-button');
 
-const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
-const switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'ws://localhost:1980/';
+let stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
+let switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'ws://localhost:1980/';
 
 let ws;
 let reconnectTimer = null;
@@ -65,12 +68,18 @@ async function loadStations() {
   }
 }
 
-function connectWebSocket() {
+async function connectWebSocket() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     return;
   }
 
+  const result = await Preferences.get({ key: 'switchboardUrl' });
+  if (result.value) {
+    switchboardUrl = result.value;
+  }
+
   console.log('Connecting to WebSocket:', switchboardUrl);
+  debugInfo.innerText = "🔄 Connecting to " + switchboardUrl;
   ws = new WebSocket(switchboardUrl);
 
   // Add a 3-second timeout for the connection attempt
@@ -82,6 +91,7 @@ function connectWebSocket() {
   }, 3000);
 
   ws.onopen = () => {
+    debugInfo.innerText = "✅ Connected to " + switchboardUrl; 
     console.log('WebSocket connected');
     clearTimeout(connectTimeout);
     clearTimeout(reconnectTimer);
@@ -152,3 +162,21 @@ function stopStation() {
 
 loadStations();
 connectWebSocket();
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('settings-save').addEventListener('click', async () => {
+    const key = document.getElementById('settings-key').value;
+    const value = document.getElementById('settings-value').value;
+    if (key) {
+      await Preferences.set({ key, value });
+      alert(`Saved: ${key} = ${value}`);
+    } else {
+      alert('Please enter a key.');
+    }
+  });
+
+  const result = await Preferences.keys();
+  console.log('Stored keys:', result.keys);
+});
+
