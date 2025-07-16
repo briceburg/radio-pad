@@ -1,0 +1,2 @@
+name = "radio-pad"
+pages_build_output_dir = "./dist"

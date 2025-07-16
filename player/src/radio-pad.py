@@ -338,6 +338,7 @@ async def switchboard_loop(url):
                     await handle_msg(msg, "SWITCHBOARD")
         except (ConnectionRefusedError, OSError) as e:
             print(f"SWITCHBOARD: failed to connect to {url}: {e}")
+            print("If this is the wrong URL, please set the SWITCHBOARD_URL environment variable.")
         except Exception as e:
             print(f"SWITCHBOARD: Unexpected error: {e}")
         finally:

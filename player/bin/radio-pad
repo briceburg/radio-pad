@@ -2,10 +2,23 @@
 set -eo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel)/player"
 
-[[ "$VIRTUAL_ENV" = "$PROJECT_ROOT/"* ]] || {
-    echo "Please run this script from within the virtual environment:" >&2
-    echo "  source $PROJECT_ROOT/venv/bin/activate" >&2
-    exit 1
+[[ "$VIRTUAL_ENV" = "$PROJECT_ROOT/"* ]] || { 
+    if [ -n "$VIRTUAL_ENV" ]; then
+        echo "You are in a virtual environment, but it does not match the project root." >&2
+        echo "Please run this script from within the virtual environment:" >&2
+        echo "  source $PROJECT_ROOT/venv/bin/activate" >&2
+        exit 1
+    fi
+    if [ ! -d venv ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv "$PROJECT_ROOT/venv"
+    fi
+    echo "Activating virtual environment..."
+    source "$PROJECT_ROOT/venv/bin/activate"
 }
 
-exec python3 "$PROJECT_ROOT"/src/radio-pad.py "$@"
+cd "$PROJECT_ROOT"
+pip install -r requirements.txt
+echo -e "  :check: activated.\n" >&2
+
+exec python3 src/radio-pad.py "$@"
