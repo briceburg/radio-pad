@@ -31,31 +31,49 @@
   </head>
   <body>
     <ion-app>
-      <ion-header slot="fixed" translucent="true">
-        <ion-toolbar>
-          <ion-title size="large">
-            Now Playing: <span id="now-playing">...</span>
-          </ion-title>
-          <ion-buttons slot="end">
-            <ion-button
-              shape="round"
-              size="small"
-              color="danger"
-              disabled="true"
-              id="stop-button"
-              aria-label="Stop playback"
-            >
-              <ion-icon slot="icon-only" name="stop"></ion-icon>
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content fullscreen="true" class="ion-padding">
-        <ion-segment-view>
-          <ion-segment-content id="stations">
-            <ion-grid id="station-grid" fixed="true"></ion-grid>
-          </ion-segment-content>
-          <ion-segment-content id="settings">
+      <ion-tabs>
+
+        <!-- navbar -->
+        <ion-tab-bar slot="bottom">
+          <ion-tab-button tab="radio">
+            <ion-icon name="radio-outline"></ion-icon>
+            Radio
+          </ion-tab-button>
+          <ion-tab-button tab="settings">
+            <ion-icon name="settings-outline"></ion-icon>
+            Settings
+          </ion-tab-button>
+        </ion-tab-bar>
+
+        <!-- radio page -->
+        <ion-tab tab="radio">
+          <ion-header translucent="true">
+            <ion-toolbar>
+              <ion-title size="large">
+                Now Playing: <span id="now-playing">...</span>
+              </ion-title>
+              <ion-buttons slot="end">
+                <ion-button shape="round" size="small" color="danger" disabled="true" id="stop-button" aria-label="Stop playback">
+                  <ion-icon slot="icon-only" name="stop"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+            </ion-toolbar>
+          </ion-header>
+          <ion-content fullscreen="true" class="ion-padding">
+            <ion-grid id="station-grid"></ion-grid>
+          </ion-content>
+        </ion-tab>
+
+        <!-- settings page -->
+        <ion-tab tab="settings">
+          <ion-header>
+            <ion-toolbar>
+              <ion-title size="large">
+                Settings
+              </ion-title>
+            </ion-toolbar>
+          </ion-header>
+          <ion-content fullscreen="true" class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
             <ion-list>
               <ion-item>
@@ -68,21 +86,10 @@
               </ion-item>
               <ion-button id="settings-save" expand="block">Save</ion-button>
             </ion-list>
-          </ion-segment-content>
-        </ion-segment-view>
-      </ion-content>
-      <ion-footer>
-        <ion-toolbar>
-          <ion-segment>
-            <ion-segment-button value="stations" content-id="stations">
-              <ion-label>Stations</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="settings" content-id="settings">
-              <ion-label>Settings</ion-label>
-            </ion-segment-button>
-          </ion-segment>
-        </ion-toolbar>
-      </ion-footer>
+          </ion-content>
+        </ion-tab>
+
+      </ion-tabs>
     </ion-app>
     <script type="module" src="/js/app.js"></script>
   </body>
