@@ -1,0 +1,37 @@
+name: Docker - Build Images
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      publish:
+        type: boolean
+        default: true
+        description: When true, publish images.
+
+concurrency:
+  group: "docker-build-${{ github.head_ref || github.ref_name }}"
+  cancel-in-progress: true
+
+jobs:
+  docker-bake:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Log in to the Container registry
+      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: bake
+      name: Bake Image
+      uses: briceburg/github-action-docker-bake@v2
+      with:
+        push: ${{ github.event_name == 'push' && 'true' || inputs.publish }}
+        disable-cache: ${{ github.ref_name != github.event.repository.default_branch && 'true' || 'false' }}
