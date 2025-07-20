@@ -25,8 +25,7 @@ async def get_player(player_id):
 
 async def list_players():
     # TODO: Implement pagination
-    players = [{"id": p["id"], "name": p["name"]} for p in app.PLAYERS.values()]
-    return response(players, root="players")
+    return response(app.PLAYERS_SUMMARY, root="players")
 
 
 if __name__ == "__main__":

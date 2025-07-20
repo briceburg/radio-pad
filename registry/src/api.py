@@ -60,6 +60,7 @@ def create_app():
             Path(__file__).parent / "players",
             Path(__file__).parent / "spec" / "player.schema.json",
         )
+        app.PLAYERS_SUMMARY = [{"id": p["id"], "name": p["name"]} for p in app.PLAYERS.values()]
     except PlayerValidationError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)
