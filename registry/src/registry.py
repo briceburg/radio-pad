@@ -3,7 +3,6 @@ from api import create_app, response
 
 app = create_app()
 
-
 async def get_player(player_id):
     player = app.PLAYERS.get(player_id)
     if player is None:
