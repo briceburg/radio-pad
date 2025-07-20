@@ -2,7 +2,7 @@
 {"name": "wwoz", "url": "https://www.wwoz.org/listen/hi"},
 {"name": "wmse", "url": "https://wmse.streamguys1.com/wmselivemp3"},
 {"name": "gmcr", "url": "http://stream.gmcr.org:8000/gmcr"},
-{"name": "kunm","url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3"},
+{"name": "kunm", "url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3"},
 {"name": "kmkb", "url": "http://50.19.66.66:8000/kmkb"},
 {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
 {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
