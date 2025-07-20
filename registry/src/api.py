@@ -6,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 import yaml
 import json
 import jsonschema
+from types import MappingProxyType
 
 
 class PlayerValidationError(Exception):
@@ -21,17 +22,19 @@ def load_players(players_dir, schema_path):
             player = yaml.safe_load(f)
             try:
                 jsonschema.validate(instance=player, schema=schema)
-                players[player["id"]] = {
-                    "id": player.get("id"),
-                    "name": player.get("name"),
-                    "stationsUrl": player.get("stationsUrl"),
-                    "switchboardUrl": player.get("switchboardUrl"),
-                }
+                players[player["id"]] = MappingProxyType(
+                    {
+                        "id": player.get("id"),
+                        "name": player.get("name"),
+                        "stationsUrl": player.get("stationsUrl"),
+                        "switchboardUrl": player.get("switchboardUrl"),
+                    }
+                )
             except jsonschema.ValidationError as e:
                 raise PlayerValidationError(
                     f"Validation failed for {player_file}: {e.message}"
                 )
-    return players
+    return MappingProxyType(players)
 
 
 def response(data, root="data", status=200):

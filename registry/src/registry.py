@@ -9,6 +9,9 @@ async def get_player(player_id):
     if player is None:
         return response({"error": "Player not found"}, status=404)
 
+    # Make a shallow copy for fallback fields
+    player = dict(player)
+
     if not player.get("stationsUrl"):
         player["stationsUrl"] = (
             f"https://registry.radiopad.dev/players/{player_id}/stations.json"
