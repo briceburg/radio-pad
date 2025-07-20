@@ -5,7 +5,7 @@ app = create_app()
 
 
 async def get_player(player_id):
-    player = next((p for p in app.PLAYERS if p["id"] == player_id), None)
+    player = app.PLAYERS.get(player_id)
     if player is None:
         return response({"error": "Player not found"}, status=404)
 
@@ -21,7 +21,8 @@ async def get_player(player_id):
 
 
 async def list_players():
-    players = [{"id": p["id"], "name": p["name"]} for p in app.PLAYERS]
+    # TODO: Implement pagination
+    players = [{"id": p["id"], "name": p["name"]} for p in app.PLAYERS.values()]
     return response(players, root="players")
 
 

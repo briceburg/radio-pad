@@ -13,7 +13,7 @@ class PlayerValidationError(Exception):
 
 
 def load_players(players_dir, schema_path):
-    players = []
+    players = {}
     with open(schema_path, "r") as f:
         schema = json.load(f)
     for player_file in players_dir.glob("*/player.yaml"):
@@ -21,14 +21,12 @@ def load_players(players_dir, schema_path):
             player = yaml.safe_load(f)
             try:
                 jsonschema.validate(instance=player, schema=schema)
-                players.append(
-                    {
-                        "id": player.get("id"),
-                        "name": player.get("name"),
-                        "stationsUrl": player.get("stationsUrl"),
-                        "switchboardUrl": player.get("switchboardUrl"),
-                    }
-                )
+                players[player["id"]] = {
+                    "id": player.get("id"),
+                    "name": player.get("name"),
+                    "stationsUrl": player.get("stationsUrl"),
+                    "switchboardUrl": player.get("switchboardUrl"),
+                }
             except jsonschema.ValidationError as e:
                 raise PlayerValidationError(
                     f"Validation failed for {player_file}: {e.message}"
