@@ -1,0 +1,5 @@
+---
+id: briceburg
+name: bonjour briceburg
+stationsUrl: ./stations.json
+switchboardUrl: wss://foo.player-switchboard.radiopad.dev

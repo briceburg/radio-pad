@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+[[ "$VIRTUAL_ENV" = "$PROJECT_ROOT/"* ]] || {
+    echo "Please run this script from within the virtual environment:" >&2
+    echo "  source $PROJECT_ROOT/venv/bin/activate" >&2
+    exit 1
+}
+
+exec python3 "$PROJECT_ROOT"/src/registry.py "$@"
