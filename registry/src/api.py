@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 from connexion.middleware import MiddlewarePosition
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse, Response, PlainTextResponse
 import yaml
 import json
 import jsonschema
@@ -38,9 +39,6 @@ def load_players(players_dir, schema_path):
 
 
 def response(data, root="data", status=200):
-    import connexion
-    from starlette.responses import JSONResponse, Response
-
     accept = connexion.request.headers.get("accept", "")
     if "application/xml" in accept:
         from dicttoxml import dicttoxml
@@ -60,7 +58,9 @@ def create_app():
             Path(__file__).parent / "players",
             Path(__file__).parent / "spec" / "player.schema.json",
         )
-        app.PLAYERS_SUMMARY = [{"id": p["id"], "name": p["name"]} for p in app.PLAYERS.values()]
+        app.PLAYERS_SUMMARY = [
+            {"id": p["id"], "name": p["name"]} for p in app.PLAYERS.values()
+        ]
     except PlayerValidationError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)
@@ -69,5 +69,9 @@ def create_app():
         position=MiddlewarePosition.BEFORE_EXCEPTION,
         allow_origins=["*"],
         allow_credentials=False,
+    )
+
+    app.add_url_rule(
+        "/healthz", "healthz", lambda request: PlainTextResponse("ok", status_code=200)
     )
     return app

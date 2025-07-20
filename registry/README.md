@@ -15,4 +15,7 @@ GET registry.radiopad.dev/players/foo
 
 GET foo.player-switchboard.radiopad.dev
   -> WSS://fly.dev:1980/
+
+GET /healthz
+  -> ok
 ```
