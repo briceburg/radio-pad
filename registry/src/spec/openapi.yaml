@@ -1,0 +1,79 @@
+openapi: "3.0.0"
+
+info:
+  title: RadioPad Registry
+  version: "0.0.0"
+servers:
+  - url: /
+
+paths:
+  /player/{player_id}:
+    get:
+      summary: Get Player
+      description: Returns a RadioPad Player by its ID.
+      operationId: registry.get_player
+      parameters:
+        - name: player_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the player to retrieve.
+      responses:
+        '200':
+          description: Player details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '404':
+          description: Player not found
+  /players:
+    get:
+      summary: List Players
+      description: Returns a list of RadioPad Players.
+      operationId: registry.list_players
+      responses:
+        '200':
+          description: List of players
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerList'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/PlayerList'
+
+components:
+  schemas:
+    Player:
+      type: object
+      properties:
+        id:
+          type: string
+          example: foo
+        name:
+          type: string
+          example: bonjour foo
+        stationsUrl:
+          type: string
+          format: uri
+          example: https://registry.radiopad.dev/players/foo/stations.json
+        switchboardUrl:
+          type: string
+          format: uri
+          example: wss://foo.player-switchboard.radiopad.dev
+    PlayerList:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            example: foo
+          name:
+            type: string
+            example: Foo Player

@@ -21,7 +21,14 @@ def load_players(players_dir, schema_path):
             player = yaml.safe_load(f)
             try:
                 jsonschema.validate(instance=player, schema=schema)
-                players.append({"id": player.get("id"), "name": player.get("name")})
+                players.append(
+                    {
+                        "id": player.get("id"),
+                        "name": player.get("name"),
+                        "stationsUrl": player.get("stationsUrl"),
+                        "switchboardUrl": player.get("switchboardUrl"),
+                    }
+                )
             except jsonschema.ValidationError as e:
                 raise PlayerValidationError(
                     f"Validation failed for {player_file}: {e.message}"
@@ -29,7 +36,7 @@ def load_players(players_dir, schema_path):
     return players
 
 
-def response(data, root="data"):
+def response(data, root="data", status=200):
     import connexion
     from starlette.responses import JSONResponse, Response
 
@@ -40,17 +47,17 @@ def response(data, root="data"):
         xml = dicttoxml(
             data, custom_root=root, attr_type=False, item_func=lambda x: x[:-1]
         )
-        return Response(content=xml, media_type="application/xml")
-    return JSONResponse(data)
+        return Response(content=xml, media_type="application/xml", status_code=status)
+    return JSONResponse(data, status_code=status)
 
 
 def create_app():
-    app = connexion.AsyncApp(__name__)
+    app = connexion.AsyncApp(__name__, specification_dir="spec")
     app.add_api("openapi.yaml")
     try:
         app.PLAYERS = load_players(
             Path(__file__).parent / "players",
-            Path(__file__).parent / "players" / "player.schema.json",
+            Path(__file__).parent / "spec" / "player.schema.json",
         )
     except PlayerValidationError as e:
         print(str(e), file=sys.stderr)

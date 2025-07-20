@@ -16,9 +16,8 @@
     "stationsUrl": {
       "type": "string",
       "description": "Relative or absolute URL to the stations JSON",
-      "default": "./stations.json",
+      "default": "",
       "examples": [
-        "./stations.json",
         "https://registry.radiopad.dev/players/foo/stations.json"
       ]
     },
