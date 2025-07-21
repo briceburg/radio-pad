@@ -1,4 +1,3 @@
 connexion
-connexion[asyncio]
-connexion[uvicorn]
+connexion[asyncio, swagger-ui, uvicorn]
 dicttoxml

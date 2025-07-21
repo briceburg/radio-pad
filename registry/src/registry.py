@@ -3,6 +3,7 @@ from api import create_app, response
 
 app = create_app()
 
+
 async def get_player(player_id):
     player = app.PLAYERS.get(player_id)
     if player is None:
@@ -19,7 +20,7 @@ async def get_player(player_id):
     if not player.get("switchboardUrl"):
         player["switchboardUrl"] = f"wss://{player_id}.player-switchboard.radiopad.dev"
 
-    return response(player)
+    return response(player, root="player")
 
 
 async def list_players():

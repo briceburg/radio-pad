@@ -1,9 +1,15 @@
 import connexion
 from pathlib import Path
 import sys
+from connexion.options import SwaggerUIOptions
 from connexion.middleware import MiddlewarePosition
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, Response, PlainTextResponse
+from starlette.responses import (
+    JSONResponse,
+    Response,
+    PlainTextResponse,
+    RedirectResponse,
+)
 import yaml
 import json
 import jsonschema
@@ -51,8 +57,12 @@ def response(data, root="data", status=200):
 
 
 def create_app():
-    app = connexion.AsyncApp(__name__, specification_dir="spec")
-    app.add_api("openapi.yaml")
+    options = SwaggerUIOptions(swagger_ui_path="/api-docs")
+
+    app = connexion.AsyncApp(
+        __name__, specification_dir="spec", swagger_ui_options=options
+    )
+    app.add_api("openapi.yaml", swagger_ui_options=options)
     try:
         app.PLAYERS = load_players(
             Path(__file__).parent / "players",
@@ -72,6 +82,12 @@ def create_app():
     )
 
     app.add_url_rule(
-        "/healthz", "healthz", lambda request: PlainTextResponse("ok", status_code=200)
+        "/", "root_redirect", lambda request: RedirectResponse("/v1/api-docs/")
+    )
+
+    app.add_url_rule(
+        "/healthz",
+        "health_check",
+        lambda request: PlainTextResponse("ok", status_code=200),
     )
     return app

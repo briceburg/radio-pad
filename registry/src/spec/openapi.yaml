@@ -1,13 +1,13 @@
 openapi: "3.0.0"
 
 info:
-  title: RadioPad Registry
+  title: RadioPad Registry API
   version: "0.0.0"
 servers:
-  - url: /
+  - url: /v1
 
 paths:
-  /player/{player_id}:
+  /players/{player_id}:
     get:
       summary: Get Player
       description: Returns a RadioPad Player by its ID.
@@ -29,6 +29,9 @@ paths:
             application/xml:
               schema:
                 $ref: '#/components/schemas/Player'
+                xml:
+                  name: player
+                  wrapped: true
         '404':
           description: Player not found
   /players:
@@ -46,6 +49,9 @@ paths:
             application/xml:
               schema:
                 $ref: '#/components/schemas/PlayerList'
+                xml:
+                  name: players
+                  wrapped: true
 
 components:
   schemas:
