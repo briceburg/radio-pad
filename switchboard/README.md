@@ -4,9 +4,13 @@ websockets :octopus: enabling event driven communication between the [radio-pad 
 
 ## Usage
 
-the switchboard can run on the local network, or as an internet available service.
-
 TBD
+
+### Environment Variables
+
+- `SWITCHBOARD_HOST`: The hostname or IP address to bind to. Defaults to `localhost`.
+- `SWITCHBOARD_PORT`: The port to listen on. Defaults to `1980`.
+- `SWITCHBOARD_PARTITION_BY_HTTP_HOST`: When set to `'true'`, the switchboard will partition broadcasts by the `Host` header of incoming websocket connections. This allows multiple radio-pad instances to share the same switchboard without interfering with each other -- e.g. foo.switchboard.dev and bar.switchboard.dev would have separate broadcasts and currently playing stations.
 
 ## Development
 
