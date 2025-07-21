@@ -41,29 +41,29 @@ def get_host_key(websocket) -> str:
     return getattr(websocket, "host", None)
 
 
-def mkmsg(event: str, data) -> str:
-    return json.dumps({"event": event, "data": data})
-
-
 async def switchboard(websocket):
     host_key = get_host_key(websocket)
-    if not host_key:
-        # This should not happen if switchboard_connect is correctly implemented
-        return await websocket.close(1011, "Internal server error")
+
+    def mkmsg(event: str, data=None) -> str:
+        if data is None:
+            if event == "station_playing":
+                data = CURRENT_STATION_BY_HOST[host_key]
+            elif event == "client_count":
+                data = len(get_connections())
+
+        return json.dumps({"event": event, "data": data})
 
     def get_connections():
         return WEBSOCKETS_BY_HOST.get(host_key, set())
 
-    def broadcast_all(event: str, data):
+    def broadcast_all(event: str, data=None):
         connections = get_connections()
         if connections:
             broadcast(connections, mkmsg(event, data))
 
     try:
-        broadcast_all("client_count", len(get_connections()))
-        await websocket.send(
-            mkmsg("station_playing", CURRENT_STATION_BY_HOST[host_key])
-        )
+        broadcast_all("client_count")
+        await websocket.send(mkmsg("station_playing"))
 
         async for msg in websocket:
             try:
@@ -84,7 +84,7 @@ async def switchboard(websocket):
 
             if event == "station_playing":
                 CURRENT_STATION_BY_HOST[host_key] = data
-                broadcast_all("station_playing", CURRENT_STATION_BY_HOST[host_key])
+                broadcast_all("station_playing")
             elif event == "station_request":
                 broadcast_all("station_request", data)
             else:
@@ -96,25 +96,24 @@ async def switchboard(websocket):
         # Suppress expected disconnect errors
         pass
     finally:
-        if host_key in WEBSOCKETS_BY_HOST:
-            if websocket in WEBSOCKETS_BY_HOST[host_key]:
-                WEBSOCKETS_BY_HOST[host_key].remove(websocket)
-            if not WEBSOCKETS_BY_HOST[host_key]:
-                del WEBSOCKETS_BY_HOST[host_key]
+        if websocket in WEBSOCKETS_BY_HOST[host_key]:
+            WEBSOCKETS_BY_HOST[host_key].remove(websocket)
+        if not WEBSOCKETS_BY_HOST[host_key]:
+            del WEBSOCKETS_BY_HOST[host_key]
 
-        broadcast_all("client_count", len(get_connections()))
+        broadcast_all("client_count")
 
         # if the disconnected client is the RadioPad Player, reset the current station
         if getattr(websocket, "is_radio_pad", False):
             CURRENT_STATION_BY_HOST[host_key] = None
-            broadcast_all("station_playing", CURRENT_STATION_BY_HOST[host_key])
+            broadcast_all("station_playing")
 
 
 async def switchboard_connect(
     connection: ServerConnection,
     request: websockets.http11.Request,
 ) -> None | websockets.http11.Response:
-    if request.path == "/health":
+    if request.path == "/healthz":
         return connection.respond(HTTPStatus.OK, "OK\n")
 
     if PARTITION_ENABLED:
