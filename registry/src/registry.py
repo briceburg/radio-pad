@@ -1,32 +1,27 @@
 import connexion
-from api import create_app, response
+from connexion.resolver import RestyResolver
+from connexion.options import SwaggerUIOptions
+from connexion.middleware import MiddlewarePosition
+from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import (
+    RedirectResponse,
+    PlainTextResponse,
+)
 
-app = create_app()
+options = SwaggerUIOptions(swagger_ui_path="/api-docs")
 
+app = connexion.AsyncApp(__name__, specification_dir="spec", swagger_ui_options=options)
+app.add_api("openapi.yaml", swagger_ui_options=options, resolver=RestyResolver("api"))
 
-async def get_player(player_id):
-    player = app.PLAYERS.get(player_id)
-    if player is None:
-        return response({"error": "Player not found"}, status=404)
+app.add_middleware(
+    CORSMiddleware,
+    position=MiddlewarePosition.BEFORE_EXCEPTION,
+    allow_origins=["*"],
+    allow_credentials=False,
+)
 
-    # Make a shallow copy for fallback fields
-    player = dict(player)
-
-    if not player.get("stationsUrl"):
-        player["stationsUrl"] = (
-            f"https://registry.radiopad.dev/players/{player_id}/stations.json"
-        )
-
-    if not player.get("switchboardUrl"):
-        player["switchboardUrl"] = f"wss://{player_id}.player-switchboard.radiopad.dev"
-
-    return response(player, root="player")
-
-
-async def list_players():
-    # TODO: Implement pagination
-    return response(app.PLAYERS_SUMMARY, root="players")
-
+app.add_url_rule("/", "root_redirect", lambda req: RedirectResponse("/v1/api-docs/"))
+app.add_url_rule("/healthz", "health", lambda req: PlainTextResponse("ok"))
 
 if __name__ == "__main__":
     from pathlib import Path

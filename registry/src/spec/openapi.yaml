@@ -11,7 +11,6 @@ paths:
     get:
       summary: Get Player
       description: Returns a RadioPad Player by its ID.
-      operationId: registry.get_player
       parameters:
         - name: player_id
           in: path
@@ -38,7 +37,6 @@ paths:
     get:
       summary: List Players
       description: Returns a list of RadioPad Players.
-      operationId: registry.list_players
       responses:
         '200':
           description: List of players
