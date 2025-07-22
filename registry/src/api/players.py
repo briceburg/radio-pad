@@ -1,4 +1,4 @@
-from api.helpers import response, PLAYERS, PLAYERS_SUMMARY, paginate
+from api.helpers import PLAYERS, PLAYERS_SUMMARY, paginate, response
 
 
 async def get(player_id: str):

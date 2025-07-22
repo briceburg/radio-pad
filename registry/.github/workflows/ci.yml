@@ -9,26 +9,16 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Set up Python
+
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
-    
-    - name: Install dependencies
+        python-version: '3.13'
+
+    - name: CI
       run: |
-        python -m pip install --upgrade pip
-        pip install black isort autoflake
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    
-    - name: Run black
-      run: black --check src/
-    
-    - name: Run isort
-      run: isort --check --diff src/
-    
-    - name: Run autoflake
-      run: autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --recursive src/
+        pip install -r requirements-dev.txt
+        bin/ci
