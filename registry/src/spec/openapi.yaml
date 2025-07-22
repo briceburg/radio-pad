@@ -33,6 +33,29 @@ paths:
                   wrapped: true
         '404':
           description: Player not found
+  /players/{player_id}/stations:
+    get:
+      summary: Get Player Stations
+      description: Returns the stations for a specific RadioPad Player.
+      operationId: api.players.get_stations
+      parameters:
+        - name: player_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the player to retrieve stations for.
+      responses:
+        '200':
+          description: List of stations for the player
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Station'
+        '404':
+          description: Player not found
   /players:
     get:
       summary: List Players
@@ -46,7 +69,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedPlayers'
+                allOf:
+                - $ref: '#/components/schemas/_Pagination'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      description: List of PlayerSummary objects
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: foo
+                          name:
+                            type: string
+                            example: Foo Player
 
 components:
   parameters:
@@ -71,7 +109,7 @@ components:
       description: Number of items per page.
 
   schemas:
-    PaginationMeta:
+    _Pagination:
       type: object
       properties:
         page:
@@ -87,17 +125,6 @@ components:
           type: integer
           description: Total number of pages
       required: [page, per_page, total, total_pages]
-
-    PaginatedPlayers:
-      allOf:
-        - $ref: '#/components/schemas/PaginationMeta'
-        - type: object
-          properties:
-            items:
-              type: array
-              description: List of PlayerSummary objects
-              items:
-                $ref: '#/components/schemas/PlayerSummary'
     Player:
       type: object
       properties:
@@ -115,13 +142,13 @@ components:
           type: string
           format: uri
           example: wss://foo.player-switchboard.radiopad.dev
-    PlayerSummary:
+    Station:
       type: object
       properties:
-        id:
-          type: string
-          example: foo
         name:
           type: string
-          example: Foo Player
-
+          example: wwoz
+        url:
+          type: string
+          format: uri
+          example: https://www.wwoz.org/listen/hi

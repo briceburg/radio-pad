@@ -1,3 +1,6 @@
+import json
+import os
+
 from api.helpers import PLAYERS, PLAYERS_SUMMARY, paginate, response
 
 
@@ -19,6 +22,23 @@ async def get(player_id: str):
         player["switchboardUrl"] = f"wss://{player_id}.player-switchboard.radiopad.dev"
 
     return response(player, root="player")
+
+
+async def get_stations(player_id: str):
+    """Get stations for a player - maps to GET /players/{player_id}/stations"""
+    if player_id not in PLAYERS:
+        return response({"error": "Player not found"}, status=404)
+
+    player_dir = os.path.join(os.path.dirname(__file__), "..", "players", player_id)
+    stations_path = os.path.join(player_dir, "stations.json")
+    if not os.path.isfile(stations_path):
+        return response({"error": "Stations not found"}, status=404)
+    try:
+        with open(stations_path, "r") as f:
+            stations = json.load(f)
+        return response(stations, root="stations")
+    except Exception:
+        return response({"error": "Failed to load stations"}, status=500)
 
 
 async def search(page: int = 1, per_page: int = 10):
