@@ -1,5 +1,4 @@
 from api.helpers import response, PLAYERS, PLAYERS_SUMMARY, paginate
-import connexion
 
 
 async def get(player_id: str):

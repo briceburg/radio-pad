@@ -1,13 +1,15 @@
-import connexion
-from starlette.responses import JSONResponse, Response
-from pathlib import Path
-import sys
-import yaml
 import json
-import jsonschema
+import sys
+from pathlib import Path
 from types import MappingProxyType
 
+import connexion
+import jsonschema
+import yaml
+from starlette.responses import JSONResponse, Response
+
 BASE_DIR = Path(__file__).parent.parent
+
 
 def paginate(items, page=1, per_page=10, max_per_page=100):
     """Paginate a list of items, returning a dict with items and metadata."""
@@ -36,6 +38,7 @@ def paginate(items, page=1, per_page=10, max_per_page=100):
         "total": total,
         "total_pages": (total + per_page - 1) // per_page,
     }
+
 
 def response(data, root="data", status=200):
     """Return a JSON or XML response based on Accept header."""
@@ -67,9 +70,6 @@ def _load_players(players_dir: Path, schema_path: Path):
             "switchboardUrl": player.get("switchboardUrl"),
         }
     return MappingProxyType(players)
-
-
-
 
 
 # Load PLAYERS and PLAYERS_SUMMARY _once_ at import time

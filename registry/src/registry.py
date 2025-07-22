@@ -1,12 +1,9 @@
 import connexion
-from connexion.resolver import RestyResolver
-from connexion.options import SwaggerUIOptions
 from connexion.middleware import MiddlewarePosition
+from connexion.options import SwaggerUIOptions
+from connexion.resolver import RestyResolver
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import (
-    RedirectResponse,
-    PlainTextResponse,
-)
+from starlette.responses import PlainTextResponse, RedirectResponse
 
 options = SwaggerUIOptions(swagger_ui_path="/api-docs")
 
