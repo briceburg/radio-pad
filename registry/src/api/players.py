@@ -1,7 +1,7 @@
 import json
 import os
 
-from api.helpers import PLAYERS, PLAYERS_SUMMARY, paginate, response
+from api.helpers import PLAYERS, PLAYERS_LIST, paginate, response
 
 
 async def get(player_id: str):
@@ -13,13 +13,15 @@ async def get(player_id: str):
     # Make a shallow copy for fallback fields
     player = dict(player)
 
+    player["id"] = player_id  # Ensure ID is included in the response
+
     if not player.get("stationsUrl"):
         player["stationsUrl"] = (
-            f"https://registry.radiopad.dev/players/{player_id}/stations.json"
+            f"https://registry.radiopad.dev/v1/players/{player_id}/stations"
         )
 
     if not player.get("switchboardUrl"):
-        player["switchboardUrl"] = f"wss://{player_id}.player-switchboard.radiopad.dev"
+        player["switchboardUrl"] = f"wss://{player_id}.switchboard.radiopad.dev/"
 
     return response(player, root="player")
 
@@ -43,5 +45,5 @@ async def get_stations(player_id: str):
 
 async def search(page: int = 1, per_page: int = 10):
     """List all players - maps to GET /players with pagination"""
-    pagination = paginate(PLAYERS_SUMMARY, page, per_page)
+    pagination = paginate(PLAYERS_LIST, page, per_page)
     return response(pagination, root="players")

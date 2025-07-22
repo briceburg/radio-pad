@@ -28,9 +28,6 @@ paths:
             application/xml:
               schema:
                 $ref: '#/components/schemas/Player'
-                xml:
-                  name: player
-                  wrapped: true
         '404':
           description: Player not found
   /players/{player_id}/stations:
@@ -51,9 +48,10 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Station'
+                $ref: '#/components/schemas/StationList'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/StationList'
         '404':
           description: Player not found
   /players:
@@ -65,26 +63,18 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: List of players with pagination metadata
+          description: List of paginated Players
           content:
             application/json:
               schema:
                 allOf:
+                - $ref: '#/components/schemas/PlayerList'
                 - $ref: '#/components/schemas/_Pagination'
-                - type: object
-                  properties:
-                    items:
-                      type: array
-                      description: List of PlayerSummary objects
-                      items:
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                            example: foo
-                          name:
-                            type: string
-                            example: Foo Player
+            application/xml:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/PlayerList'
+                - $ref: '#/components/schemas/_Pagination'
 
 components:
   parameters:
@@ -125,24 +115,44 @@ components:
           type: integer
           description: Total number of pages
       required: [page, per_page, total, total_pages]
+
     Player:
+      xml:
+        name: player
       type: object
       properties:
         id:
           type: string
-          example: foo
         name:
           type: string
-          example: bonjour foo
         stationsUrl:
           type: string
           format: uri
-          example: https://registry.radiopad.dev/players/foo/stations.json
+          example: https://registry.radiopad.dev/players/foo/stations
         switchboardUrl:
           type: string
           format: uri
-          example: wss://foo.player-switchboard.radiopad.dev
+          example: wss://foo.switchboard.radiopad.dev
+    PlayerList:
+      xml:
+        name: players
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                example: foo
+              name:
+                type: string
+                example: bonjour foo
+
     Station:
+      xml:
+        name: station
       type: object
       properties:
         name:
@@ -152,3 +162,10 @@ components:
           type: string
           format: uri
           example: https://www.wwoz.org/listen/hi
+    StationList:
+      xml:
+        name: stations
+        wrapped: true
+      type: array
+      items:
+          $ref: '#/components/schemas/Station'

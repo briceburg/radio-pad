@@ -64,7 +64,6 @@ def _load_players(players_dir: Path, schema_path: Path):
             player = yaml.safe_load(f)
         jsonschema.validate(instance=player, schema=schema)
         players[player["id"]] = {
-            "id": player.get("id"),
             "name": player.get("name"),
             "stationsUrl": player.get("stationsUrl"),
             "switchboardUrl": player.get("switchboardUrl"),
@@ -77,7 +76,7 @@ try:
     PLAYERS = _load_players(
         BASE_DIR / "players", BASE_DIR / "spec" / "player.schema.json"
     )
-    PLAYERS_SUMMARY = [{"id": p["id"], "name": p["name"]} for p in PLAYERS.values()]
+    PLAYERS_LIST = [{"id": id, "name": p["name"]} for id, p in PLAYERS.items()]
 except Exception as e:
     print(str(e), file=sys.stderr)
     sys.exit(1)
