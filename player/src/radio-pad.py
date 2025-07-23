@@ -39,6 +39,7 @@ mpv_sock = None
 mpv_volume = None
 mpv_sock_lock = asyncio.Lock()
 
+
 async def broadcast(event, data=None, audience="all"):
     """
     Broadcast an event to the macropad and/or switchboard.
@@ -368,6 +369,7 @@ def fetch_json_url(url, timeout=10, retries=3):
             print(f"Attempt {attempt + 1} failed for {url}: {e}")
     return None
 
+
 async def main():
     try:
         await asyncio.gather(
@@ -394,9 +396,11 @@ if __name__ == "__main__":
     RADIOPAD_STATIONS_URL = os.getenv("RADIOPAD_STATIONS_URL", None)
     RADIOPAD_SWITCHBOARD_URL = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
 
-    if RADIOPAD_PLAYER_NAME and os.getenv("RADIOPAD_DISCOVERY", "true").lower() == "true":
+    if RADIOPAD_PLAYER_NAME and os.getenv("RADIOPAD_DISCOVERY", "true") == "true":
         url = f"{RADIOPAD_REGISTRY_URL.rstrip('/')}/v1/players/{RADIOPAD_PLAYER_NAME}"
-        print(f"Fetching player URLs from {url} ...\n   to skip, set RADIOPAD_DISCOVERY=false")
+        print(
+            f"Fetching player URLs from {url} ...\n   to skip, set RADIOPAD_DISCOVERY=false"
+        )
         data = fetch_json_url(url)
         if data:
             if not RADIOPAD_STATIONS_URL:
@@ -405,7 +409,6 @@ if __name__ == "__main__":
                 RADIOPAD_SWITCHBOARD_URL = data.get("switchboardUrl")
         else:
             print("Failed to discover player info from registry.")
-            sys.exit(1)
 
     if RADIOPAD_STATIONS_URL is None:
         print("Please set RADIOPAD_STATIONS_URL or enable Discovery")
@@ -413,7 +416,7 @@ if __name__ == "__main__":
 
     print(f"Fetching stations from {RADIOPAD_STATIONS_URL} ...")
     RADIO_STATIONS = fetch_json_url(RADIOPAD_STATIONS_URL)
-    if RADIO_STATIONS is None or len(RADIO_STATIONS) == 0:
+    if not RADIO_STATIONS:
         print("Station list is empty, exiting.")
         sys.exit(1)
 
@@ -428,4 +431,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Unexpected error: {e}")
         sys.exit(1)
-
