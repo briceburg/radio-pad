@@ -28,39 +28,16 @@ import serial_asyncio
 import signal
 import serial.tools.list_ports
 
-
 AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
-RADIO_STATIONS_FILE = "/tmp/radio-pad-stations.json"
-RADIO_STATIONS_URL = os.getenv(
-    "RADIO_STATIONS_URL",
-    "https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json",
-)
 MACROPAD = None
 SWITCHBOARD = None
 STATION = None
-
-# cache radio stations
-if not os.path.exists(RADIO_STATIONS_FILE):
-    try:
-        print(f"Downloading radio stations from {RADIO_STATIONS_URL} ...")
-        urllib.request.urlretrieve(RADIO_STATIONS_URL, RADIO_STATIONS_FILE)
-    except Exception as e:
-        print(f"Error downloading radio stations: {e}")
-        sys.exit(1)
-
-with open(RADIO_STATIONS_FILE, "r") as f:
-    try:
-        RADIO_STATIONS = json.load(f)
-    except json.JSONDecodeError as e:
-        print(f"Error parsing radio stations JSON: {e}")
-        sys.exit(1)
 
 mpv_process = None
 mpv_sock = None
 mpv_volume = None
 mpv_sock_lock = asyncio.Lock()
-
 
 async def broadcast(event, data=None, audience="all"):
     """
@@ -341,8 +318,8 @@ async def switchboard_loop(url):
     """Connect to switchboard and listen for events with auto-reconnect."""
     global SWITCHBOARD
 
-    if url == "":
-        print("SWITCHBOARD: URL is empty, skipping switchboard connection.")
+    if not url:
+        print("RADIOPAD_SWITCHBOARD_URL is empty, skipping switchboard connection.")
         return
 
     while True:
@@ -377,11 +354,25 @@ async def switchboard_loop(url):
         await asyncio.sleep(5)
 
 
+def fetch_json_url(url, timeout=10, retries=3):
+    """Fetch JSON from a URL with retries and a timeout."""
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                if response.status == 200:
+                    return json.loads(response.read())
+                else:
+                    print(f"Failed to fetch JSON: {response.status} from {url}")
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed for {url}: {e}")
+    return None
+
 async def main():
     try:
         await asyncio.gather(
             macropad_loop(),
-            switchboard_loop(os.getenv("SWITCHBOARD_URL", "ws://localhost:1980/")),
+            switchboard_loop(RADIOPAD_SWITCHBOARD_URL),
         )
     except asyncio.CancelledError:
         print("\nPLAYER: exiting...")
@@ -395,6 +386,37 @@ async def main():
 
 if __name__ == "__main__":
 
+    RADIOPAD_PLAYER_NAME = os.getenv("RADIOPAD_PLAYER_NAME", "briceburg")
+    RADIOPAD_REGISTRY_URL = os.getenv(
+        "RADIOPAD_REGISTRY_URL",
+        "https://registry.radiopad.dev",
+    )
+    RADIOPAD_STATIONS_URL = os.getenv("RADIOPAD_STATIONS_URL", None)
+    RADIOPAD_SWITCHBOARD_URL = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
+
+    if RADIOPAD_PLAYER_NAME and os.getenv("RADIOPAD_DISCOVERY", "true").lower() == "true":
+        url = f"{RADIOPAD_REGISTRY_URL.rstrip('/')}/v1/players/{RADIOPAD_PLAYER_NAME}"
+        print(f"Fetching player URLs from {url} ...\n   to skip, set RADIOPAD_DISCOVERY=false")
+        data = fetch_json_url(url)
+        if data:
+            if not RADIOPAD_STATIONS_URL:
+                RADIOPAD_STATIONS_URL = data.get("stationsUrl")
+            if not RADIOPAD_SWITCHBOARD_URL:
+                RADIOPAD_SWITCHBOARD_URL = data.get("switchboardUrl")
+        else:
+            print("Failed to discover player info from registry.")
+            sys.exit(1)
+
+    if RADIOPAD_STATIONS_URL is None:
+        print("Please set RADIOPAD_STATIONS_URL or enable Discovery")
+        sys.exit(1)
+
+    print(f"Fetching stations from {RADIOPAD_STATIONS_URL} ...")
+    RADIO_STATIONS = fetch_json_url(RADIOPAD_STATIONS_URL)
+    if RADIO_STATIONS is None or len(RADIO_STATIONS) == 0:
+        print("Station list is empty, exiting.")
+        sys.exit(1)
+
     def handle_exit(signum=None, frame=None, code=0):
         print("\nPLAYER: received exit signal...")
         sys.exit(code)
@@ -406,3 +428,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Unexpected error: {e}")
         sys.exit(1)
+
