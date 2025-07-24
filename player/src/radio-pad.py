@@ -27,8 +27,9 @@ import websockets
 import serial_asyncio
 import signal
 import serial.tools.list_ports
+import time
 
-AUDIO_CHANNELS = os.getenv("AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
+AUDIO_CHANNELS = os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 MACROPAD = None
 SWITCHBOARD = None
@@ -320,7 +321,7 @@ async def switchboard_loop(url):
     global SWITCHBOARD
 
     if not url:
-        print("RADIOPAD_SWITCHBOARD_URL is empty, skipping switchboard connection.")
+        print("SWITCHBOARD_URL is empty, skipping switchboard connection.")
         return
 
     while True:
@@ -355,7 +356,7 @@ async def switchboard_loop(url):
         await asyncio.sleep(5)
 
 
-def fetch_json_url(url, timeout=10, retries=3):
+def fetch_json_url(url, timeout=12, retries=3):
     """Fetch JSON from a URL with retries and a timeout."""
     for attempt in range(retries):
         try:
@@ -367,6 +368,9 @@ def fetch_json_url(url, timeout=10, retries=3):
                     print(f"Failed to fetch JSON: {response.status} from {url}")
         except Exception as e:
             print(f"Attempt {attempt + 1} failed for {url}: {e}")
+
+        print(f"Retrying in {2 ** attempt} seconds...")
+        time.sleep(2**attempt)
     return None
 
 
@@ -374,7 +378,7 @@ async def main():
     try:
         await asyncio.gather(
             macropad_loop(),
-            switchboard_loop(RADIOPAD_SWITCHBOARD_URL),
+            switchboard_loop(SWITCHBOARD_URL),
         )
     except asyncio.CancelledError:
         print("\nPLAYER: exiting...")
@@ -388,34 +392,39 @@ async def main():
 
 if __name__ == "__main__":
 
-    RADIOPAD_PLAYER_NAME = os.getenv("RADIOPAD_PLAYER_NAME", "briceburg")
-    RADIOPAD_REGISTRY_URL = os.getenv(
+    PLAYER_ID = os.getenv("RADIOPAD_PLAYER_ID", "briceburg")
+    REGISTRY_URL = os.getenv(
         "RADIOPAD_REGISTRY_URL",
         "https://registry.radiopad.dev",
     )
-    RADIOPAD_STATIONS_URL = os.getenv("RADIOPAD_STATIONS_URL", None)
-    RADIOPAD_SWITCHBOARD_URL = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
+    STATIONS_URL = os.getenv("RADIOPAD_STATIONS_URL", None)
+    SWITCHBOARD_URL = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
 
-    if RADIOPAD_PLAYER_NAME and os.getenv("RADIOPAD_DISCOVERY", "true") == "true":
-        url = f"{RADIOPAD_REGISTRY_URL.rstrip('/')}/v1/players/{RADIOPAD_PLAYER_NAME}"
+    if os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true") == "true":
+        if not PLAYER_ID:
+            print("RADIOPAD_PLAYER_ID must be set to enable discovery.")
+            sys.exit(1)
+        url = f"{REGISTRY_URL.rstrip('/')}/v1/players/{PLAYER_ID}"
         print(
-            f"Fetching player URLs from {url} ...\n   to skip, set RADIOPAD_DISCOVERY=false"
+            f"Discovering station presets and switchboard from {url} ...\n   to skip, set RADIOPAD_ENABLE_DISCOVERY=false"
         )
         data = fetch_json_url(url)
         if data:
-            if not RADIOPAD_STATIONS_URL:
-                RADIOPAD_STATIONS_URL = data.get("stationsUrl")
-            if not RADIOPAD_SWITCHBOARD_URL:
-                RADIOPAD_SWITCHBOARD_URL = data.get("switchboardUrl")
+            if not STATIONS_URL:
+                STATIONS_URL = data.get("stationsUrl")
+            if not SWITCHBOARD_URL:
+                SWITCHBOARD_URL = data.get("switchboardUrl")
         else:
             print("Failed to discover player info from registry.")
 
-    if RADIOPAD_STATIONS_URL is None:
-        print("Please set RADIOPAD_STATIONS_URL or enable Discovery")
+    if not STATIONS_URL:
+        print(
+            "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER_ID."
+        )
         sys.exit(1)
 
-    print(f"Fetching stations from {RADIOPAD_STATIONS_URL} ...")
-    RADIO_STATIONS = fetch_json_url(RADIOPAD_STATIONS_URL)
+    print(f"Fetching stations from {STATIONS_URL} ...")
+    RADIO_STATIONS = fetch_json_url(STATIONS_URL)
     if not RADIO_STATIONS:
         print("Station list is empty, exiting.")
         sys.exit(1)

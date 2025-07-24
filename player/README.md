@@ -11,14 +11,9 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 - [python-mpv-jsonipc](https://github.com/iwalton3/python-mpv-jsonipc)
 - [python-websockets](https://github.com/python-websockets/websockets)
 
-### Running the Listener
+### Running the Player
 
-install deps
-```sh
-pip3 install -r requirements.txt
-```
-
-start the player
+start the player via a script that automatically activates a python virtual environment and installs dependencies.
 
 ```sh
 ./bin/radio-pad
@@ -37,9 +32,22 @@ fi
 
 > tmux maintains the tty1 attachment whereas screen drops it if you attach via ssh.
 
+### Environment Variables
+
+name | description | default
+--- | --- | ---
+`RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
+`RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
+`RADIOPAD_PLAYER_ID` | Used to discover the station presets and switchboard URL. | `briceburg`
+`RADIOPAD_REGISTRY_URL` | Player discovery URL. | `https://registry.radiopad.dev`
+`RADIOPAD_STATIONS_URL` | URL to load stations from. Must return a JSON list of stations. Discovered if not provided. | `None`
+`RADIOPAD_SWITCHBOARD_URL` | URL of switchboard. The switchboard enables remote-controls. Not needed for locally controlled players. Discovered if not provided. | `None`
+
 ### Editing Stations
 
-Modify and commit [stations.json](./stations.json). Changes are loaded by the player at startup.
+Modify and commit [stations.json](https://github.com/briceburg/radio-pad-registry/blob/main/src/players/briceburg/stations.json) files for your desired player in the registry. Changes are loaded by the player at startup, and the loaded station list is shared with connected controllers.
+
+If you prefer to skip station discovery and roll your own list, set the RADIOPAD_STATIONS_URL environment variable to a URL that responds with your desired stations.
 
 Example configuration:
 
