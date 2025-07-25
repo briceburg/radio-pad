@@ -23,6 +23,8 @@ services:
   remote-control:
     build:
       context: ./remote-control
+    environment:
+      VITE_SWITCHBOARD_URL: "ws://switchboard:1980/"
     ports:
       - "5173:5173"
     user: "${UID:-1000}:${GID:-1000}"

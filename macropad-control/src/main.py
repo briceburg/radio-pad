@@ -186,6 +186,8 @@ class RadioPadApp:
             try:
                 self._serial_buffer += PLAYER.read(PLAYER.in_waiting).decode("utf-8")
             except Exception as e:
+                # TODO: blink LED light to indicate error occured and is on console.
+                #       also broadcast error to player?
                 print(f"PLAYER: error reading serial buffer: {e}")
                 return
             while "\n" in self._serial_buffer:
@@ -273,9 +275,6 @@ class RadioPadApp:
                 self.handle_key_events()
             except Exception as e:
                 print(f"Uncaught error in run loop: {e}")
-            finally:
-                PLAYER.reset_input_buffer()
-                PLAYER.reset_output_buffer()
 
 
 if __name__ == "__main__":

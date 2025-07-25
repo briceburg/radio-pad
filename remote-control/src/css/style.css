@@ -4,3 +4,8 @@
     margin: 0 auto;
   }
 }
+
+ion-row.station-placeholder ion-skeleton-text {
+  height: 2em;
+  width: 100%;
+}
