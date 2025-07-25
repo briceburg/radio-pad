@@ -31,6 +31,7 @@ from http import HTTPStatus
 
 CURRENT_STATION_BY_HOST = defaultdict(lambda: None)
 PARTITION_ENABLED = os.environ.get("SWITCHBOARD_PARTITION_BY_HTTP_HOST") == "true"
+STATIONS_URL_BY_HOST = defaultdict(str)
 WEBSOCKETS_BY_HOST = defaultdict(set)
 
 
@@ -38,7 +39,7 @@ def get_host_key(websocket) -> str:
     """Returns the host key for a given websocket, or '_global' if partitioning is disabled."""
     if not PARTITION_ENABLED:
         return "_global"
-    return getattr(websocket, "host", None)
+    return getattr(websocket, "host")
 
 
 async def switchboard(websocket):
@@ -64,6 +65,7 @@ async def switchboard(websocket):
     try:
         broadcast_all("client_count")
         await websocket.send(mkmsg("station_playing"))
+        await websocket.send(mkmsg("station_url", STATIONS_URL_BY_HOST[host_key]))
 
         async for msg in websocket:
             try:
@@ -132,6 +134,16 @@ async def switchboard_connect(
 
     if request.headers.get("User-Agent", "").startswith("RadioPad/"):
         setattr(connection, "is_radio_pad", True)
+        stations_url = request.headers.get("RadioPad-Stations-Url")
+        if not stations_url:
+            return connection.respond(
+                HTTPStatus.BAD_REQUEST,
+                "RadioPad-Stations-Url header required for RadioPad Player connections.\n",
+            )
+
+        logging.info(f"RadioPad Player connected with stations URL: {stations_url}")
+        STATIONS_URL_BY_HOST[get_host_key(connection)] = stations_url
+
     return None
 
 
