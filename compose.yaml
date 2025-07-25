@@ -3,8 +3,8 @@ services:
     build:
       context: ./player
     environment:
-      SWITCHBOARD_URL: "ws://switchboard:1980/"
       PULSE_SERVER: "unix:/run/user/${UID:-1000}/pulse/native"
+      RADIOPAD_SWITCHBOARD_URL: "ws://switchboard:1980/"
     tty: true
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
