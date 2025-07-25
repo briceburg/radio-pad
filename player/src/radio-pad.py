@@ -230,7 +230,7 @@ async def handle_msg(msg, source):
                 else:
                     stop_station()
                 await broadcast("station_playing")
-            case "station_playing" | "client_count":
+            case "station_playing" | "client_count" | "station_url":
                 pass  # ignore these events.
             case _:
                 print(f"{source}: unknown event: {event}")
@@ -250,7 +250,7 @@ async def macropad_loop():
             macropad_ports = [
                 port.device
                 for port in serial.tools.list_ports.comports()
-                if port.interface.startswith("CircuitPython CDC2")
+                if port.interface and port.interface.startswith("CircuitPython CDC2")
             ]
 
             if not macropad_ports:
@@ -326,12 +326,16 @@ async def switchboard_loop(url):
 
     while True:
         try:
-            async with websockets.connect(url, user_agent_header="RadioPad/1.0") as ws:
+            headers = {
+                "User-Agent": "RadioPad/1.0",
+                "RadioPad-Stations-Url": STATIONS_URL,
+            }
+            async with websockets.connect(url, additional_headers=headers) as ws:
                 print(f"SWITCHBOARD: connected to: {url}")
                 # expose the switchboard websocket globally
                 SWITCHBOARD = ws
 
-                # Send initial station playing event -> TODO can we limit this to this websocket?
+                # Send initial station playing event
                 await broadcast("station_playing", audience="switchboard")
 
                 # Listen for station requests
