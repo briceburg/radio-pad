@@ -20,20 +20,42 @@ const stationGrid = document.getElementById('station-grid');
 const nowPlaying = document.getElementById('now-playing');
 const stopButton = document.getElementById('stop-button');
 
-const stationsUrl = 'https://raw.githubusercontent.com/briceburg/radio-pad/refs/heads/main/player/stations.json';
-const switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || 'ws://localhost:1980/';
+
+let playerId = import.meta.env.VITE_PLAYER_ID || 'briceburg';
+let registryUrl = import.meta.env.VITE_REGISTRY_URL || 'https://registry.radiopad.dev';
+let stationsUrl = import.meta.env.VITE_STATIONS_URL || null;
+let switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || null;
 
 let ws;
 let reconnectTimer = null;
 let reconnectDelay = 2000; // Start with 2 seconds
 
 // Keep a map of station name to button for easy highlighting
-const stationButtons = {};
+let stationButtons = {};
+
+function resetStations() {
+  stationButtons = {};
+  stationGrid.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const ionRow = document.createElement('ion-row');
+    ionRow.className = 'station-placeholder';
+    for (let j = 0; j < 3; j++) {
+      const ionCol = document.createElement('ion-col');
+      const skeleton = document.createElement('ion-skeleton-text');
+      skeleton.setAttribute('animated', '');
+      ionCol.appendChild(skeleton);
+      ionRow.appendChild(ionCol);
+    }
+    stationGrid.appendChild(ionRow);
+  }
+}
 
 async function loadStations() {
+  resetStations();
   try {
     const response = await fetch(stationsUrl);
     const stations = await response.json();
+    stationGrid.innerHTML = '';
 
     let ionRow;
     stations.forEach((station, index) => {
@@ -112,6 +134,9 @@ function connectWebSocket() {
             btn.setAttribute('color', name === data ? 'success' : 'primary')
           );
           break;
+        case "station_url":
+          stationsUrl = data;
+          loadStations();
         case "station_request":
         case "client_count":
           break;
@@ -150,5 +175,32 @@ function stopStation() {
   sendStationRequest(null);
 }
 
-loadStations();
-connectWebSocket();
+// Initialize the app
+async function initialize() {
+  async function discover() {
+    const url = `${registryUrl}/v1/players/${playerId}`;
+    console.log(`Discovering switchboard from ${url}...`);
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      switchboardUrl = switchboardUrl || data.switchboardUrl;
+    } catch (error) {
+      console.error('Error discovering player info from registry:', error);
+    }
+  }
+
+  resetStations();
+
+  if (!switchboardUrl) {
+    await discover();
+
+    if (!switchboardUrl) {
+      console.error('Missing switchboardUrl. Cannot initialize app.');
+      return;
+    }
+  }
+
+  connectWebSocket();
+}
+
+initialize()
