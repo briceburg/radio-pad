@@ -18,8 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from python_mpv_jsonipc import MPV
-import os, sys, subprocess
+import os, sys
 import urllib.request
 import json
 import asyncio
@@ -30,24 +29,18 @@ import serial.tools.list_ports
 import time
 import traceback
 
-AUDIO_CHANNELS = os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo")  # 'stereo' or 'mono'
-MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
+from lib.player_mpv import MpvPlayer as Player
+
 MACROPAD = None
 SWITCHBOARD = None
-STATION = None
-
-mpv_process = None
-mpv_sock = None
-mpv_volume = None
-mpv_sock_lock = asyncio.Lock()
-
+PLAYER = Player(os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo"))
 
 async def broadcast(event, data=None, audience="all"):
     """
     Broadcast an event to the macropad and/or switchboard.
     """
     if event == "station_playing":
-        data = STATION["name"] if STATION else None
+        data = PLAYER.get_station_name()
 
     message = json.dumps({"event": event, "data": data})
 
@@ -66,12 +59,11 @@ async def broadcast(event, data=None, audience="all"):
 
 
 async def cleanup():
-    global mpv_process, mpv_sock, SWITCHBOARD, MACROPAD
+    global PLAYER, SWITCHBOARD, MACROPAD
     print("Cleaning up before exit...")
 
-    if mpv_process or mpv_sock:
-        stop_station()
-        await broadcast("station_playing")
+    PLAYER.stop()
+    await broadcast("station_playing")
 
     if SWITCHBOARD:
         try:
@@ -87,132 +79,6 @@ async def cleanup():
             print(f"Error closing MACROPAD: {e}")
         MACROPAD = None
 
-
-async def play_station(station_name):
-    global mpv_process, mpv_sock, STATION
-    print(f"PLAYER: attempting to play station: {station_name}")
-    try:
-        # Stop any currently playing station
-        if mpv_process:
-            stop_station()
-
-        # Find the station by name
-        for station in RADIO_STATIONS:
-            if station["name"] == station_name:
-                STATION = station
-                break
-
-        if not STATION:
-            print(f"PLAYER: station not found: {station_name}")
-            return
-
-        print(
-            f"PLAYER: playing: {STATION['name']} @ {STATION['url']} ({AUDIO_CHANNELS})"
-        )
-        mpv_process = subprocess.Popen(
-            [
-                "mpv",
-                STATION["url"],
-                "--no-osc",
-                "--no-osd-bar",
-                "--no-input-default-bindings",
-                "--no-input-cursor",
-                "--no-input-vo-keyboard",
-                "--no-input-terminal",
-                "--no-audio-display",
-                f"--input-ipc-server={MPV_SOCKET_FILE}",
-                "--no-video",
-                "--no-cache",
-                "--stream-lavf-o=reconnect_streamed=1",
-                "--profile=low-latency",
-                f"--audio-channels={AUDIO_CHANNELS}",
-            ],
-            stdin=subprocess.DEVNULL,
-            stdout=sys.stdout,
-            stderr=subprocess.STDOUT,
-        )
-        # Reset mpv_sock so a new one will be created for the new process
-        mpv_sock = None
-        await establish_ipc_socket()
-    except Exception as e:
-        print(f"PLAYER: error starting station: {e}")
-
-
-def stop_station():
-    global mpv_process, mpv_sock, STATION
-    STATION = None
-
-    if mpv_sock:
-        try:
-            mpv_sock.stop()
-        except Exception as e:
-            pass
-        finally:
-            mpv_sock = None
-
-    if mpv_process:
-        try:
-            mpv_process.terminate()
-            if os.path.exists(MPV_SOCKET_FILE):
-                os.remove(MPV_SOCKET_FILE)
-        except Exception as e:
-            pass
-        finally:
-            mpv_process = None
-
-
-async def volume_adjust(amt):
-    global mpv_sock
-    global mpv_volume
-    if mpv_sock is None:
-        print("PLAYER: mpv IPC socket not established, cannot adjust volume.")
-        return
-
-    if mpv_volume is None:
-        mpv_volume = mpv_sock.volume
-
-    volume = mpv_volume + amt
-
-    # keep volume from getting too high or too low
-    if volume > 100:
-        volume = 100
-    elif volume < 50:
-        volume = 50
-
-    mpv_volume = volume
-    mpv_sock.volume = mpv_volume
-    print(f"  Adjusted Volume: {mpv_volume}")
-
-
-async def establish_ipc_socket():
-    global mpv_sock
-    async with mpv_sock_lock:
-        if mpv_sock is not None:
-            return mpv_sock
-        loop = asyncio.get_running_loop()
-        for i in range(20):
-            try:
-                # Run the blocking MPV constructor in a thread pool
-                sock = await loop.run_in_executor(
-                    None, lambda: MPV(start_mpv=False, ipc_socket=MPV_SOCKET_FILE)
-                )
-                mpv_sock = sock
-                print("mpv IPC established.")
-                # Restore previously set volume if available
-                if mpv_volume is not None:
-                    print(f"Restoring volume to {mpv_volume}.")
-                    try:
-                        mpv_sock.volume = mpv_volume
-                    except Exception as e:
-                        print(f"Failed restoring volume: {e}")
-                return mpv_sock
-            except Exception as e:
-                if i == 19:
-                    print(f"Failed to connect to mpv IPC socket: {e}")
-                await asyncio.sleep(0.1)
-        print("failed to establish mpv IPC. volume controls disabled")
-        mpv_sock = None
-        return None
 
 async def decode_msg(msg, source):
     """Decode a JSON message and return the event and data."""
@@ -230,12 +96,16 @@ async def handle_event(event, data, source):
     try:
         match event:
             case "volume":
-                await volume_adjust(5 if data == "up" else -5)
+                PLAYER.volume_up() if data == "up" else PLAYER.volume_down()
             case "station_request":
                 if data:
-                    await play_station(data)
+                    station = next((s for s in RADIO_STATIONS if s["name"] == data), None)
+                    if station:
+                        await PLAYER.play(station)
+                    else:
+                        print(f"WARNING: Station '{data}' not found in RADIO_STATIONS.")
                 else:
-                    stop_station()
+                    PLAYER.stop()
                 await broadcast("station_playing")
             case "station_playing" | "client_count" | "station_url":
                 pass  # ignore these events.
