@@ -5,5 +5,6 @@ my_id=$(id -u)
 disk="/dev/disk/by-label/CIRCUITPY"
 target="/mnt/CIRCUITPY"
 [ -d "$target" ] || sudo mkdir -p "$target"
+sudo umount "$target" || true
 sudo mount "$disk" "$target" -o uid="$my_id" -o rw
 echo "[ok] mounted disk to /mnt/CIRCUITPY under uid $my_id"
