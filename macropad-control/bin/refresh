@@ -15,6 +15,5 @@ if [ "${1:-}" = "--hard" ]; then
 fi
 
 cp -r "$PROJECT_ROOT"/src/* .
-cp -r "$PROJECT_ROOT"/../player/stations.json .
 sync
 echo "[ok] copied files"
