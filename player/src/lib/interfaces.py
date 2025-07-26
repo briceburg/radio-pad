@@ -121,7 +121,7 @@ class RadioPadClient(abc.ABC):
         """Register or override a handler for a specific event."""
         self._event_handlers[event_name] = handler
 
-    async def broadcast(self, event, data=None, audience="all"):
+    async def broadcast(self, event, data=None):
         """Broadcast an event."""
         if event == "station_playing":
             data = self.player.station_name
@@ -193,4 +193,9 @@ class RadioPadClient(abc.ABC):
     @abc.abstractmethod
     async def _send(self, message: str):
         """Send a message to the macropad or switchboard."""
+        pass
+
+    @abc.abstractmethod
+    async def close(self):
+        """Close the client connection."""
         pass
