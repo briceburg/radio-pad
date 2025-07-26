@@ -1,0 +1,196 @@
+# This file is part of the radio-pad project.
+# https://github.com/briceburg/radio-pad
+#
+# Copyright (c) 2025 Brice Burgess <https://github.com/briceburg>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+import abc
+import json
+from typing import TypedDict, Optional, Literal
+import traceback
+from dataclasses import dataclass
+
+
+@dataclass
+class RadioPadStation:
+    name: str
+    url: str
+    color: Optional[str] = None
+
+
+@dataclass
+class RadioPadPlayerConfig:
+    id: str
+    stations_url: str
+    stations: list[RadioPadStation] = None
+
+    audio_channels: Optional[Literal["stereo", "mono"]] = None
+    registry_url: Optional[str] = None
+    switchboard_url: Optional[str] = None
+
+
+class RadioPadEvent(TypedDict, total=False):
+    event: str
+    data: Optional[
+        object
+    ]  # Any JSON serializable data, including strings, numbers, lists, or dictionaries
+
+
+class RadioPadPlayer(abc.ABC):
+    """
+    Interface for RadioPad player implementations.
+    """
+
+    def __init__(self, config: RadioPadPlayerConfig):
+        self._station: Optional[RadioPadStation] = None
+        self._config: RadioPadPlayerConfig = config
+
+    @property
+    def config(self) -> RadioPadPlayerConfig:
+        """Get the player configuration."""
+        return self._config
+
+    @property
+    def station(self) -> Optional[RadioPadStation]:
+        """Get or set the currently playing station."""
+        return self._station
+
+    @station.setter
+    def station(self, value: Optional[RadioPadStation]):
+        self._station = value
+
+    @property
+    def station_name(self) -> Optional[str]:
+        """Get the name of the currently playing station, or None if not set."""
+        return self._station.name if self._station else None
+
+    @abc.abstractmethod
+    async def play(self, station: RadioPadStation):
+        """Play a radio station."""
+        pass
+
+    @abc.abstractmethod
+    async def stop(self):
+        """Stop playback of the current station."""
+        pass
+
+    @abc.abstractmethod
+    async def volume_up(self):
+        """Increase the volume."""
+        pass
+
+    @abc.abstractmethod
+    async def volume_down(self):
+        """Decrease the volume."""
+        pass
+
+
+class RadioPadClient(abc.ABC):
+    """
+    Interface for RadioPad clients (e.g., MacroPadClient, SwitchboardClient).
+    """
+
+    def __init__(self, player: RadioPadPlayer):
+        self._player = player
+        self._event_handlers = {}
+        self.register_event("volume", self._handle_volume)
+        self.register_event("station_request", self._handle_station_request)
+        self.register_event("station_list", self._handle_station_list)
+        # Ignored events
+        for ignored in ("station_playing", "client_count", "stations_url"):
+            self.register_event(ignored, self._handle_ignored)
+
+    @property
+    def player(self) -> RadioPadPlayer:
+        """Get the player instance."""
+        return self._player
+
+    def register_event(self, event_name: str, handler):
+        """Register or override a handler for a specific event."""
+        self._event_handlers[event_name] = handler
+
+    async def broadcast(self, event, data=None, audience="all"):
+        """Broadcast an event."""
+        if event == "station_playing":
+            data = self.player.station_name
+        message = json.dumps({"event": event, "data": data})
+        await self._send(message)
+
+    async def handle_message(self, message: str):
+        """Handle incoming messages."""
+        try:
+            event = json.loads(message)
+            await self.handle_event(event)
+        except (json.JSONDecodeError, ValueError):
+            print(f"Invalid message received: {message}")
+        except Exception as e:
+            print(f"Error handling message: {message}")
+            traceback.print_exc()
+
+    async def handle_event(self, event: RadioPadEvent):
+        """Dispatch event to registered handler, fallback to unknown."""
+        if not (isinstance(event, dict) and "event" in event):
+            raise ValueError("Invalid event structure")
+        event_name = event.get("event")
+        handler = self._event_handlers.get(event_name, self._handle_unknown)
+        await handler(event)
+
+    async def _handle_volume(self, event):
+        data = event.get("data")
+        if data == "up":
+            await self.player.volume_up()
+        else:
+            await self.player.volume_down()
+
+    async def _handle_station_request(self, event):
+        data = event.get("data")
+        if data:
+            station = next(
+                (s for s in self.player.config.stations if s["name"] == data), None
+            )
+            if station:
+                await self.player.play(station)
+            else:
+                print(f"WARNING: Station '{data}' not found in RADIO_STATIONS.")
+        else:
+            await self.player.stop()
+        await self.broadcast("station_playing")
+
+    async def _handle_station_list(self, event):
+        pass
+        # if source == "MACROPAD":
+        #     stations_no_url = [
+        #         {k: v for k, v in station.items() if k != "url"}
+        #         for station in RADIO_STATIONS
+        #     ]
+        #     await self.broadcast("station_list", audience="macropad", data=stations_no_url)
+        #     await asyncio.sleep(0.1)
+        #     await self.broadcast("station_playing", audience="macropad")
+
+    async def _handle_ignored(self, event):
+        pass  # Ignore these events
+
+    async def _handle_unknown(self, event):
+        print(f"{self.__class__.__name__}: unknown event: {event}")
+
+    @abc.abstractmethod
+    async def run(self):
+        """Continuously try to connect and listen for messages."""
+        pass
+
+    @abc.abstractmethod
+    async def _send(self, message: str):
+        """Send a message to the macropad or switchboard."""
+        pass

@@ -22,25 +22,27 @@ import os, sys
 import urllib.request
 import json
 import asyncio
-import websockets
 import serial_asyncio
 import signal
 import serial.tools.list_ports
 import time
 import traceback
 
-from lib.player_mpv import MpvPlayer as Player
+from lib.player_mpv import MpvPlayer
+from lib.client_switchboard import SwitchboardClient
+from lib.interfaces import RadioPadPlayerConfig
 
 MACROPAD = None
 SWITCHBOARD = None
-PLAYER = Player(os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo"))
+
 
 async def broadcast(event, data=None, audience="all"):
     """
     Broadcast an event to the macropad and/or switchboard.
     """
     if event == "station_playing":
-        data = PLAYER.get_station_name()
+        data = None
+        # data = PLAYER.station.name if PLAYER.station else None
 
     message = json.dumps({"event": event, "data": data})
 
@@ -89,6 +91,7 @@ async def decode_msg(msg, source):
         print(f"{source}: error decoding message: {e}")
         return None, None
 
+
 async def handle_event(event, data, source):
     """
     Common event handler for both macropad and switchboard events.
@@ -99,7 +102,9 @@ async def handle_event(event, data, source):
                 PLAYER.volume_up() if data == "up" else PLAYER.volume_down()
             case "station_request":
                 if data:
-                    station = next((s for s in RADIO_STATIONS if s["name"] == data), None)
+                    station = next(
+                        (s for s in RADIO_STATIONS if s["name"] == data), None
+                    )
                     if station:
                         await PLAYER.play(station)
                     else:
@@ -107,7 +112,7 @@ async def handle_event(event, data, source):
                 else:
                     PLAYER.stop()
                 await broadcast("station_playing")
-            case "station_playing" | "client_count" | "station_url":
+            case "station_playing" | "client_count" | "stations_url":
                 pass  # ignore these events.
             case "station_list":
                 if source == "MACROPAD":
@@ -116,7 +121,9 @@ async def handle_event(event, data, source):
                         {k: v for k, v in station.items() if k != "url"}
                         for station in RADIO_STATIONS
                     ]
-                    await broadcast("station_list", audience="macropad", data=stations_no_url)
+                    await broadcast(
+                        "station_list", audience="macropad", data=stations_no_url
+                    )
                     await asyncio.sleep(0.1)  # Handle backpressure
                     await broadcast("station_playing", audience="macropad")
             case _:
@@ -154,6 +161,7 @@ async def connect_to_macropad():
             continue  # Try next port
     return None, None
 
+
 async def macropad_message_loop(reader):
     """
     Listen for messages from the macropad and handle events.
@@ -181,6 +189,7 @@ async def macropad_message_loop(reader):
         except Exception as e:
             print(f"MACROPAD: error reading message: {e}")
             break
+
 
 async def macropad_connect_loop():
     """Connect to macropad and listen for events with auto-reconnect."""
@@ -214,11 +223,13 @@ async def macropad_connect_loop():
                             self._last_line = last_line
                             self._reader = reader
                             self._used = False
+
                         async def readline(self):
                             if not self._used:
                                 self._used = True
                                 return self._last_line
                             return await self._reader.readline()
+
                     reader = LastLineReader(last_line, reader)
 
                 # Listen for messages from macropad
@@ -238,94 +249,25 @@ async def macropad_connect_loop():
         print("MACROPAD: reconnecting in 3s...")
         await asyncio.sleep(3)
 
-async def switchboard_message_loop(ws):
+
+def create_player_and_config():
     """
-    Listen for messages from the switchboard and handle events.
+    Create and configure the PLAYER and its config,
+    performing registry discovery if needed.
+    Returns (PLAYER, RADIO_STATIONS).
     """
-    async for msg in ws:
-        try:
-            event, data = await decode_msg(msg, "SWITCHBOARD")
-            if event:
-                await handle_event(event, data, "SWITCHBOARD")
-        except Exception as e:
-            print(f"SWITCHBOARD: error handling event: {e}")
-
-
-async def switchboard_connect_loop(url):
-    """Connect to switchboard and listen for events with auto-reconnect."""
-    global SWITCHBOARD
-
-    if not url:
-        print("SWITCHBOARD_URL is empty, skipping switchboard connection.")
-        return
-
-    while True:
-        try:
-            headers = {
-                "User-Agent": "RadioPad/1.0",
-                "RadioPad-Stations-Url": STATIONS_URL,
-            }
-            async with websockets.connect(url, additional_headers=headers) as ws:
-                print(f"SWITCHBOARD: connected to: {url}")
-                SWITCHBOARD = ws
-
-                # let the switchboard know what current station is playing. 
-                asyncio.create_task(broadcast("station_playing", audience="switchboard"))
-
-                # begin listening for messages
-                await switchboard_message_loop(ws)
-
-        except (ConnectionRefusedError, OSError) as e:
-            print(f"SWITCHBOARD: failed to connect to {url}: {e}")
-            print(
-                "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
-            )
-        except Exception as e:
-            print(f"SWITCHBOARD: Unexpected error: {e}")
-        finally:
-            if SWITCHBOARD:
-                try:
-                    await SWITCHBOARD.close()
-                    print("SWITCHBOARD: websocket connection closed.")
-                except Exception as e:
-                    print(f"Error closing SWITCHBOARD: {e}")
-                SWITCHBOARD = None
-        print("reconnecting to switchboard in 5s...")
-        await asyncio.sleep(5)
-        
-
-async def main():
-    try:
-        await asyncio.gather(
-            macropad_connect_loop(),
-            switchboard_connect_loop(SWITCHBOARD_URL),
-        )
-    except asyncio.CancelledError:
-        print("\nPLAYER: exiting...")
-        await cleanup()
-        raise
-    except Exception as e:
-        print(f"Unexpected error in main: {e}")
-        traceback.print_exc()
-        await cleanup()
-        raise
-
-
-if __name__ == "__main__":
-
-    PLAYER_ID = os.getenv("RADIOPAD_PLAYER_ID", "briceburg")
-    REGISTRY_URL = os.getenv(
-        "RADIOPAD_REGISTRY_URL",
-        "https://registry.radiopad.dev",
-    )
-    STATIONS_URL = os.getenv("RADIOPAD_STATIONS_URL", None)
-    SWITCHBOARD_URL = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
+    audio_channels = os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo")
+    player_id = os.getenv("RADIOPAD_PLAYER_ID", "briceburg")
+    registry_url = os.getenv("RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev")
+    stations_url = os.getenv("RADIOPAD_STATIONS_URL", None)
+    switchboard_url = os.getenv("RADIOPAD_SWITCHBOARD_URL", None)
 
     def fetch_json_url(url, timeout=12, retries=3):
-        """Fetch JSON from a URL with retries and a timeout."""
         for attempt in range(retries):
             try:
-                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                req = urllib.request.Request(
+                    url, headers={"Accept": "application/json"}
+                )
                 with urllib.request.urlopen(req, timeout=timeout) as response:
                     if response.status == 200:
                         return json.loads(response.read())
@@ -333,47 +275,85 @@ if __name__ == "__main__":
                         print(f"Failed to fetch JSON: {response.status} from {url}")
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed for {url}: {e}")
-
             print(f"Retrying in {2 ** attempt} seconds...")
             time.sleep(2**attempt)
         return None
 
+    # Discovery logic
     if os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true") == "true":
-        if not PLAYER_ID:
+        if not player_id:
             print("RADIOPAD_PLAYER_ID must be set to enable discovery.")
             sys.exit(1)
-        url = f"{REGISTRY_URL.rstrip('/')}/v1/players/{PLAYER_ID}"
+        url = f"{registry_url.rstrip('/')}/v1/players/{player_id}"
         print(
             f"Discovering station presets and switchboard from {url} ...\n   to skip, set RADIOPAD_ENABLE_DISCOVERY=false"
         )
         data = fetch_json_url(url)
         if data:
-            if not STATIONS_URL:
-                STATIONS_URL = data.get("stationsUrl")
-            if not SWITCHBOARD_URL:
-                SWITCHBOARD_URL = data.get("switchboardUrl")
+            if not stations_url:
+                stations_url = data.get("stationsUrl")
+            if not switchboard_url:
+                switchboard_url = data.get("switchboardUrl")
         else:
             print("Failed to discover player info from registry.")
 
-    if not STATIONS_URL:
+    if not stations_url:
         print(
             "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER_ID."
         )
         sys.exit(1)
 
-    print(f"Fetching stations from {STATIONS_URL} ...")
-    RADIO_STATIONS = fetch_json_url(STATIONS_URL)
-    if not RADIO_STATIONS:
+    print(f"Fetching stations from {stations_url} ...")
+    radio_stations = fetch_json_url(stations_url)
+    if not radio_stations:
         print("Station list is empty, exiting.")
         sys.exit(1)
+
+    # Create config and PLAYER
+    player_config = RadioPadPlayerConfig(
+        id=player_id,
+        stations=radio_stations,
+        stations_url=stations_url,
+        audio_channels=audio_channels,
+        registry_url=registry_url,
+        switchboard_url=switchboard_url,
+    )
+    PLAYER = MpvPlayer(player_config)
+    return PLAYER, radio_stations
+
+
+# --- Usage in main script ---
+
+if __name__ == "__main__":
 
     def handle_exit(signum=None, frame=None, code=0):
         print("\nPLAYER: received exit signal...")
         sys.exit(code)
 
+    PLAYER, RADIO_STATIONS = create_player_and_config()
+    SWITCHBOARD = SwitchboardClient(PLAYER)
+
+    signal.signal(signal.SIGTERM, handle_exit)
+    signal.signal(signal.SIGINT, handle_exit)
+
+    async def main():
+        global MACROPAD, SWITCHBOARD, PLAYER
+        try:
+            await asyncio.gather(
+                macropad_connect_loop(),
+                SWITCHBOARD.run(),
+            )
+        except asyncio.CancelledError:
+            print("\nexiting...")
+            await cleanup()
+            raise
+        except Exception as e:
+            print(f"Unexpected error in main: {e}")
+            traceback.print_exc()
+            await cleanup()
+            raise
+
     try:
-        signal.signal(signal.SIGTERM, handle_exit)
-        signal.signal(signal.SIGINT, handle_exit)
         asyncio.run(main())
     except Exception as e:
         print(f"Unexpected error: {e}")

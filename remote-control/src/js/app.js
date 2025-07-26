@@ -134,7 +134,7 @@ function connectWebSocket() {
             btn.setAttribute('color', name === data ? 'success' : 'primary')
           );
           break;
-        case "station_url":
+        case "stations_url":
           stationsUrl = data;
           loadStations();
         case "station_request":
