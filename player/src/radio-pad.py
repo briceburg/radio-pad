@@ -32,23 +32,20 @@ from lib.client_macropad import MacropadClient
 from lib.interfaces import RadioPadPlayerConfig
 
 
-async def cleanup(player, clients):
+async def cleanup(player):
     print("Cleaning up before exit...")
-
     player.stop()
-
-    for client in clients:
+    for client in player.clients:
         try:
             await client.close()
         except Exception as e:
             print(f"Error closing client {client.__class__.__name__}: {e}")
 
 
-def create_player_and_config():
+def create_player():
     """
-    Create and configure the PLAYER and its config,
+    Create and configure a RadioPadPlayer,
     performing registry discovery if needed.
-    Returns (PLAYER, RADIO_STATIONS).
     """
     audio_channels = os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo")
     player_id = os.getenv("RADIOPAD_PLAYER_ID", "briceburg")
@@ -112,8 +109,7 @@ def create_player_and_config():
         registry_url=registry_url,
         switchboard_url=switchboard_url,
     )
-    player = MpvPlayer(player_config)
-    return player, radio_stations
+    return MpvPlayer(player_config)
 
 
 # --- Usage in main script ---
@@ -124,28 +120,26 @@ if __name__ == "__main__":
         print("\nPLAYER: received exit signal...")
         sys.exit(code)
 
-    player, radio_stations = create_player_and_config()
-    clients = [
-        MacropadClient(player),
-        SwitchboardClient(player),
-    ]
+    player = create_player()
+    macropad_client = MacropadClient(player)
+    switchboard_client = SwitchboardClient(player)
 
     signal.signal(signal.SIGTERM, handle_exit)
     signal.signal(signal.SIGINT, handle_exit)
 
     async def main():
         try:
-            client_tasks = [client.run() for client in clients]
+            client_tasks = [client.run() for client in player.clients]
             await asyncio.gather(*client_tasks)
 
         except asyncio.CancelledError:
             print("\nexiting...")
-            await cleanup(player, clients)
+            await cleanup(player)
             raise
         except Exception as e:
             print(f"Unexpected error in main: {e}")
             traceback.print_exc()
-            await cleanup(player, clients)
+            await cleanup(player)
             raise
 
     try:

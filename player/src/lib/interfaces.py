@@ -56,6 +56,7 @@ class RadioPadPlayer(abc.ABC):
     def __init__(self, config: RadioPadPlayerConfig):
         self._station: Optional[RadioPadStation] = None
         self._config: RadioPadPlayerConfig = config
+        self._clients = [RadioPadClient]  # Internal list of connected clients
 
     @property
     def config(self) -> RadioPadPlayerConfig:
@@ -75,6 +76,15 @@ class RadioPadPlayer(abc.ABC):
     def station_name(self) -> Optional[str]:
         """Get the name of the currently playing station, or None if not set."""
         return self._station.name if self._station else None
+
+    @property
+    def clients(self):
+        """Get the list of connected clients (read-only)."""
+        return self._clients
+
+    def register_client(self, client):
+        """Register a client with this player."""
+        self._clients.append(client)
 
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
@@ -105,6 +115,7 @@ class RadioPadClient(abc.ABC):
     def __init__(self, player: RadioPadPlayer):
         self._player = player
         self._event_handlers = {}
+        player.register_client(self)  # Register with the player
         self.register_event("volume", self._handle_volume)
         self.register_event("station_request", self._handle_station_request)
         self.register_event("station_list", self._handle_station_list)
@@ -122,11 +133,12 @@ class RadioPadClient(abc.ABC):
         self._event_handlers[event_name] = handler
 
     async def broadcast(self, event, data=None):
-        """Broadcast an event."""
+        """Broadcast an event to all clients registered with the player."""
         if event == "station_playing":
             data = self.player.station_name
         message = json.dumps({"event": event, "data": data})
-        await self._send(message)
+        for client in self.player.clients:
+            await client._send(message)
 
     async def handle_message(self, message: str):
         """Handle incoming messages."""
@@ -170,14 +182,6 @@ class RadioPadClient(abc.ABC):
 
     async def _handle_station_list(self, event):
         pass
-        # if source == "MACROPAD":
-        #     stations_no_url = [
-        #         {k: v for k, v in station.items() if k != "url"}
-        #         for station in RADIO_STATIONS
-        #     ]
-        #     await self.broadcast("station_list", audience="macropad", data=stations_no_url)
-        #     await asyncio.sleep(0.1)
-        #     await self.broadcast("station_playing", audience="macropad")
 
     async def _handle_ignored(self, event):
         pass  # Ignore these events
