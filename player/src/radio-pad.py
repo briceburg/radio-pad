@@ -22,232 +22,26 @@ import os, sys
 import urllib.request
 import json
 import asyncio
-import serial_asyncio
 import signal
-import serial.tools.list_ports
 import time
 import traceback
 
 from lib.player_mpv import MpvPlayer
 from lib.client_switchboard import SwitchboardClient
+from lib.client_macropad import MacropadClient
 from lib.interfaces import RadioPadPlayerConfig
 
-MACROPAD = None
-SWITCHBOARD = None
 
-
-async def broadcast(event, data=None, audience="all"):
-    """
-    Broadcast an event to the macropad and/or switchboard.
-    """
-    if event == "station_playing":
-        data = None
-        # data = PLAYER.station.name if PLAYER.station else None
-
-    message = json.dumps({"event": event, "data": data})
-
-    if audience in ["macropad", "all"] and MACROPAD:
-        try:
-            MACROPAD.write((message + "\n").encode())
-            await MACROPAD.drain()
-        except Exception as e:
-            print(f"BROADCAST: Failed to send to macropad: {e}")
-
-    if audience in ["switchboard", "all"] and SWITCHBOARD:
-        try:
-            await SWITCHBOARD.send(message)
-        except Exception as e:
-            print(f"BROADCAST: Failed to send to switchboard: {e}")
-
-
-async def cleanup():
-    global PLAYER, SWITCHBOARD, MACROPAD
+async def cleanup(player, clients):
     print("Cleaning up before exit...")
 
-    PLAYER.stop()
-    await broadcast("station_playing")
+    player.stop()
 
-    if SWITCHBOARD:
+    for client in clients:
         try:
-            await SWITCHBOARD.close()
+            await client.close()
         except Exception as e:
-            print(f"Error closing SWITCHBOARD: {e}")
-        SWITCHBOARD = None
-
-    if MACROPAD:
-        try:
-            MACROPAD.close()
-        except Exception as e:
-            print(f"Error closing MACROPAD: {e}")
-        MACROPAD = None
-
-
-async def decode_msg(msg, source):
-    """Decode a JSON message and return the event and data."""
-    try:
-        event, data = (lambda m: (m.get("event"), m.get("data")))(json.loads(msg))
-        return event, data
-    except Exception as e:
-        print(f"{source}: error decoding message: {e}")
-        return None, None
-
-
-async def handle_event(event, data, source):
-    """
-    Common event handler for both macropad and switchboard events.
-    """
-    try:
-        match event:
-            case "volume":
-                PLAYER.volume_up() if data == "up" else PLAYER.volume_down()
-            case "station_request":
-                if data:
-                    station = next(
-                        (s for s in RADIO_STATIONS if s["name"] == data), None
-                    )
-                    if station:
-                        await PLAYER.play(station)
-                    else:
-                        print(f"WARNING: Station '{data}' not found in RADIO_STATIONS.")
-                else:
-                    PLAYER.stop()
-                await broadcast("station_playing")
-            case "station_playing" | "client_count" | "stations_url":
-                pass  # ignore these events.
-            case "station_list":
-                if source == "MACROPAD":
-                    # Send list of stations to macropad, stripping "url" key
-                    stations_no_url = [
-                        {k: v for k, v in station.items() if k != "url"}
-                        for station in RADIO_STATIONS
-                    ]
-                    await broadcast(
-                        "station_list", audience="macropad", data=stations_no_url
-                    )
-                    await asyncio.sleep(0.1)  # Handle backpressure
-                    await broadcast("station_playing", audience="macropad")
-            case _:
-                print(f"{source}: unknown event: {event}")
-    except Exception as e:
-        print(f"{source}: error handling event '{event}': {e}")
-
-
-async def connect_to_macropad():
-    """
-    Find and connect to the first available macropad data port (CDC2).
-    Returns (reader, writer) tuple, or (None, None) if not found.
-    """
-    macropad_ports = [
-        port.device
-        for port in serial.tools.list_ports.comports()
-        if port.interface and port.interface.startswith("CircuitPython CDC2")
-    ]
-
-    if not macropad_ports:
-        print("MACROPAD: no data ports found, is it plugged in?")
-        return None, None
-
-    print(f"MACROPAD: found ports: {macropad_ports}")
-    for macropad_port in macropad_ports:
-        print(f"MACROPAD: attempting to connect to {macropad_port}")
-        try:
-            reader, writer = await serial_asyncio.open_serial_connection(
-                url=macropad_port, baudrate=115200
-            )
-            print(f"MACROPAD: connected to: {macropad_port}")
-            return reader, writer
-        except Exception as e:
-            print(f"MACROPAD: failed to connect to {macropad_port}: {e}")
-            continue  # Try next port
-    return None, None
-
-
-async def macropad_message_loop(reader):
-    """
-    Listen for messages from the macropad and handle events.
-    """
-    macropad_buffer = ""
-    while True:
-        try:
-            line = await reader.readline()
-            if not line:
-                break
-            macropad_buffer += line.decode("utf-8")
-            while "\n" in macropad_buffer:
-                msg, macropad_buffer = macropad_buffer.split("\n", 1)
-                msg = msg.strip()
-                if not msg:
-                    continue
-                try:
-                    event, data = await decode_msg(msg, "MACROPAD")
-                except Exception as e:
-                    # partial or malformed message, continue buffering...
-                    continue
-
-                if event:
-                    await handle_event(event, data, "MACROPAD")
-        except Exception as e:
-            print(f"MACROPAD: error reading message: {e}")
-            break
-
-
-async def macropad_connect_loop():
-    """Connect to macropad and listen for events with auto-reconnect."""
-    global MACROPAD
-
-    while True:
-        try:
-            reader, writer = await connect_to_macropad()
-            MACROPAD = writer
-
-            if MACROPAD:
-                # Clear all pending serial messages except the last one
-                # this will preserve the last station request from macropad.
-                last_line = None
-                try:
-                    while True:
-                        line = await asyncio.wait_for(reader.readline(), timeout=0.1)
-                        if not line:
-                            break
-                        last_line = line
-                except Exception:
-                    pass  # Ignore timeout or empty buffer
-
-                # If we found any lines, keep only the last one
-                if last_line:
-                    # Put the last line back into the buffer for processing
-                    # This works because readline() returns bytes
-                    # We'll decode and process it in macropad_message_loop
-                    class LastLineReader:
-                        def __init__(self, last_line, reader):
-                            self._last_line = last_line
-                            self._reader = reader
-                            self._used = False
-
-                        async def readline(self):
-                            if not self._used:
-                                self._used = True
-                                return self._last_line
-                            return await self._reader.readline()
-
-                    reader = LastLineReader(last_line, reader)
-
-                # Listen for messages from macropad
-                await macropad_message_loop(reader)
-
-        except Exception as e:
-            print(f"MACROPAD: Unexpected error: {e}")
-        finally:
-            if MACROPAD:
-                try:
-                    MACROPAD.close()
-                    await MACROPAD.wait_closed()
-                except Exception as e:
-                    print(f"MACROPAD: error during wait_closed (likely unplugged): {e}")
-                MACROPAD = None
-
-        print("MACROPAD: reconnecting in 3s...")
-        await asyncio.sleep(3)
+            print(f"Error closing client {client.__class__.__name__}: {e}")
 
 
 def create_player_and_config():
@@ -318,8 +112,8 @@ def create_player_and_config():
         registry_url=registry_url,
         switchboard_url=switchboard_url,
     )
-    PLAYER = MpvPlayer(player_config)
-    return PLAYER, radio_stations
+    player = MpvPlayer(player_config)
+    return player, radio_stations
 
 
 # --- Usage in main script ---
@@ -330,27 +124,28 @@ if __name__ == "__main__":
         print("\nPLAYER: received exit signal...")
         sys.exit(code)
 
-    PLAYER, RADIO_STATIONS = create_player_and_config()
-    SWITCHBOARD = SwitchboardClient(PLAYER)
+    player, radio_stations = create_player_and_config()
+    clients = [
+        MacropadClient(player),
+        SwitchboardClient(player),
+    ]
 
     signal.signal(signal.SIGTERM, handle_exit)
     signal.signal(signal.SIGINT, handle_exit)
 
     async def main():
-        global MACROPAD, SWITCHBOARD, PLAYER
         try:
-            await asyncio.gather(
-                macropad_connect_loop(),
-                SWITCHBOARD.run(),
-            )
+            client_tasks = [client.run() for client in clients]
+            await asyncio.gather(*client_tasks)
+
         except asyncio.CancelledError:
             print("\nexiting...")
-            await cleanup()
+            await cleanup(player, clients)
             raise
         except Exception as e:
             print(f"Unexpected error in main: {e}")
             traceback.print_exc()
-            await cleanup()
+            await cleanup(player, clients)
             raise
 
     try:

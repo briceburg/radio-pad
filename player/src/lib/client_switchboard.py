@@ -77,3 +77,7 @@ class SwitchboardClient(RadioPadClient):
         """Send a message to the macropad or switchboard."""
         if self.ws:
             await self.ws.send(message)
+
+    async def close(self):
+        if self.ws:
+            await self.ws.close()
