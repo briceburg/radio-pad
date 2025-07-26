@@ -65,7 +65,7 @@ async def switchboard(websocket):
     try:
         broadcast_all("client_count")
         await websocket.send(mkmsg("station_playing"))
-        await websocket.send(mkmsg("station_url", STATIONS_URL_BY_HOST[host_key]))
+        await websocket.send(mkmsg("stations_url", STATIONS_URL_BY_HOST[host_key]))
 
         async for msg in websocket:
             try:
