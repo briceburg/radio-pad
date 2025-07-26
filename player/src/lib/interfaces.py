@@ -158,7 +158,7 @@ class RadioPadClient(abc.ABC):
         data = event.get("data")
         if data:
             station = next(
-                (s for s in self.player.config.stations if s["name"] == data), None
+                (s for s in self.player.config.stations if s.name == data), None
             )
             if station:
                 await self.player.play(station)
