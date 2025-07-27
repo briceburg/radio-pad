@@ -1,9 +1,12 @@
 import os
-import sys
 import time
 import json
 import urllib.request
+import logging
 from lib.interfaces import RadioPadPlayerConfig, RadioPadStation
+from lib.exceptions import ConfigError
+
+logger = logging.getLogger('CONFIG')
 
 def fetch_json_url(url, timeout=12, retries=3):
     for attempt in range(retries):
@@ -15,10 +18,10 @@ def fetch_json_url(url, timeout=12, retries=3):
                 if response.status == 200:
                     return json.loads(response.read())
                 else:
-                    print(f"Failed to fetch JSON: {response.status} from {url}")
+                    logger.warning("Failed to fetch JSON: %s from %s", response.status, url)
         except Exception as e:
-            print(f"Attempt {attempt + 1} failed for {url}: {e}")
-        print(f"Retrying in {2 ** attempt} seconds...")
+            logger.warning("Attempt %s failed for %s: %s", attempt + 1, url, e)
+        logger.info("Retrying in %s seconds...", 2 ** attempt)
         time.sleep(2**attempt)
     return None
 
@@ -31,13 +34,11 @@ def make(player_id, registry_url, stations_url=None, switchboard_url=None, enabl
         stations_url, switchboard_url = discover_config(player_id, registry_url, stations_url, switchboard_url)
 
     if not stations_url:
-        print("Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER_ID.")
-        sys.exit(1)
+        raise ConfigError("Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER_ID.")
 
     radio_stations = fetch_json_url(stations_url)
     if not radio_stations:
-        print("Station list is empty, exiting.")
-        sys.exit(1)
+        raise ConfigError("Station list is empty, exiting.")
 
     # Convert station dicts to RadioPadStation objects
     radio_stations = [
@@ -58,13 +59,12 @@ def discover_config(player_id, registry_url, stations_url=None, switchboard_url=
     """Discover missing player configuration from the registry."""
 
     if stations_url and switchboard_url:
-        print("skipping discovery, using provided URLs.")
+        logger.info("skipping discovery, using provided URLs.")
         return stations_url, switchboard_url
 
     url = f"{registry_url.rstrip('/')}/v1/players/{player_id}"
-    print(
-        f"Discovering configuration from {url} ...\n   to skip, set RADIOPAD_ENABLE_DISCOVERY=false"
-    )
+    logger.info("Discovering configuration from %s ...", url)
+    logger.info("  To skip, set RADIOPAD_ENABLE_DISCOVERY=false")
     data = fetch_json_url(url)
     if data:
         if not stations_url:

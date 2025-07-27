@@ -21,4 +21,4 @@ cd "$PROJECT_ROOT"
 pip install -r requirements.txt
 echo -e "  :check: activated.\n" >&2
 
-exec python3 src/radio-pad.py "$@"
+exec python3 src/player.py "$@"

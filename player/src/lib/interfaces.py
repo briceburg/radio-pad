@@ -18,9 +18,11 @@
 
 import abc
 import json
+import logging
 from typing import TypedDict, Optional
-import traceback
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -71,11 +73,6 @@ class RadioPadPlayer(abc.ABC):
         self._station = value
 
     @property
-    def station_name(self) -> Optional[str]:
-        """Get the name of the currently playing station, or None if not set."""
-        return self._station.name if self._station else None
-
-    @property
     def clients(self):
         """Get the list of connected clients (read-only)."""
         return self._clients
@@ -113,7 +110,6 @@ class RadioPadClient(abc.ABC):
     def __init__(self, player: RadioPadPlayer):
         self._player = player
         self._event_handlers = {}
-        player.register_client(self)  # Register with the player
         self.register_event("volume", self._handle_volume)
         self.register_event("station_request", self._handle_station_request)
         # Ignored events
@@ -132,13 +128,13 @@ class RadioPadClient(abc.ABC):
     async def broadcast(self, event, data=None):
         """Broadcast an event to all clients registered with the player."""
         if event == "station_playing":
-            data = self.player.station_name
+            data = self.player.station.name if self.player.station else None
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
             try:
                 await client._send(message)
             except Exception as e:
-                print(f"Broadcast error for {client}: {e}")
+                logger.error("Broadcast error for %s: %s", client, e)
 
     async def handle_message(self, message: str):
         """Handle incoming messages."""
@@ -146,10 +142,9 @@ class RadioPadClient(abc.ABC):
             event = json.loads(message)
             await self.handle_event(event)
         except (json.JSONDecodeError, ValueError):
-            print(f"Invalid message received: {message}")
+            logger.warning("Invalid message received: %s", message)
         except Exception as e:
-            print(f"Error handling message: {message}")
-            traceback.print_exc()
+            logger.error("Error handling message: %s", message, exc_info=True)
 
     async def handle_event(self, event: RadioPadEvent):
         """Dispatch event to registered handler, fallback to unknown."""
@@ -175,7 +170,7 @@ class RadioPadClient(abc.ABC):
             if station:
                 await self.player.play(station)
             else:
-                print(f"WARNING: Station '{data}' not found in RADIO_STATIONS.")
+                logger.warning("Station '%s' not found in RADIO_STATIONS.", data)
         else:
             await self.player.stop()
         await self.broadcast("station_playing")
@@ -184,7 +179,7 @@ class RadioPadClient(abc.ABC):
         pass  # Ignore these events
 
     async def _handle_unknown(self, event):
-        print(f"{self.__class__.__name__}: unknown event: {event['event']}")
+        logger.warning("%s: unknown event: %s", self.__class__.__name__, event["event"])
 
     @abc.abstractmethod
     async def run(self):

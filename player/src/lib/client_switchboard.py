@@ -19,15 +19,15 @@
 
 import websockets
 import asyncio
+import logging
 from lib.interfaces import RadioPadClient, RadioPadPlayer
-import traceback
 
+logger = logging.getLogger('SWITCHBOARD')
 
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 
 
 class SwitchboardClient(RadioPadClient):
-    # TODO: instead of passing stations_url, these should be part of the player.config object
     def __init__(self, player: RadioPadPlayer):
         super().__init__(player)
         self.url = player.config.switchboard_url
@@ -40,16 +40,15 @@ class SwitchboardClient(RadioPadClient):
 
     async def run(self):
         if not self.url:
-            print("skipping switchboard connection, url not provided.")
+            logger.info("skipping switchboard connection, url not provided.")
             return
 
         while True:
             try:
                 await self._connect_and_listen()
             except Exception as e:
-                print(f"SWITCHBOARD: Unexpected error: {e}")
-                traceback.print_exc()
-            print("reconnecting to switchboard in 5s...")
+                logger.error("Unexpected error: %s", e, exc_info=True)
+            logger.info("reconnecting to switchboard in 5s...")
             await asyncio.sleep(5)
 
     async def _connect_and_listen(self):
@@ -57,7 +56,7 @@ class SwitchboardClient(RadioPadClient):
             self.url, additional_headers=self.http_headers
         ):
             try:
-                print(f"SWITCHBOARD: connected to: {self.url}")
+                logger.info(f"connected to: {self.url}")
                 self.ws = ws
                 asyncio.create_task(self.broadcast("station_playing"))
                 async for msg in ws:
@@ -67,14 +66,14 @@ class SwitchboardClient(RadioPadClient):
                 self.ws = None
                 continue
             except (ConnectionRefusedError, OSError) as e:
-                print(f"SWITCHBOARD: failed to connect to {self.url}: {e}")
-                print(
+                logger.warning(f"failed to connect to {self.url}: {e}")
+                logger.warning(
                     "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
                 )
                 continue
 
     async def _send(self, message):
-        """Send a message to the macropad or switchboard."""
+        """Send a message to the macropad or switchboard.""" 
         if self.ws:
             await self.ws.send(message)
 

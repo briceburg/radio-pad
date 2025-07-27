@@ -22,16 +22,17 @@ from python_mpv_jsonipc import MPV
 import asyncio
 import os
 import subprocess
-import sys
-import traceback
+import logging
 
-MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
+logger = logging.getLogger('PLAYER')
 
 
 class MpvPlayer(RadioPadPlayer):
-    def __init__(self, config: RadioPadPlayerConfig, audio_channels: str = "stereo"):
+    def __init__(self, config: RadioPadPlayerConfig, audio_channels: str = "stereo",
+                 socket_path: str = "/tmp/radio-pad-mpv.sock"):
         super().__init__(config)
         self.audio_channels = audio_channels
+        self.socket_path = socket_path
         self.mpv_process = None
         self.mpv_sock = None
         self.mpv_volume = None
@@ -40,7 +41,7 @@ class MpvPlayer(RadioPadPlayer):
     async def play(self, station: RadioPadStation):
         """Play a radio station."""
 
-        print(f"PLAYER: playing station {station.name} ({station.url})")
+        logger.info("playing station %s (%s)", station.name, station.url)
         try:
             # Stop any existing playback
             await self.stop()
@@ -56,7 +57,7 @@ class MpvPlayer(RadioPadPlayer):
                     "--no-input-vo-keyboard",
                     "--no-input-terminal",
                     "--no-audio-display",
-                    f"--input-ipc-server={MPV_SOCKET_FILE}",
+                    f"--input-ipc-server={self.socket_path}",
                     "--no-video",
                     "--no-cache",
                     "--stream-lavf-o=reconnect_streamed=1",
@@ -64,19 +65,18 @@ class MpvPlayer(RadioPadPlayer):
                     f"--audio-channels={self.audio_channels}",
                 ],
                 stdin=subprocess.DEVNULL,
-                stdout=sys.stdout,
-                stderr=subprocess.STDOUT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             if self.mpv_process and self.mpv_process.poll() is None:
-                print(f"PLAYER: mpv process started with PID {self.mpv_process.pid}")
+                logger.info("mpv process started with PID %s", self.mpv_process.pid)
                 self.station = station
             else:
-                print("PLAYER: failed to start mpv process.")
+                logger.error("failed to start mpv process.")
             self.mpv_sock = None
             await self._establish_ipc_socket()
         except Exception as e:
-            print(f"PLAYER: error starting station: {e}")
-            traceback.print_exc()
+            logger.error("error starting station: %s", e, exc_info=True)
 
     async def stop(self):
         """Stop playback of the current station."""
@@ -92,8 +92,8 @@ class MpvPlayer(RadioPadPlayer):
         if self.mpv_process:
             try:
                 self.mpv_process.terminate()
-                if os.path.exists(MPV_SOCKET_FILE):
-                    os.remove(MPV_SOCKET_FILE)
+                if os.path.exists(self.socket_path):
+                    os.remove(self.socket_path)
             except Exception:
                 pass
             finally:
@@ -107,7 +107,7 @@ class MpvPlayer(RadioPadPlayer):
 
     def _adjust_volume(self, amount):
         if self.mpv_sock is None:
-            print("PLAYER: mpv IPC socket not established, cannot adjust volume.")
+            logger.warning("mpv IPC socket not established, cannot adjust volume.")
             return
 
         if self.mpv_volume is None:
@@ -122,7 +122,7 @@ class MpvPlayer(RadioPadPlayer):
 
         self.mpv_volume = volume
         self.mpv_sock.volume = self.mpv_volume
-        print(f"  Adjusted Volume: {self.mpv_volume}")
+        logger.debug("Adjusted Volume: %s", self.mpv_volume)
 
     async def _establish_ipc_socket(self):
         async with self.mpv_sock_lock:
@@ -132,12 +132,12 @@ class MpvPlayer(RadioPadPlayer):
             for i in range(20):
                 try:
                     sock = await loop.run_in_executor(
-                        None, lambda: MPV(start_mpv=False, ipc_socket=MPV_SOCKET_FILE)
+                        None, lambda: MPV(start_mpv=False, ipc_socket=self.socket_path)
                     )
                     self.mpv_sock = sock
                     self.mpv_volume = sock.volume
                     return sock
                 except Exception as e:
                     await asyncio.sleep(0.2)
-            print("PLAYER: failed to establish mpv IPC socket.")
+            logger.error("failed to establish mpv IPC socket.")
             return
