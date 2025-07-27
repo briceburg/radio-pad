@@ -18,7 +18,7 @@
 
 import abc
 import json
-from typing import TypedDict, Optional, Literal
+from typing import TypedDict, Optional
 import traceback
 from dataclasses import dataclass
 
@@ -35,8 +35,6 @@ class RadioPadPlayerConfig:
     id: str
     stations_url: str
     stations: list[RadioPadStation] = None
-
-    audio_channels: Optional[Literal["stereo", "mono"]] = None
     registry_url: Optional[str] = None
     switchboard_url: Optional[str] = None
 
@@ -56,7 +54,7 @@ class RadioPadPlayer(abc.ABC):
     def __init__(self, config: RadioPadPlayerConfig):
         self._station: Optional[RadioPadStation] = None
         self._config: RadioPadPlayerConfig = config
-        self._clients = [RadioPadClient]  # Internal list of connected clients
+        self._clients: list[RadioPadClient] = []
 
     @property
     def config(self) -> RadioPadPlayerConfig:
@@ -118,7 +116,6 @@ class RadioPadClient(abc.ABC):
         player.register_client(self)  # Register with the player
         self.register_event("volume", self._handle_volume)
         self.register_event("station_request", self._handle_station_request)
-        self.register_event("station_list", self._handle_station_list)
         # Ignored events
         for ignored in ("station_playing", "client_count", "stations_url"):
             self.register_event(ignored, self._handle_ignored)
@@ -138,7 +135,10 @@ class RadioPadClient(abc.ABC):
             data = self.player.station_name
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
-            await client._send(message)
+            try:
+                await client._send(message)
+            except Exception as e:
+                print(f"Broadcast error for {client}: {e}")
 
     async def handle_message(self, message: str):
         """Handle incoming messages."""
@@ -170,7 +170,7 @@ class RadioPadClient(abc.ABC):
         data = event.get("data")
         if data:
             station = next(
-                (s for s in self.player.config.stations if s["name"] == data), None
+                (s for s in self.player.config.stations if s.name == data), None
             )
             if station:
                 await self.player.play(station)
@@ -180,14 +180,11 @@ class RadioPadClient(abc.ABC):
             await self.player.stop()
         await self.broadcast("station_playing")
 
-    async def _handle_station_list(self, event):
-        pass
-
     async def _handle_ignored(self, event):
         pass  # Ignore these events
 
     async def _handle_unknown(self, event):
-        print(f"{self.__class__.__name__}: unknown event: {event}")
+        print(f"{self.__class__.__name__}: unknown event: {event['event']}")
 
     @abc.abstractmethod
     async def run(self):
