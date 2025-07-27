@@ -19,8 +19,8 @@
 import abc
 import json
 import logging
-from typing import TypedDict, Optional
 from dataclasses import dataclass
+from typing import Optional, TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -84,22 +84,18 @@ class RadioPadPlayer(abc.ABC):
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
         """Play a radio station."""
-        pass
 
     @abc.abstractmethod
     async def stop(self):
         """Stop playback of the current station."""
-        pass
 
     @abc.abstractmethod
     async def volume_up(self):
         """Increase the volume."""
-        pass
 
     @abc.abstractmethod
     async def volume_down(self):
         """Decrease the volume."""
-        pass
 
 
 class RadioPadClient(abc.ABC):
@@ -145,7 +141,7 @@ class RadioPadClient(abc.ABC):
             await self.handle_event(event)
         except (json.JSONDecodeError, ValueError):
             logger.warning("Invalid message received: %s", message)
-        except Exception as e:
+        except Exception:
             logger.error("Error handling message: %s", message, exc_info=True)
 
     async def handle_event(self, event: RadioPadEvent):
@@ -186,14 +182,11 @@ class RadioPadClient(abc.ABC):
     @abc.abstractmethod
     async def run(self):
         """Continuously try to connect and listen for messages."""
-        pass
 
     @abc.abstractmethod
     async def _send(self, message: str):
         """Send a message to the macropad or switchboard."""
-        pass
 
     @abc.abstractmethod
     async def close(self):
         """Close the client connection."""
-        pass

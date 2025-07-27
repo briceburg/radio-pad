@@ -18,10 +18,10 @@
 
 """Custom exceptions for the radio-pad application."""
 
+
 class RadioPadError(Exception):
     """Base exception for radio-pad errors."""
-    pass
+
 
 class ConfigError(RadioPadError):
     """Raised for configuration-related errors."""
-    pass

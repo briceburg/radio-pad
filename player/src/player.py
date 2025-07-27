@@ -18,19 +18,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
+import logging
 import os
 import sys
-import asyncio
-import signal
-import logging
-import lib.config as config
-from lib.exceptions import ConfigError
 
-from lib.player_mpv import MpvPlayer
-from lib.client_switchboard import SwitchboardClient
+import lib.config as config
 from lib.client_macropad import MacropadClient
+from lib.client_switchboard import SwitchboardClient
+from lib.exceptions import ConfigError
+from lib.player_mpv import MpvPlayer
 
 logger = logging.getLogger(__name__)
+
 
 async def cleanup(player):
     logger.info("Cleaning up before exit...")
@@ -40,6 +40,7 @@ async def cleanup(player):
             await client.close()
         except Exception as e:
             logger.error("Error closing client %s: %s", client.__class__.__name__, e)
+
 
 async def main(player):
     """Runs the main event loop for the radio-pad player."""
@@ -59,24 +60,33 @@ async def main(player):
 
 if __name__ == "__main__":
     # Configure logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)-8s - %(name)-12s - %(message)s', datefmt='%H:%M:%S')
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)-8s - %(name)-12s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     player = None
     try:
         # Load configuration
         player_config = config.make(
             player_id=os.getenv("RADIOPAD_PLAYER_ID", "briceburg"),
-            registry_url=os.getenv("RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev"),
+            registry_url=os.getenv(
+                "RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev"
+            ),
             stations_url=os.getenv("RADIOPAD_STATIONS_URL", None),
             switchboard_url=os.getenv("RADIOPAD_SWITCHBOARD_URL", None),
-            enable_discovery=os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower() == "true",
+            enable_discovery=os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower()
+            == "true",
         )
 
         # Initialize player and clients
         player = MpvPlayer(
             player_config,
             audio_channels=os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo"),
-            socket_path=os.getenv("RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"),
+            socket_path=os.getenv(
+                "RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"
+            ),
         )
         player.register_client(MacropadClient(player))
         player.register_client(SwitchboardClient(player))

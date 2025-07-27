@@ -17,19 +17,25 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from lib.interfaces import RadioPadPlayer, RadioPadStation, RadioPadPlayerConfig
-from python_mpv_jsonipc import MPV
 import asyncio
+import logging
 import os
 import subprocess
-import logging
 
-logger = logging.getLogger('PLAYER')
+from python_mpv_jsonipc import MPV
+
+from lib.interfaces import RadioPadPlayer, RadioPadPlayerConfig, RadioPadStation
+
+logger = logging.getLogger("PLAYER")
 
 
 class MpvPlayer(RadioPadPlayer):
-    def __init__(self, config: RadioPadPlayerConfig, audio_channels: str = "stereo",
-                 socket_path: str = "/tmp/radio-pad-mpv.sock"):
+    def __init__(
+        self,
+        config: RadioPadPlayerConfig,
+        audio_channels: str = "stereo",
+        socket_path: str = "/tmp/radio-pad-mpv.sock",
+    ):
         super().__init__(config)
         self.audio_channels = audio_channels
         self.socket_path = socket_path
@@ -137,7 +143,7 @@ class MpvPlayer(RadioPadPlayer):
                     self.mpv_sock = sock
                     self.mpv_volume = sock.volume
                     return sock
-                except Exception as e:
+                except Exception:
                     await asyncio.sleep(0.2)
             logger.error("failed to establish mpv IPC socket.")
             return

@@ -64,9 +64,7 @@ class MacropadKeys:
 
         title = page["title"]
         if self.playing_station_index is not None:
-            station_page_index = self.get_station_page_index(
-                self.playing_station_index
-            )
+            station_page_index = self.get_station_page_index(self.playing_station_index)
             if self.current_page_index == station_page_index:
                 station_index_on_page = self.playing_station_index % MACROPAD_KEY_COUNT
                 title = page["stations"][station_index_on_page].get("name", "?")

@@ -17,9 +17,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import time
+
 from adafruit_macropad import MacroPad
+
 from lib.macropad_display import MacropadDisplay
-from lib.macropad_keys import MacropadKeys, PRESSED_COLOR, DEFAULT_COLOR
+from lib.macropad_keys import DEFAULT_COLOR, PRESSED_COLOR, MacropadKeys
 from lib.macropad_player import MacropadPlayer
 
 macropad = MacroPad()
@@ -45,10 +47,10 @@ while True:
             display.set_title("Player disconnected!")
             player.flush_buffer()
             had_stations = False
-           
+
         time.sleep(0.01)
         continue
-    
+
     # --- Player Events ---
     event = player.read_event()
     if event:
@@ -57,7 +59,9 @@ while True:
         data = event.get("data")
 
         if event_name == "station_list":
-            station_list = [{"name": station, "color": DEFAULT_COLOR} for station in data]
+            station_list = [
+                {"name": station, "color": DEFAULT_COLOR} for station in data
+            ]
             keys.set_stations(station_list)
             had_stations = True
         elif event_name == "station_playing":
@@ -94,4 +98,3 @@ while True:
         if station_name:
             keys.set_key_color(key_number, PRESSED_COLOR)
             player.send_command("station_request", station_name)
-

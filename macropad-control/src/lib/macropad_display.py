@@ -23,6 +23,7 @@ from adafruit_display_text import label
 
 from .macropad_keys import MACROPAD_KEY_COUNT
 
+
 class MacropadDisplay:
     def __init__(self, macropad):
         self.macropad = macropad
