@@ -125,12 +125,14 @@ class RadioPadClient(abc.ABC):
         """Register or override a handler for a specific event."""
         self._event_handlers[event_name] = handler
 
-    async def broadcast(self, event, data=None):
-        """Broadcast an event to all clients registered with the player."""
+    async def broadcast(self, event, data=None, limit_to_self=False):
+        """Broadcast an event to clients registered with the player."""
         if event == "station_playing":
             data = self.player.station.name if self.player.station else None
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
+            if limit_to_self and client is not self:
+                continue
             try:
                 await client._send(message)
             except Exception as e:

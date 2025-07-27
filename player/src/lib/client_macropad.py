@@ -89,25 +89,14 @@ class MacropadClient(RadioPadClient):
         if not self.writer:
             return
 
-        # Clear all pending serial messages except the last one
-        last_line = None
+        # Clear pending serial messages
         try:
             while True:
                 line = await asyncio.wait_for(self.reader.readline(), timeout=0.1)
                 if not line:
                     break
-                last_line = line
         except asyncio.TimeoutError:
             pass  # Ignore timeout
-
-        # Process the last received line if it exists
-        if last_line:
-            try:
-                msg = last_line.decode("utf-8").strip()
-                if msg:
-                    await self.handle_message(msg)
-            except Exception as e:
-                logger.error("error processing last message: %s", e)
 
         # Listen for new messages
         await self._listen()
@@ -140,7 +129,7 @@ class MacropadClient(RadioPadClient):
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]
-        await self.broadcast("station_list", data=station_list)
+        await self.broadcast("station_list", data=station_list, limit_to_self=True)
         await asyncio.sleep(0.1)  # Handle backpressure
         await self.broadcast("station_playing")
 
