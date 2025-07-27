@@ -144,10 +144,10 @@ class RadioPadApp:
                     group[i].color = 0x000000
                     group[i].background_color = 0xFFFFFF
                 else:
-                    macropad.pixels[i] = station.get("color", DEFAULT_COLOR)
+                    macropad.pixels[i] = station['color']
                     group[i].color = 0xFFFFFF
                     group[i].background_color = 0x000000
-                group[i].text = station.get("name", "?")
+                group[i].text = station['name']
             else:
                 macropad.pixels[i] = 0
                 group[i].text = ""
@@ -204,7 +204,11 @@ class RadioPadApp:
                     continue
 
                 if event == "station_list":
-                    self.load_stations(data)
+                    station_list = [{
+                        "name": station,
+                        "color": DEFAULT_COLOR,
+                    } for station in data]
+                    self.load_stations(station_list)
                 elif event == "station_playing":
                     self.current_station_index = None
                     if not data:
