@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+NC='\033[0m'
+CHECK_MARK="\xE2\x9C\x94"
+CROSS_MARK="\xE2\x9D\x8C"
+
+log(){ echo -e "$*" >&2; }
+die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
+
+npm run lint || \
+  die "Prettier check failed. Use 'npm run lint:fix' to fix."
+
+log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

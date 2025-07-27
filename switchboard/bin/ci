@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+NC='\033[0m'
+CHECK_MARK="\xE2\x9C\x94"
+CROSS_MARK="\xE2\x9D\x8C"
+
+log(){ echo -e "$*" >&2; }
+die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
+
+paths=(src/)
+
+log "🧹 [black] Checking code style..."
+black --check "${paths[@]}" || \
+  die "black failed. use 'black ${paths[*]}' to fix."
+
+log "📚 [isort] Checking import order..."
+isort --check --diff "${paths[@]}" || \
+  die "isort failed. use 'isort ${paths[*]}' to fix."
+
+log "🧽 [autoflake] Checking for unused imports and variables..."
+autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --recursive "${paths[@]}" || \
+  die "autoflake failed. use 'autoflake -i --remove-all-unused-imports --remove-unused-variables ${paths[*]}' to fix."
+
+log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"
