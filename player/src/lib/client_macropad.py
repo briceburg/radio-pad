@@ -18,14 +18,14 @@
 
 
 import asyncio
-import serial_asyncio
-import serial.tools.list_ports
 import logging
-import json
+
+import serial.tools.list_ports
+import serial_asyncio
 
 from lib.interfaces import RadioPadClient, RadioPadPlayer
 
-logger = logging.getLogger('MACROPAD')
+logger = logging.getLogger("MACROPAD")
 
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
 
@@ -51,7 +51,9 @@ class MacropadClient(RadioPadClient):
                         self.writer.close()
                         await self.writer.wait_closed()
                     except Exception as e:
-                        logger.warning("error during wait_closed (likely unplugged): %s", e)
+                        logger.warning(
+                            "error during wait_closed (likely unplugged): %s", e
+                        )
                     self.writer = None
                     self.reader = None
 

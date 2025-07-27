@@ -24,10 +24,10 @@ import logging
 import os
 import signal
 from collections import defaultdict
+from http import HTTPStatus
 
 import websockets
-from websockets.asyncio.server import broadcast, serve, ServerConnection
-from http import HTTPStatus
+from websockets.asyncio.server import ServerConnection, broadcast, serve
 
 CURRENT_STATION_BY_HOST = defaultdict(lambda: None)
 PARTITION_ENABLED = os.environ.get("SWITCHBOARD_PARTITION_BY_HTTP_HOST") == "true"

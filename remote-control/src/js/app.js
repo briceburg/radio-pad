@@ -16,13 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const stationGrid = document.getElementById('station-grid');
-const nowPlaying = document.getElementById('now-playing');
-const stopButton = document.getElementById('stop-button');
+const stationGrid = document.getElementById("station-grid");
+const nowPlaying = document.getElementById("now-playing");
+const stopButton = document.getElementById("stop-button");
 
-
-let playerId = import.meta.env.VITE_PLAYER_ID || 'briceburg';
-let registryUrl = import.meta.env.VITE_REGISTRY_URL || 'https://registry.radiopad.dev';
+let playerId = import.meta.env.VITE_PLAYER_ID || "briceburg";
+let registryUrl =
+  import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev";
 let stationsUrl = import.meta.env.VITE_STATIONS_URL || null;
 let switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || null;
 
@@ -35,14 +35,14 @@ let stationButtons = {};
 
 function resetStations() {
   stationButtons = {};
-  stationGrid.innerHTML = '';
+  stationGrid.innerHTML = "";
   for (let i = 0; i < 3; i++) {
-    const ionRow = document.createElement('ion-row');
-    ionRow.className = 'station-placeholder';
+    const ionRow = document.createElement("ion-row");
+    ionRow.className = "station-placeholder";
     for (let j = 0; j < 3; j++) {
-      const ionCol = document.createElement('ion-col');
-      const skeleton = document.createElement('ion-skeleton-text');
-      skeleton.setAttribute('animated', '');
+      const ionCol = document.createElement("ion-col");
+      const skeleton = document.createElement("ion-skeleton-text");
+      skeleton.setAttribute("animated", "");
       ionCol.appendChild(skeleton);
       ionRow.appendChild(ionCol);
     }
@@ -55,20 +55,20 @@ async function loadStations() {
   try {
     const response = await fetch(stationsUrl);
     const stations = await response.json();
-    stationGrid.innerHTML = '';
+    stationGrid.innerHTML = "";
 
     let ionRow;
     stations.forEach((station, index) => {
       if (index % 3 === 0) {
-        ionRow = document.createElement('ion-row');
+        ionRow = document.createElement("ion-row");
         stationGrid.appendChild(ionRow);
       }
 
-      const ionCol = document.createElement('ion-col');
-      const ionButton = document.createElement('ion-button');
+      const ionCol = document.createElement("ion-col");
+      const ionButton = document.createElement("ion-button");
       ionButton.innerText = station.name;
-      ionButton.expand = 'block';
-      ionButton.addEventListener('click', () => {
+      ionButton.expand = "block";
+      ionButton.addEventListener("click", () => {
         playStation(station.name, ionButton);
       });
 
@@ -79,32 +79,35 @@ async function loadStations() {
       ionRow.appendChild(ionCol);
     });
 
-    stopButton.addEventListener('click', (ev) => {
+    stopButton.addEventListener("click", (ev) => {
       stopStation();
     });
   } catch (error) {
-    console.error('Error loading stations:', error);
+    console.error("Error loading stations:", error);
   }
 }
 
 function connectWebSocket() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+  if (
+    ws &&
+    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+  ) {
     return;
   }
 
-  console.log('Connecting to WebSocket:', switchboardUrl);
+  console.log("Connecting to WebSocket:", switchboardUrl);
   ws = new WebSocket(switchboardUrl);
 
   // Add a 3-second timeout for the connection attempt
   const connectTimeout = setTimeout(() => {
     if (ws.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket connection timed out after 3s, closing socket.');
+      console.warn("WebSocket connection timed out after 3s, closing socket.");
       ws.close();
     }
   }, 3000);
 
   ws.onopen = () => {
-    console.log('WebSocket connected');
+    console.log("WebSocket connected");
     clearTimeout(connectTimeout);
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -113,13 +116,17 @@ function connectWebSocket() {
 
   ws.onclose = () => {
     clearTimeout(connectTimeout);
-    console.log('WebSocket closed, reconnecting in', reconnectDelay / 1000, 's...');
+    console.log(
+      "WebSocket closed, reconnecting in",
+      reconnectDelay / 1000,
+      "s...",
+    );
     scheduleReconnect();
   };
 
   ws.onerror = (err) => {
     clearTimeout(connectTimeout);
-    console.error('WebSocket error:', err);
+    console.error("WebSocket error:", err);
   };
 
   ws.onmessage = (msg) => {
@@ -131,7 +138,7 @@ function connectWebSocket() {
           // Enable/disable stop button based on whether a station is playing
           stopButton.disabled = !data;
           Object.entries(stationButtons).forEach(([name, btn]) =>
-            btn.setAttribute('color', name === data ? 'success' : 'primary')
+            btn.setAttribute("color", name === data ? "success" : "primary"),
           );
           break;
         case "stations_url":
@@ -142,10 +149,10 @@ function connectWebSocket() {
         case "client_count":
           break;
         default:
-          console.warn('Unknown WebSocket event:', event);
+          console.warn("Unknown WebSocket event:", event);
       }
     } catch (e) {
-      console.error('Error parsing WebSocket message:', e);
+      console.error("Error parsing WebSocket message:", e);
     }
   };
 }
@@ -163,12 +170,12 @@ function sendStationRequest(stationName) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ event: "station_request", data: stationName }));
   } else {
-    console.error('WebSocket not connected. Cannot send station request.');
+    console.error("WebSocket not connected. Cannot send station request.");
   }
 }
 
 function playStation(stationName, button) {
-  button.setAttribute('color', 'light');
+  button.setAttribute("color", "light");
   sendStationRequest(stationName);
 }
 
@@ -186,7 +193,7 @@ async function initialize() {
       const data = await response.json();
       switchboardUrl = switchboardUrl || data.switchboardUrl;
     } catch (error) {
-      console.error('Error discovering player info from registry:', error);
+      console.error("Error discovering player info from registry:", error);
     }
   }
 
@@ -196,7 +203,7 @@ async function initialize() {
     await discover();
 
     if (!switchboardUrl) {
-      console.error('Missing switchboardUrl. Cannot initialize app.');
+      console.error("Missing switchboardUrl. Cannot initialize app.");
       return;
     }
   }
@@ -204,4 +211,4 @@ async function initialize() {
   connectWebSocket();
 }
 
-initialize()
+initialize();

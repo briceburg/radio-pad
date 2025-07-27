@@ -17,12 +17,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import websockets
 import asyncio
 import logging
+
+import websockets
+
 from lib.interfaces import RadioPadClient, RadioPadPlayer
 
-logger = logging.getLogger('SWITCHBOARD')
+logger = logging.getLogger("SWITCHBOARD")
 
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 
@@ -73,7 +75,7 @@ class SwitchboardClient(RadioPadClient):
                 continue
 
     async def _send(self, message):
-        """Send a message to the macropad or switchboard.""" 
+        """Send a message to the macropad or switchboard."""
         if self.ws:
             await self.ws.send(message)
 

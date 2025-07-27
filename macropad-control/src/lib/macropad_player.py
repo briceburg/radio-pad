@@ -18,6 +18,7 @@
 
 import json
 import time
+
 import usb_cdc
 
 
@@ -42,9 +43,9 @@ class MacropadPlayer:
     def read_event(self):
         if self.player.in_waiting > 0:
             try:
-                self._serial_buffer += self.player.read(
-                    self.player.in_waiting
-                ).decode("utf-8")
+                self._serial_buffer += self.player.read(self.player.in_waiting).decode(
+                    "utf-8"
+                )
             except Exception as e:
                 print(f"PLAYER: error reading serial buffer: {e}")
                 return None
