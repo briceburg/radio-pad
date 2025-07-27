@@ -137,6 +137,7 @@ function connectWebSocket() {
         case "stations_url":
           stationsUrl = data;
           loadStations();
+          break;
         case "station_request":
         case "client_count":
           break;

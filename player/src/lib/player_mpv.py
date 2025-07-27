@@ -117,8 +117,8 @@ class MpvPlayer(RadioPadPlayer):
 
         if volume > 100:
             volume = 100
-        elif volume < 0:
-            volume = 0
+        elif volume < 50:
+            volume = 50
 
         self.mpv_volume = volume
         self.mpv_sock.volume = self.mpv_volume
