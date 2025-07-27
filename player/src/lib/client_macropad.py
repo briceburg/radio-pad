@@ -145,11 +145,8 @@ class MacropadClient(RadioPadClient):
                 print(f"MACROPAD: Failed to send: {e}")
 
     async def _handle_station_list(self, event):
-        stations_no_url = [
-            {k: v for k, v in station.items() if k != "url"}
-            for station in self.player.config.stations
-        ]
-        await self.broadcast("station_list", data=stations_no_url)
+        station_list = [station.name for station in self.player.config.stations]
+        await self.broadcast("station_list", data=station_list)
         await asyncio.sleep(0.1)  # Handle backpressure
         await self.broadcast("station_playing")
 

@@ -29,8 +29,9 @@ MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 
 
 class MpvPlayer(RadioPadPlayer):
-    def __init__(self, config: RadioPadPlayerConfig):
+    def __init__(self, config: RadioPadPlayerConfig, audio_channels: str = "stereo"):
         super().__init__(config)
+        self.audio_channels = audio_channels
         self.mpv_process = None
         self.mpv_sock = None
         self.mpv_volume = None
@@ -39,7 +40,7 @@ class MpvPlayer(RadioPadPlayer):
     async def play(self, station: RadioPadStation):
         """Play a radio station."""
 
-        print(f"PLAYER: playing station {station['name']} ({station['url']})")
+        print(f"PLAYER: playing station {station.name} ({station.url})")
         try:
             # Stop any existing playback
             await self.stop()
@@ -47,7 +48,7 @@ class MpvPlayer(RadioPadPlayer):
             self.mpv_process = subprocess.Popen(
                 [
                     "mpv",
-                    station["url"],
+                    station.url,
                     "--no-osc",
                     "--no-osd-bar",
                     "--no-input-default-bindings",
@@ -60,7 +61,7 @@ class MpvPlayer(RadioPadPlayer):
                     "--no-cache",
                     "--stream-lavf-o=reconnect_streamed=1",
                     "--profile=low-latency",
-                    f"--audio-channels={self.config.audio_channels or 'stereo'}",
+                    f"--audio-channels={self.audio_channels}",
                 ],
                 stdin=subprocess.DEVNULL,
                 stdout=sys.stdout,
@@ -68,10 +69,6 @@ class MpvPlayer(RadioPadPlayer):
             )
             if self.mpv_process and self.mpv_process.poll() is None:
                 print(f"PLAYER: mpv process started with PID {self.mpv_process.pid}")
-
-                # TODO: workaround... ideally we do this check upstream.
-                if isinstance(station, dict):
-                    station = RadioPadStation(**station)
                 self.station = station
             else:
                 print("PLAYER: failed to start mpv process.")
