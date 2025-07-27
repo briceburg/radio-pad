@@ -16,7 +16,7 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 start the player via a script that automatically activates a python virtual environment and installs dependencies.
 
 ```sh
-./bin/radio-pad
+./bin/player
 ```
 
 On a Raspberry Pi, you can start the listener at boot in a tmux session by adding the following to your auto-logged-in user's `.bashrc` file. the example assumes `radio-pad` exists it your PATH:
@@ -38,6 +38,7 @@ name | description | default
 --- | --- | ---
 `RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
+`RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
 `RADIOPAD_PLAYER_ID` | Used to discover the station presets and switchboard URL. | `briceburg`
 `RADIOPAD_REGISTRY_URL` | Player discovery URL. | `https://registry.radiopad.dev`
 `RADIOPAD_STATIONS_URL` | URL to load stations from. Must return a JSON list of stations. Discovered if not provided. | `None`

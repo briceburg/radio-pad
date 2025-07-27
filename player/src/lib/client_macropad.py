@@ -20,10 +20,14 @@
 import asyncio
 import serial_asyncio
 import serial.tools.list_ports
-import traceback
+import logging
 import json
 
 from lib.interfaces import RadioPadClient, RadioPadPlayer
+
+logger = logging.getLogger('MACROPAD')
+
+DATA_INTERFACE_NAME = "CircuitPython CDC2"
 
 
 class MacropadClient(RadioPadClient):
@@ -40,45 +44,42 @@ class MacropadClient(RadioPadClient):
             try:
                 await self._connect_and_listen()
             except Exception as e:
-                print(f"MACROPAD: Unexpected error: {e}")
-                traceback.print_exc()
+                logger.error("Unexpected error: %s", e, exc_info=True)
             finally:
                 if self.writer:
                     try:
                         self.writer.close()
                         await self.writer.wait_closed()
                     except Exception as e:
-                        print(
-                            f"MACROPAD: error during wait_closed (likely unplugged): {e}"
-                        )
+                        logger.warning("error during wait_closed (likely unplugged): %s", e)
                     self.writer = None
                     self.reader = None
 
-            print("MACROPAD: reconnecting in 3s...")
+            logger.info("reconnecting in 3s...")
             await asyncio.sleep(3)
 
     async def _connect(self):
         macropad_ports = [
             port.device
             for port in serial.tools.list_ports.comports()
-            if port.interface and port.interface.startswith("CircuitPython CDC2")
+            if port.interface and port.interface.startswith(DATA_INTERFACE_NAME)
         ]
 
         if not macropad_ports:
-            print("MACROPAD: no data ports found, is it plugged in?")
+            logger.warning("no data ports found, is it plugged in?")
             return None, None
 
-        print(f"MACROPAD: found ports: {macropad_ports}")
+        logger.info("found ports: %s", macropad_ports)
         for macropad_port in macropad_ports:
-            print(f"MACROPAD: attempting to connect to {macropad_port}")
+            logger.info("attempting to connect to %s", macropad_port)
             try:
                 reader, writer = await serial_asyncio.open_serial_connection(
                     url=macropad_port, baudrate=115200
                 )
-                print(f"MACROPAD: connected to: {macropad_port}")
+                logger.info("connected to: %s", macropad_port)
                 return reader, writer
             except Exception as e:
-                print(f"MACROPAD: failed to connect to {macropad_port}: {e}")
+                logger.warning("failed to connect to %s: %s", macropad_port, e)
                 continue
         return None, None
 
@@ -99,23 +100,16 @@ class MacropadClient(RadioPadClient):
         except asyncio.TimeoutError:
             pass  # Ignore timeout
 
+        # Process the last received line if it exists
         if last_line:
+            try:
+                msg = last_line.decode("utf-8").strip()
+                if msg:
+                    await self.handle_message(msg)
+            except Exception as e:
+                logger.error("error processing last message: %s", e)
 
-            class LastLineReader:
-                def __init__(self, last_line, reader):
-                    self._last_line = last_line
-                    self._reader = reader
-                    self._used = False
-
-                async def readline(self):
-                    if not self._used:
-                        self._used = True
-                        return self._last_line
-                    return await self._reader.readline()
-
-            self.reader = LastLineReader(last_line, self.reader)
-
-        # Listen for messages
+        # Listen for new messages
         await self._listen()
 
     async def _listen(self):
@@ -133,7 +127,7 @@ class MacropadClient(RadioPadClient):
                         continue
                     await self.handle_message(msg)
             except Exception as e:
-                print(f"MACROPAD: error reading message: {e}")
+                logger.error("error reading message: %s", e)
                 break
 
     async def _send(self, message: str):
@@ -142,7 +136,7 @@ class MacropadClient(RadioPadClient):
                 self.writer.write((message + "\n").encode())
                 await self.writer.drain()
             except Exception as e:
-                print(f"MACROPAD: Failed to send: {e}")
+                logger.error("Failed to send: %s", e)
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]
