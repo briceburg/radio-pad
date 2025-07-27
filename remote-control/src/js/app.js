@@ -32,6 +32,7 @@ let reconnectDelay = 2000; // Start with 2 seconds
 
 // Keep a map of station name to button for easy highlighting
 let stationButtons = {};
+let currentPlayingStation = null; // Track currently playing station
 
 function resetStations() {
   stationButtons = {};
@@ -47,6 +48,26 @@ function resetStations() {
       ionRow.appendChild(ionCol);
     }
     stationGrid.appendChild(ionRow);
+  }
+}
+
+function highlightCurrentStation() {
+  if (currentPlayingStation && stationButtons[currentPlayingStation]) {
+    Object.entries(stationButtons).forEach(([name, btn]) =>
+      btn.setAttribute(
+        "color",
+        name === currentPlayingStation ? "success" : "primary",
+      ),
+    );
+    stopButton.disabled = false;
+    nowPlaying.innerText = currentPlayingStation || "...";
+  } else {
+    // No station playing, reset all buttons
+    Object.values(stationButtons).forEach((btn) =>
+      btn.setAttribute("color", "primary"),
+    );
+    stopButton.disabled = true;
+    nowPlaying.innerText = "...";
   }
 }
 
@@ -82,6 +103,8 @@ async function loadStations() {
     stopButton.addEventListener("click", (ev) => {
       stopStation();
     });
+
+    highlightCurrentStation();
   } catch (error) {
     console.error("Error loading stations:", error);
   }
@@ -134,12 +157,8 @@ function connectWebSocket() {
       const { event, data } = JSON.parse(msg.data);
       switch (event) {
         case "station_playing":
-          nowPlaying.innerText = data || "...";
-          // Enable/disable stop button based on whether a station is playing
-          stopButton.disabled = !data;
-          Object.entries(stationButtons).forEach(([name, btn]) =>
-            btn.setAttribute("color", name === data ? "success" : "primary"),
-          );
+          currentPlayingStation = data;
+          highlightCurrentStation();
           break;
         case "stations_url":
           stationsUrl = data;
