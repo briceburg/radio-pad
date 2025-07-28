@@ -21,6 +21,8 @@ jobs:
         working-directory: ./${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || '' }}
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -43,6 +45,8 @@ jobs:
         working-directory: ./${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || '' }}
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
