@@ -16,239 +16,182 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const debugInfo = document.getElementById('debug-info');
-const nowPlaying = document.getElementById("now-playing");
-const stationGrid = document.getElementById("station-grid");
-const stopButton = document.getElementById("stop-button");
+import { PreferencesManager, preferencesConfig } from './preferences.js';
+import { SwitchboardClient } from './switchboard.js';
+import { renderStationGrid, showStationSkeletons, highlightCurrentStation } from './ui.js';
 
-let playerId = import.meta.env.VITE_PLAYER_ID || "briceburg";
-let registryUrl = import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev";
-let stationsUrl = import.meta.env.VITE_STATIONS_URL || null;
-let switchboardUrl = import.meta.env.VITE_SWITCHBOARD_URL || null;
+class RadioApp {
+  constructor() {
+    // --- DOM Elements ---
+    this.radioInfo = document.getElementById('radio-info');
+    this.nowPlaying = document.getElementById('now-playing');
+    this.stationGrid = document.getElementById('station-grid');
+    this.stopButton = document.getElementById('stop-button');
 
-let ws;
-let reconnectTimer = null;
-let reconnectDelay = 2000; // Start with 2 seconds
+    // --- State Management ---
+    this.registryUrl = import.meta.env.VITE_REGISTRY_URL || 'https://registry.radiopad.dev';
+    this.playerId = null;
+    this.stationsUrl = null;
+    this.stationButtons = {};
+    this.currentPlayingStation = null;
 
-// Keep a map of station name to button for easy highlighting
-let stationButtons = {};
-let currentPlayingStation = null; // Track currently playing station
-
-function resetStations() {
-  stationButtons = {};
-  stationGrid.innerHTML = "";
-  for (let i = 0; i < 3; i++) {
-    const ionRow = document.createElement("ion-row");
-    ionRow.className = "station-placeholder";
-    for (let j = 0; j < 3; j++) {
-      const ionCol = document.createElement("ion-col");
-      const skeleton = document.createElement("ion-skeleton-text");
-      skeleton.setAttribute("animated", "");
-      ionCol.appendChild(skeleton);
-      ionRow.appendChild(ionCol);
-    }
-    stationGrid.appendChild(ionRow);
-  }
-}
-
-function highlightCurrentStation() {
-  if (currentPlayingStation && stationButtons[currentPlayingStation]) {
-    Object.entries(stationButtons).forEach(([name, btn]) =>
-      btn.setAttribute(
-        "color",
-        name === currentPlayingStation ? "success" : "primary",
-      ),
+    // --- Services ---
+    this.preferencesManager = new PreferencesManager(
+      preferencesConfig,
+      'settings-list',
+      'settings-save',
+      (key, value) => this.handlePreferenceChange(key, value)
     );
-    stopButton.disabled = false;
-    nowPlaying.innerText = currentPlayingStation || "...";
-  } else {
-    // No station playing, reset all buttons
-    Object.values(stationButtons).forEach((btn) =>
-      btn.setAttribute("color", "primary"),
-    );
-    stopButton.disabled = true;
-    nowPlaying.innerText = "...";
-  }
-}
-
-async function loadStations() {
-  resetStations();
-  try {
-    const response = await fetch(stationsUrl);
-    const stations = await response.json();
-    stationGrid.innerHTML = "";
-
-    let ionRow;
-    stations.forEach((station, index) => {
-      if (index % 3 === 0) {
-        ionRow = document.createElement("ion-row");
-        stationGrid.appendChild(ionRow);
-      }
-
-      const ionCol = document.createElement("ion-col");
-      const ionButton = document.createElement("ion-button");
-      ionButton.innerText = station.name;
-      ionButton.expand = "block";
-      ionButton.addEventListener("click", () => {
-        playStation(station.name, ionButton);
-      });
-
-      // Store button reference for highlighting
-      stationButtons[station.name] = ionButton;
-
-      ionCol.appendChild(ionButton);
-      ionRow.appendChild(ionCol);
-    });
-
-    stopButton.addEventListener("click", (ev) => {
-      stopStation();
-    });
-
-    highlightCurrentStation();
-  } catch (error) {
-    console.error("Error loading stations:", error);
-  }
-}
-
-async function connectWebSocket() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-    return;
+    this.switchboardClient = null;
   }
 
-  // TODO: use registry discovered switchboardUrl...
-  // const result = await Preferences.get({ key: 'switchboardUrl' });
-  // if (result.value) {
-  //   switchboardUrl = result.value;
-  // }
-
-  console.log('Connecting to WebSocket:', switchboardUrl);
-  debugInfo.innerText = "🔄 Connecting to " + switchboardUrl;
-  ws = new WebSocket(switchboardUrl);
-
-  // Add a 3-second timeout for the connection attempt
-  const connectTimeout = setTimeout(() => {
-    if (ws.readyState !== WebSocket.OPEN) {
-      console.warn("WebSocket connection timed out after 3s, closing socket.");
-      ws.close();
+  /**
+   * Main entry point for the application.
+   */
+  async init() {
+    const savedRegistryUrl = await this.preferencesManager.get('registryUrl');
+    if (savedRegistryUrl) {
+      this.registryUrl = savedRegistryUrl;
     }
-  }, 3000);
+    preferencesConfig.find(p => p.key === 'playerId').options = await this.fetchPlayers();
+    await this.preferencesManager.render();
 
-  ws.onopen = () => {
-    debugInfo.innerText = "✅ Connected to " + switchboardUrl; 
-    console.log('WebSocket connected');
-    clearTimeout(connectTimeout);
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-    reconnectDelay = 2000; // Reset delay after successful connection
-  };
-
-  ws.onclose = () => {
-    clearTimeout(connectTimeout);
-    console.log(
-      "WebSocket closed, reconnecting in",
-      reconnectDelay / 1000,
-      "s...",
-    );
-    scheduleReconnect();
-  };
-
-  ws.onerror = (err) => {
-    clearTimeout(connectTimeout);
-    console.error("WebSocket error:", err);
-  };
-
-  ws.onmessage = (msg) => {
-    try {
-      const { event, data } = JSON.parse(msg.data);
-      switch (event) {
-        case "station_playing":
-          currentPlayingStation = data;
-          highlightCurrentStation();
-          break;
-        case "stations_url":
-          stationsUrl = data;
-          loadStations();
-          break;
-        case "station_request":
-        case "client_count":
-          break;
-        default:
-          console.warn("Unknown WebSocket event:", event);
-      }
-    } catch (e) {
-      console.error("Error parsing WebSocket message:", e);
-    }
-  };
-}
-
-function scheduleReconnect() {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => {
-    connectWebSocket();
-    // Exponential backoff, max 30s
-    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-  }, reconnectDelay);
-}
-
-function sendStationRequest(stationName) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ event: "station_request", data: stationName }));
-  } else {
-    console.error("WebSocket not connected. Cannot send station request.");
-  }
-}
-
-function playStation(stationName, button) {
-  button.setAttribute("color", "light");
-  sendStationRequest(stationName);
-}
-
-function stopStation() {
-  sendStationRequest(null);
-}
-
-// Initialize the app
-async function initialize() {
-  async function discover() {
-    const url = `${registryUrl}/v1/players/${playerId}`;
-    console.log(`Discovering switchboard from ${url}...`);
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-      switchboardUrl = switchboardUrl || data.switchboardUrl;
-    } catch (error) {
-      console.error("Error discovering player info from registry:", error);
-    }
-  }
-
-  resetStations();
-
-  if (!switchboardUrl) {
-    await discover();
-
-    if (!switchboardUrl) {
-      console.error("Missing switchboardUrl. Cannot initialize app.");
+    this.playerId = await this.preferencesManager.get('playerId');
+    if (!this.checkPlayerSelection()) {
       return;
     }
+
+    await this.initialize();
   }
 
-  connectWebSocket();
+  /**
+   * Initializes the connection to the player.
+   */
+  async initialize() {
+    this.resetStations();
+    
+    if (this.switchboardClient) {
+      this.switchboardClient.disconnect();
+    }
+
+    this.switchboardClient = new SwitchboardClient(this.registryUrl, this.playerId, {
+      onConnecting: (url) => { this.radioInfo.innerText = `🔄 Connecting...`; },
+      onConnect: (url) => { this.radioInfo.innerText = `✅ Connected`; },
+      onDisconnect: () => { this.radioInfo.innerText = '🔌 Disconnected. Reconnecting...'; },
+      onError: (message) => { this.radioInfo.innerText = `⚠️ Error: ${message}`; },
+      onStationPlaying: (station) => {
+        this.currentPlayingStation = station;
+        highlightCurrentStation(
+          this.currentPlayingStation,
+          this.stationButtons,
+          this.stopButton,
+          this.nowPlaying
+        );
+      },
+      onStationsUrl: (url) => {
+        this.stationsUrl = url;
+        this.loadStations();
+      },
+    });
+
+    await this.switchboardClient.connect();
+  }
+
+  // --- Core Logic Methods ---
+
+  playStation(stationName, button) {
+    button.setAttribute("color", "light");
+    this.switchboardClient?.sendStationRequest(stationName);
+  }
+
+  stopStation() {
+    this.switchboardClient?.sendStationRequest(null);
+  }
+
+  // --- UI & State Methods ---
+
+  resetStations() {
+    this.stationButtons = {};
+    showStationSkeletons(this.stationGrid);
+  }
+
+  async loadStations() {
+    this.resetStations();
+    try {
+      const response = await fetch(this.stationsUrl);
+      const stations = await response.json();
+      renderStationGrid(
+        stations,
+        this.stationGrid,
+        (stationName, button) => this.playStation(stationName, button),
+        this.stationButtons
+      );
+      this.stopButton.addEventListener("click", () => this.stopStation());
+      highlightCurrentStation(
+        this.currentPlayingStation,
+        this.stationButtons,
+        this.stopButton,
+        this.nowPlaying
+      );
+    } catch (error) {
+      console.error("Error loading stations:", error);
+    }
+  }
+
+  // --- API & Event Handlers ---
+
+  async handlePreferenceChange(key, value) {
+    if (key === 'registryUrl') {
+      this.registryUrl = value;
+      preferencesConfig.find(p => p.key === 'playerId').options = await this.fetchPlayers();
+      await this.preferencesManager.render();
+    }
+
+    this.playerId = await this.preferencesManager.get('playerId');
+
+    if (this.checkPlayerSelection()) {
+      await this.initialize();
+    }
+  }
+
+  checkPlayerSelection() {
+    const playerSelect = this.preferencesManager.inputs.playerId;
+    const hasOptions = playerSelect && playerSelect.querySelectorAll('ion-select-option').length > 0;
+
+    if (!this.playerId) {
+      this.radioInfo.innerText = hasOptions
+        ? '⚠️ Please select a player from Settings.'
+        : '⚠️ No players found. Check Registry URL in Settings.';
+      return false;
+    }
+
+    this.radioInfo.innerText = '';
+    return true;
+  }
+
+  async fetchPlayers() {
+    let players = [];
+    let page = 1;
+    try {
+      do {
+        const url = `${this.registryUrl}/v1/players?page=${page}&per_page=50`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (Array.isArray(data.items)) {
+          players = players.concat(data.items);
+        }
+        page = data.page < data.total_pages ? data.page + 1 : -1;
+      } while (page !== -1);
+    } catch (e) {
+      console.error('Failed to fetch players from registry:', e);
+    }
+    return players.map(p => ({ value: p.id, label: p.name || p.id }));
+  }
 }
 
-initialize();
-
-document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('settings-save').addEventListener('click', async () => {
-    const key = document.getElementById('settings-key').value;
-    const value = document.getElementById('settings-value').value;
-    if (key) {
-      await Preferences.set({ key, value });
-      alert(`Saved: ${key} = ${value}`);
-    } else {
-      alert('Please enter a key.');
-    }
-  });
-
-  const result = await Preferences.keys();
-  console.log('Stored keys:', result.keys);
+// --- App Startup ---
+document.addEventListener('DOMContentLoaded', () => {
+  const app = new RadioApp();
+  app.init();
 });
+
