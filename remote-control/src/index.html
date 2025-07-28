@@ -60,6 +60,7 @@
             </ion-toolbar>
           </ion-header>
           <ion-content fullscreen="true" class="ion-padding">
+            <div id="radio-info" class="ion-text-center"></div>
             <ion-grid id="station-grid"></ion-grid>
           </ion-content>
         </ion-tab>
@@ -75,17 +76,13 @@
           </ion-header>
           <ion-content fullscreen="true" class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
-            <ion-list>
+            <ion-list id="settings-list">
               <ion-item>
-                <ion-label position="stacked">Key</ion-label>
-                <ion-input id="settings-key" placeholder="Enter key"></ion-input>
+                <ion-label position="stacked">Registry URL</ion-label>
+                <ion-input id="settings-registry-url" placeholder="Enter registry URL"></ion-input>
               </ion-item>
-              <ion-item>
-                <ion-label position="stacked">Value</ion-label>
-                <ion-input id="settings-value" placeholder="Enter value"></ion-input>
-              </ion-item>
-              <ion-button id="settings-save" expand="block">Save</ion-button>
             </ion-list>
+            <ion-button id="settings-save" expand="block">Save</ion-button>
           </ion-content>
         </ion-tab>
 
