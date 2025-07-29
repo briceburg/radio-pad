@@ -25,5 +25,9 @@
     "vite": "^5.4.2"
   },
   "author": "Brice Burgess (https://github.com/briceburg)",
-  "license": "AGPL-3.0-or-later"
+  "license": "AGPL-3.0-or-later",
+  "prettier": {
+    "singleQuote": false,
+    "semi": true
+  }
 }
