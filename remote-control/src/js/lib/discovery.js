@@ -17,33 +17,33 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 export async function discoverPlayer(registryUrl, playerId) {
-    const url = `${registryUrl}/v1/players/${playerId}`;
-    console.log('Discovering player from registry:', url);
-    try {
-        const response = await fetch(url);
-        return await response.json();
-    } catch (error) {
-        // TODO: use toast / ui  notification error?
-        console.error('Error discovering player info from registry:', error);
-    }
+  const url = `${registryUrl}/v1/players/${playerId}`;
+  console.log("Discovering player from registry:", url);
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (error) {
+    // TODO: use toast / ui  notification error?
+    console.error("Error discovering player info from registry:", error);
+  }
 }
 
 export async function discoverPlayers(registryUrl) {
-    let players = [];
-    let page = 1;
-    try {
+  let players = [];
+  let page = 1;
+  try {
     do {
-        const url = `${registryUrl}/v1/players?page=${page}&per_page=50`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (Array.isArray(data.items)) {
+      const url = `${registryUrl}/v1/players?page=${page}&per_page=50`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (Array.isArray(data.items)) {
         players = players.concat(data.items);
-        }
-        page = data.page < data.total_pages ? data.page + 1 : -1;
+      }
+      page = data.page < data.total_pages ? data.page + 1 : -1;
     } while (page !== -1);
-    } catch (e) {
-        // TODO: use toast / ui  notification error?
-        console.error('Failed to fetch players from registry:', e);
-    }
-    return players.map(p => ({ value: p.id, label: p.name || p.id }));
+  } catch (e) {
+    // TODO: use toast / ui  notification error?
+    console.error("Failed to fetch players from registry:", e);
+  }
+  return players.map((p) => ({ value: p.id, label: p.name || p.id }));
 }

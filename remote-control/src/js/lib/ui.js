@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { EventEmitter } from './interfaces.js';
+import { EventEmitter } from "./interfaces.js";
 
 export class RadioPadUI extends EventEmitter {
   constructor() {
@@ -25,14 +25,14 @@ export class RadioPadUI extends EventEmitter {
   }
 
   init() {
-    this._radioInfo = document.getElementById('radio-info');
-    this._nowPlaying = document.getElementById('now-playing');
-    this._stationGrid = document.getElementById('station-grid');
-    this._stopButton = document.getElementById('stop-button');
-    this._settingsSaveButton = document.getElementById('settings-save-button');
+    this._radioInfo = document.getElementById("radio-info");
+    this._nowPlaying = document.getElementById("now-playing");
+    this._stationGrid = document.getElementById("station-grid");
+    this._stopButton = document.getElementById("stop-button");
+    this._settingsSaveButton = document.getElementById("settings-save-button");
 
     this._stopButton.addEventListener("click", () => {
-      this.emitEvent('click-stop', null);
+      this.emitEvent("click-stop", null);
     });
   }
 
@@ -42,25 +42,25 @@ export class RadioPadUI extends EventEmitter {
 
   renderPreferences(prefs) {
     const settingsList = document.getElementById("settings-list");
-    settingsList.innerHTML = '';
+    settingsList.innerHTML = "";
 
     for (const [key, pref] of Object.entries(prefs.preferences)) {
-      const item = document.createElement('ion-item');
-      const label = document.createElement('ion-label');
-      label.setAttribute('position', 'stacked');
+      const item = document.createElement("ion-item");
+      const label = document.createElement("ion-label");
+      label.setAttribute("position", "stacked");
       label.innerText = pref.label;
 
       let input;
       switch (pref.type) {
-        case 'text':
-          input = document.createElement('ion-input');
-          input.setAttribute('placeholder', pref.placeholder || '');
+        case "text":
+          input = document.createElement("ion-input");
+          input.setAttribute("placeholder", pref.placeholder || "");
           break;
-        case 'select':
-          input = document.createElement('ion-select');
+        case "select":
+          input = document.createElement("ion-select");
           if (pref.options && pref.options.length > 0) {
             for (const option of pref.options) {
-              const optionElement = document.createElement('ion-select-option');
+              const optionElement = document.createElement("ion-select-option");
               optionElement.value = option.value;
               optionElement.innerText = option.label;
               input.appendChild(optionElement);
@@ -75,7 +75,7 @@ export class RadioPadUI extends EventEmitter {
       settingsList.appendChild(item);
     }
 
-    this._settingsSaveButton.addEventListener('click', async () => {
+    this._settingsSaveButton.addEventListener("click", async () => {
       for (const [key, pref] of Object.entries(prefs.preferences)) {
         const input = document.getElementById(`pref-${key}`);
         if (input) {
@@ -88,7 +88,7 @@ export class RadioPadUI extends EventEmitter {
   renderStations(stations, currentStation) {
     this.stationButtons = {};
     this._stationGrid.innerHTML = "";
-  
+
     let ionRow;
     stations.forEach((station, index) => {
       if (index % 3 === 0) {
@@ -101,13 +101,13 @@ export class RadioPadUI extends EventEmitter {
       ionButton.expand = "block";
       ionButton.addEventListener("click", () => {
         ionButton.setAttribute("color", "light");
-        this.emitEvent('click-station', station.name);
+        this.emitEvent("click-station", station.name);
       });
       this.stationButtons[station.name] = ionButton;
       ionCol.appendChild(ionButton);
       ionRow.appendChild(ionCol);
     });
-    
+
     this.highlightCurrentStation(currentStation);
   }
 
@@ -129,7 +129,10 @@ export class RadioPadUI extends EventEmitter {
 
   highlightCurrentStation(currentStation) {
     Object.entries(this.stationButtons).forEach(([name, btn]) => {
-      btn.setAttribute("color", name === currentStation ? "success" : "primary");
+      btn.setAttribute(
+        "color",
+        name === currentStation ? "success" : "primary"
+      );
     });
     this._stopButton.disabled = !currentStation;
     this._nowPlaying.innerText = currentStation || "...";

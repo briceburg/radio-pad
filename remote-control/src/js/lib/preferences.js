@@ -16,27 +16,30 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { Preferences } from '@capacitor/preferences';
-import { EventEmitter } from './interfaces.js';
+import { Preferences } from "@capacitor/preferences";
+import { EventEmitter } from "./interfaces.js";
 
 export class RadioPadPreferences extends EventEmitter {
-  constructor(prefs = {
-        registryUrl: {
-          type: 'text',
-          label: 'Registry URL',
-          placeholder: 'Enter registry URL',
-          default: import.meta.env.VITE_REGISTRY_URL || 'https://registry.radiopad.dev'
-        },
-        playerId: {
-          type: 'select',
-          label: 'Player',
-          default: import.meta.env.VITE_PLAYER_ID || "briceburg"
-        }
-      }) {
+  constructor(
+    prefs = {
+      registryUrl: {
+        type: "text",
+        label: "Registry URL",
+        placeholder: "Enter registry URL",
+        default:
+          import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
+      },
+      playerId: {
+        type: "select",
+        label: "Player",
+        default: import.meta.env.VITE_PLAYER_ID || "briceburg",
+      },
+    }
+  ) {
     super();
     this.preferences = prefs;
 
-    this.registerEvent('on-change', (data) => {
+    this.registerEvent("on-change", (data) => {
       console.log(`Preference changed: ${data.key} = ${data.value}`);
     });
   }
@@ -47,7 +50,7 @@ export class RadioPadPreferences extends EventEmitter {
       if (value !== null) {
         pref.value = value;
       } else {
-        pref.value = pref.default || '';
+        pref.value = pref.default || "";
       }
     }
   }
@@ -55,7 +58,7 @@ export class RadioPadPreferences extends EventEmitter {
   async get(key) {
     const result = await Preferences.get({ key });
     if (result.value !== this.preferences[key]?.value) {
-      await this.emitEvent('on-change', { key, value: result.value });
+      await this.emitEvent("on-change", { key, value: result.value });
     }
     return result.value;
   }
@@ -64,7 +67,7 @@ export class RadioPadPreferences extends EventEmitter {
     if (value !== this.preferences[key]?.value) {
       this.preferences[key] = value;
       await Preferences.set({ key, value });
-      await this.emitEvent('on-change', { key, value });
+      await this.emitEvent("on-change", { key, value });
     }
   }
 }

@@ -1,4 +1,4 @@
-import { EventEmitter } from './interfaces.js';
+import { EventEmitter } from "./interfaces.js";
 
 /*
 This file is part of the radio-pad project.
@@ -47,18 +47,27 @@ export class RadioPadSwitchboard extends EventEmitter {
 
   sendStationRequest(stationName) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ event: 'station_request', data: stationName }));
+      this.ws.send(
+        JSON.stringify({ event: "station_request", data: stationName })
+      );
     } else {
-      this.emitEvent('error', 'WebSocket not connected. Cannot send station request.');
+      this.emitEvent(
+        "error",
+        "WebSocket not connected. Cannot send station request."
+      );
     }
   }
 
   _connectWebSocket(url) {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
-    this.emitEvent('connecting', url);
+    this.emitEvent("connecting", url);
     this.ws = new WebSocket(url);
 
     const connectTimeout = setTimeout(() => {
@@ -71,33 +80,33 @@ export class RadioPadSwitchboard extends EventEmitter {
       clearTimeout(connectTimeout);
       this.reconnectDelay = 1000;
       if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-      this.emitEvent('connect', url);
+      this.emitEvent("connect", url);
     };
 
     this.ws.onclose = () => {
       clearTimeout(connectTimeout);
-      this.emitEvent('disconnect');
+      this.emitEvent("disconnect");
       this._scheduleReconnect();
     };
 
     this.ws.onerror = (err) => {
       clearTimeout(connectTimeout);
-      this.emitEvent('error', 'WebSocket error.');
+      this.emitEvent("error", "WebSocket error.");
     };
 
     this.ws.onmessage = (msg) => {
       try {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
-          case 'station_playing':
-            this.emitEvent('station-playing', data);
+          case "station_playing":
+            this.emitEvent("station-playing", data);
             break;
-          case 'stations_url':
-            this.emitEvent('stations-url', data);
+          case "stations_url":
+            this.emitEvent("stations-url", data);
             break;
         }
       } catch (e) {
-        this.emitEvent('error', 'Error parsing WebSocket message.');
+        this.emitEvent("error", "Error parsing WebSocket message.");
       }
     };
   }

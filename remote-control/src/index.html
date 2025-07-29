@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
@@ -32,7 +32,6 @@
   <body>
     <ion-app>
       <ion-tabs>
-
         <!-- navbar -->
         <ion-tab-bar slot="bottom">
           <ion-tab-button tab="radio">
@@ -53,7 +52,14 @@
                 Now Playing: <span id="now-playing">...</span>
               </ion-title>
               <ion-buttons slot="end">
-                <ion-button shape="round" size="small" color="danger" disabled="true" id="stop-button" aria-label="Stop playback">
+                <ion-button
+                  shape="round"
+                  size="small"
+                  color="danger"
+                  disabled="true"
+                  id="stop-button"
+                  aria-label="Stop playback"
+                >
                   <ion-icon slot="icon-only" name="stop"></ion-icon>
                 </ion-button>
               </ion-buttons>
@@ -69,9 +75,7 @@
         <ion-tab tab="settings">
           <ion-header>
             <ion-toolbar>
-              <ion-title size="large">
-                Settings
-              </ion-title>
+              <ion-title size="large"> Settings </ion-title>
             </ion-toolbar>
           </ion-header>
           <ion-content fullscreen="true" class="ion-padding">
@@ -79,13 +83,17 @@
             <ion-list id="settings-list">
               <ion-item>
                 <ion-label position="stacked">Registry URL</ion-label>
-                <ion-input id="settings-registry-url" placeholder="Enter registry URL"></ion-input>
+                <ion-input
+                  id="settings-registry-url"
+                  placeholder="Enter registry URL"
+                ></ion-input>
               </ion-item>
             </ion-list>
-            <ion-button id="settings-save-button" expand="block">Save</ion-button>
+            <ion-button id="settings-save-button" expand="block"
+              >Save</ion-button
+            >
           </ion-content>
         </ion-tab>
-
       </ion-tabs>
     </ion-app>
     <script type="module" src="/js/app.js"></script>

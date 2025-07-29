@@ -16,19 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { EventEmitter } from './interfaces.js';
+import { EventEmitter } from "./interfaces.js";
 
 export class RadioPadState extends EventEmitter {
-  constructor(initialState = {
-        player: {
-          id: null,
-          name: null,
-          stationsUrl: null,
-          switchboardUrl: null
-        },
+  constructor(
+    initialState = {
+      player: {
+        id: null,
+        name: null,
         stationsUrl: null,
-        currentStation: null
-      }) {
+        switchboardUrl: null,
+      },
+      stationsUrl: null,
+      currentStation: null,
+    }
+  ) {
     super();
     this.state = initialState;
   }
@@ -40,7 +42,7 @@ export class RadioPadState extends EventEmitter {
   async set(key, value) {
     if (value !== this.state[key]) {
       this.state[key] = value;
-      await this.emitEvent('on-change', { key, value });
+      await this.emitEvent("on-change", { key, value });
     }
   }
 }

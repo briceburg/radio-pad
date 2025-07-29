@@ -33,7 +33,9 @@ export class EventEmitter {
     for (const handler of handlers) {
       const result = await handler(data);
       if (result === false) {
-        throw new Error(`Event "${event_name}" propagation stopped by a handler.`);
+        throw new Error(
+          `Event "${event_name}" propagation stopped by a handler.`
+        );
       }
     }
   }
