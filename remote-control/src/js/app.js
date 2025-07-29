@@ -16,182 +16,102 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { PreferencesManager, preferencesConfig } from './preferences.js';
-import { SwitchboardClient } from './switchboard.js';
-import { renderStationGrid, showStationSkeletons, highlightCurrentStation } from './ui.js';
+import { RadioPadPreferences } from "./lib/preferences.js";
+import { RadioPadState } from "./lib/state.js";
+import { RadioPadSwitchboard } from "./lib/switchboard.js";
+import { RadioPadUI } from "./lib/ui.js";
+import { discoverPlayer, discoverPlayers } from "./lib/discovery.js";
 
-class RadioApp {
+class RadioPad {
   constructor() {
-    // --- DOM Elements ---
-    this.radioInfo = document.getElementById('radio-info');
-    this.nowPlaying = document.getElementById('now-playing');
-    this.stationGrid = document.getElementById('station-grid');
-    this.stopButton = document.getElementById('stop-button');
+    this.STATE = new RadioPadState();
+    this.PREFS = new RadioPadPreferences();
+    this.SWITCHBOARD = new RadioPadSwitchboard();
+    this.UI = new RadioPadUI();
 
-    // --- State Management ---
-    this.registryUrl = import.meta.env.VITE_REGISTRY_URL || 'https://registry.radiopad.dev';
-    this.playerId = null;
-    this.stationsUrl = null;
-    this.stationButtons = {};
-    this.currentPlayingStation = null;
-
-    // --- Services ---
-    this.preferencesManager = new PreferencesManager(
-      preferencesConfig,
-      'settings-list',
-      'settings-save',
-      (key, value) => this.handlePreferenceChange(key, value)
-    );
-    this.switchboardClient = null;
-  }
-
-  /**
-   * Main entry point for the application.
-   */
-  async init() {
-    const savedRegistryUrl = await this.preferencesManager.get('registryUrl');
-    if (savedRegistryUrl) {
-      this.registryUrl = savedRegistryUrl;
-    }
-    preferencesConfig.find(p => p.key === 'playerId').options = await this.fetchPlayers();
-    await this.preferencesManager.render();
-
-    this.playerId = await this.preferencesManager.get('playerId');
-    if (!this.checkPlayerSelection()) {
-      return;
-    }
-
-    await this.initialize();
-  }
-
-  /**
-   * Initializes the connection to the player.
-   */
-  async initialize() {
-    this.resetStations();
-    
-    if (this.switchboardClient) {
-      this.switchboardClient.disconnect();
-    }
-
-    this.switchboardClient = new SwitchboardClient(this.registryUrl, this.playerId, {
-      onConnecting: (url) => { this.radioInfo.innerText = `🔄 Connecting...`; },
-      onConnect: (url) => { this.radioInfo.innerText = `✅ Connected`; },
-      onDisconnect: () => { this.radioInfo.innerText = '🔌 Disconnected. Reconnecting...'; },
-      onError: (message) => { this.radioInfo.innerText = `⚠️ Error: ${message}`; },
-      onStationPlaying: (station) => {
-        this.currentPlayingStation = station;
-        highlightCurrentStation(
-          this.currentPlayingStation,
-          this.stationButtons,
-          this.stopButton,
-          this.nowPlaying
-        );
-      },
-      onStationsUrl: (url) => {
-        this.stationsUrl = url;
-        this.loadStations();
-      },
+    // PREFERENCE CHANGES
+    this.PREFS.registerEvent("on-change", async (data) => {
+      console.log(`data: ${data.key} = ${data.value}`);
+      switch (data.key) {
+        case "registryUrl":
+          this.PREFS.preferences.playerId.options = await discoverPlayers(
+            data.value
+          );
+          break;
+        case "playerId":
+          const registryUrl = await this.PREFS.get("registryUrl");
+          this.STATE.set(
+            "player",
+            await discoverPlayer(registryUrl, data.value)
+          );
+          break;
+      }
     });
 
-    await this.switchboardClient.connect();
+    // STATE CHANGES
+    this.STATE.registerEvent("on-change", async (data) => {
+      switch (data.key) {
+        case "currentStation":
+          this.UI.highlightCurrentStation(data.value);
+          break;
+        case "player":
+          await this.SWITCHBOARD.connect(data.value.switchboardUrl);
+          break;
+        case "stationsUrl":
+          await this.loadStations(data.value);
+          break;
+      }
+    });
+
+    // SWITCHBOARD EVENTS
+    this.SWITCHBOARD.registerEvent("connect", (url) => {
+      this.UI.info(`✅ Connected`);
+    });
+    this.SWITCHBOARD.registerEvent("connecting", (url) => {
+      this.UI.info(`🔄 Connecting...`);
+    });
+    this.SWITCHBOARD.registerEvent("disconnect", () => {
+      this.UI.info("🔌 Disconnected. Reconnecting...");
+    });
+    this.SWITCHBOARD.registerEvent("error", (msg) => {
+      this.UI.info(`⚠️ Error: ${msg}`);
+    });
+    this.SWITCHBOARD.registerEvent("station-playing", (stationName) => {
+      this.STATE.set("currentStation", stationName);
+    });
+    this.SWITCHBOARD.registerEvent("stations-url", (url) => {
+      this.STATE.set("stationsUrl", url);
+    });
+
+    // UI EVENTS
+    this.UI.registerEvent("click-station", (stationName) => {
+      this.SWITCHBOARD.sendStationRequest(stationName);
+    });
+    this.UI.registerEvent("click-stop", () => {
+      this.SWITCHBOARD.sendStationRequest(null);
+    });
   }
 
-  // --- Core Logic Methods ---
-
-  playStation(stationName, button) {
-    button.setAttribute("color", "light");
-    this.switchboardClient?.sendStationRequest(stationName);
+  async start() {
+    this.UI.init();
+    await this.PREFS.init();
+    this.UI.renderPreferences(this.PREFS);
   }
 
-  stopStation() {
-    this.switchboardClient?.sendStationRequest(null);
-  }
-
-  // --- UI & State Methods ---
-
-  resetStations() {
-    this.stationButtons = {};
-    showStationSkeletons(this.stationGrid);
-  }
-
-  async loadStations() {
-    this.resetStations();
+  async loadStations(url) {
+    this.UI.renderSkeletonStations();
     try {
-      const response = await fetch(this.stationsUrl);
+      const response = await fetch(url);
       const stations = await response.json();
-      renderStationGrid(
-        stations,
-        this.stationGrid,
-        (stationName, button) => this.playStation(stationName, button),
-        this.stationButtons
-      );
-      this.stopButton.addEventListener("click", () => this.stopStation());
-      highlightCurrentStation(
-        this.currentPlayingStation,
-        this.stationButtons,
-        this.stopButton,
-        this.nowPlaying
-      );
+      this.UI.renderStations(stations, this.STATE.get("currentStation"));
     } catch (error) {
+      // TODO: use toast / ui notification error?
       console.error("Error loading stations:", error);
     }
   }
-
-  // --- API & Event Handlers ---
-
-  async handlePreferenceChange(key, value) {
-    if (key === 'registryUrl') {
-      this.registryUrl = value;
-      preferencesConfig.find(p => p.key === 'playerId').options = await this.fetchPlayers();
-      await this.preferencesManager.render();
-    }
-
-    this.playerId = await this.preferencesManager.get('playerId');
-
-    if (this.checkPlayerSelection()) {
-      await this.initialize();
-    }
-  }
-
-  checkPlayerSelection() {
-    const playerSelect = this.preferencesManager.inputs.playerId;
-    const hasOptions = playerSelect && playerSelect.querySelectorAll('ion-select-option').length > 0;
-
-    if (!this.playerId) {
-      this.radioInfo.innerText = hasOptions
-        ? '⚠️ Please select a player from Settings.'
-        : '⚠️ No players found. Check Registry URL in Settings.';
-      return false;
-    }
-
-    this.radioInfo.innerText = '';
-    return true;
-  }
-
-  async fetchPlayers() {
-    let players = [];
-    let page = 1;
-    try {
-      do {
-        const url = `${this.registryUrl}/v1/players?page=${page}&per_page=50`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (Array.isArray(data.items)) {
-          players = players.concat(data.items);
-        }
-        page = data.page < data.total_pages ? data.page + 1 : -1;
-      } while (page !== -1);
-    } catch (e) {
-      console.error('Failed to fetch players from registry:', e);
-    }
-    return players.map(p => ({ value: p.id, label: p.name || p.id }));
-  }
 }
 
-// --- App Startup ---
-document.addEventListener('DOMContentLoaded', () => {
-  const app = new RadioApp();
-  app.init();
+document.addEventListener("DOMContentLoaded", () => {
+  const app = new RadioPad();
+  app.start();
 });
-
