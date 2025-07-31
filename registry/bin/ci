@@ -14,14 +14,14 @@ paths=(src/)
 
 log "🧹 [black] Checking code style..."
 black --check "${paths[@]}" || \
-  die "black failed. use 'black <filename>' to fix."
+  die "black failed. use 'black ${paths[*]}' to fix."
 
 log "📚 [isort] Checking import order..."
 isort --check --diff "${paths[@]}" || \
-  die "isort failed. use 'isort <filename>' to fix."
+  die "isort failed. use 'isort ${paths[*]}' to fix."
 
 log "🧽 [autoflake] Checking for unused imports and variables..."
 autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --recursive "${paths[@]}" || \
-  die "autoflake failed. use 'autoflake -i --remove-all-unused-imports --remove-unused-variables <filename>' to fix."
+  die "autoflake failed. use 'autoflake -i --remove-all-unused-imports --remove-unused-variables ${paths[*]}' to fix."
 
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"
