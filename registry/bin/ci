@@ -10,7 +10,7 @@ CROSS_MARK="\xE2\x9D\x8C"
 log(){ echo -e "$*" >&2; }
 die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 
-paths=(src/)
+paths=(src/ tests/)
 
 log "🧹 [black] Checking code style..."
 black --check "${paths[@]}" || \

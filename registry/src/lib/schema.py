@@ -7,7 +7,18 @@ from referencing.exceptions import NoSuchResource
 
 from lib.helpers import BASE_DIR
 
+
+@referencing.retrieval.to_cached_resource()
+def _retrieve_from_schema_file(uri):
+    schema_path = SCHEMA_DIR / uri
+    if not schema_path.exists():
+        raise NoSuchResource(ref=uri)
+
+    return schema_path.read_text()
+
+
 SCHEMA_DIR = BASE_DIR / "spec" / "schemas"
+SCHEMA_REGISTRY = Registry(retrieve=_retrieve_from_schema_file)
 
 
 def validate_schema(schema_name: str, instance: dict | list) -> tuple[bool, str | None]:
@@ -42,6 +53,3 @@ def _retrieve_from_schema_file(uri):
         raise NoSuchResource(ref=uri)
 
     return schema_path.read_text()
-
-
-SCHEMA_REGISTRY = Registry(retrieve=_retrieve_from_schema_file)

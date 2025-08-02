@@ -22,3 +22,23 @@ jobs:
       run: |
         pip install -r requirements-dev.txt
         bin/ci
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Test
+      run: |
+        pytest
