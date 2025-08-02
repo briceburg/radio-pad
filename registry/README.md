@@ -8,7 +8,7 @@ registry.radiopad.dev - uniting players, remote-controls, and switchboards
 # run these once
 python -m venv venv
 . venv/bin/activate
-pip3 install requirements.txt
+pip3 install -r requirements.txt
 
 # run everytime you want to start the registry
 bin/registry

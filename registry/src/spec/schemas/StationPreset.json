@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StationPreset Schema",
+  "definitions": {
+    "StationPreset": {
+      "title": "StationPreset",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "briceburg"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2025-10-01T12:00:00Z"
+        }
+      },
+      "required": ["id", "lastUpdated"]
+    }
+  }
+}

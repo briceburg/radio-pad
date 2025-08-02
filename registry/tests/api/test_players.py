@@ -10,4 +10,5 @@ def test_get_players(client):
     assert "total_pages" in data
     assert isinstance(data["items"], list)
 
+
 # TODO: add preset fixtures to further exercise. check for 404s.

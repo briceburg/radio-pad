@@ -6,6 +6,10 @@ info:
 servers:
   - url: /v1
 
+x-pagination-params: &paginationParams
+    - $ref: '#/components/parameters/Page'
+    - $ref: '#/components/parameters/PerPage'
+
 paths:
   /players/{id}:
     get:
@@ -27,15 +31,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Player'
         '404':
-          description: Player not found
+          $ref: '#/components/responses/NotFound'
   /players:
     get:
       tags: [Players]
       summary: List Players
       description: Returns a list of RadioPad Players.
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
+      parameters: *paginationParams
       responses:
         '200':
           description: List of paginated Players
@@ -43,8 +45,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/PlayerList'
-                - $ref: '#/components/schemas/_Pagination'
+                  - $ref: '#/components/schemas/_PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        $ref: '#/components/schemas/PlayerList'
 
   /station-presets/{id}:
     get:
@@ -66,16 +71,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/StationList'
         '404':
-          description: Preset not found
+          $ref: '#/components/responses/NotFound'
 
   /station-presets:
     get:
       tags: [Stations]
       summary: List Station Presets
       description: Returns a list of available station presets.
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
+      parameters: *paginationParams
       responses:
         '200':
           description: List of paginated Station Presets
@@ -83,8 +86,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/StationPresetsList'
-                - $ref: '#/components/schemas/_Pagination'
+                  - $ref: '#/components/schemas/_PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        $ref: '#/components/schemas/StationPresetList'
 
 components:
   parameters:
@@ -108,10 +114,40 @@ components:
         default: 10
       description: Number of items per page.
 
+  responses:
+    NotFound:
+      description: The specified resource was not found.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Not Found
   schemas:
-    _Pagination:
+    Player:
+      $ref: './schemas/Player.json#/definitions/Player'
+      
+    PlayerList:
+      $ref: './schemas/PlayerList.json#/definitions/PlayerList'
+
+    StationList:
+      $ref: './schemas/StationList.json#/definitions/StationList'
+
+    StationPreset:
+      $ref: './schemas/StationPreset.json#/definitions/StationPreset'
+
+    StationPresetList:
+      $ref: './schemas/StationPresetList.json#/definitions/StationPresetList'
+
+    _PaginatedResponse:
       type: object
       properties:
+        items:
+          type: array
+          description: List of items in the current page
+          items: {}
         page:
           type: integer
           description: Current page number
@@ -125,32 +161,4 @@ components:
           type: integer
           description: Total number of pages
       required: [page, per_page, total, total_pages]
-
-    Player:
-      $ref: './schemas/Player.json#/definitions/Player'
-    PlayerList:
-      type: object
-      properties:
-        items:
-          $ref: './schemas/PlayerList.json#/definitions/PlayerList'
-        
-
-    StationList:
-      $ref: './schemas/StationList.json#/definitions/StationList'
-    StationPresetsList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                example: briceburg
-              lastUpdated:
-                type: string
-                format: date-time
-                example: '2025-10-01T12:00:00Z'
-            required: [id, lastUpdated]
 

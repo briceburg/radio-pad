@@ -42,5 +42,5 @@ def test_validate_schema_file_not_found():
     assert "does not exist" in err
 
 
-# TODO: Test other schemas, 
+# TODO: Test other schemas,
 #   ...however this is mainly to test that lib.schema.validate_schema() is working.
