@@ -1,3 +1,2 @@
 connexion
 connexion[asyncio, swagger-ui, uvicorn]
-dicttoxml

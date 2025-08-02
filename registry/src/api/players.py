@@ -1,49 +1,40 @@
-import json
-import os
+from types import MappingProxyType
 
-from api.helpers import PLAYERS, PLAYERS_LIST, paginate, response
+from lib.helpers import get_logger, paginate
+
+logger = get_logger()
 
 
-async def get(player_id: str):
-    """Get a player by ID - maps to GET /players/{player_id}"""
-    player = PLAYERS.get(player_id)
+async def get(id: str):
+    """Get a player by ID - maps to GET /players/{id}"""
+    player = PLAYERS.get(id)
     if player is None:
-        return response({"error": "Player not found"}, status=404)
+        return {"error": "Player not found"}, 404
 
-    # Make a shallow copy for fallback fields
     player = dict(player)
-
-    player["id"] = player_id  # Ensure ID is included in the response
+    player["id"] = id
 
     if not player.get("stationsUrl"):
         player["stationsUrl"] = (
-            f"https://registry.radiopad.dev/v1/players/{player_id}/stations"
+            f"https://registry.radiopad.dev/v1/players/{id}/stations"
         )
-
     if not player.get("switchboardUrl"):
-        player["switchboardUrl"] = f"wss://{player_id}.switchboard.radiopad.dev/"
+        player["switchboardUrl"] = f"wss://{id}.switchboard.radiopad.dev/"
 
-    return response(player, root="player")
-
-
-async def get_stations(player_id: str):
-    """Get stations for a player - maps to GET /players/{player_id}/stations"""
-    if player_id not in PLAYERS:
-        return response({"error": "Player not found"}, status=404)
-
-    player_dir = os.path.join(os.path.dirname(__file__), "..", "players", player_id)
-    stations_path = os.path.join(player_dir, "stations.json")
-    if not os.path.isfile(stations_path):
-        return response({"error": "Stations not found"}, status=404)
-    try:
-        with open(stations_path, "r") as f:
-            stations = json.load(f)
-        return response(stations, root="stations")
-    except Exception:
-        return response({"error": "Failed to load stations"}, status=500)
+    return player
 
 
 async def search(page: int = 1, per_page: int = 10):
     """List all players - maps to GET /players with pagination"""
-    pagination = paginate(PLAYERS_LIST, page, per_page)
-    return response(pagination, root="players")
+    return paginate(PLAYERS_LIST, page, per_page)
+
+
+def _load_players():
+    # TODO: add player persistence
+    players = {}
+    return MappingProxyType(players), [
+        {"id": id, "name": p.get("name")} for id, p in players.items()
+    ]
+
+
+PLAYERS, PLAYERS_LIST = _load_players()

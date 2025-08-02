@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StationList Schema",
+  "definitions": {
+    "StationList": {
+      "title": "StationList",
+      "type": "array",
+      "items": {
+        "$ref": "Station.json#/definitions/Station"
+      },
+      "description": "List of radio stations with their names and streaming URLs."
+    }
+  }
+}

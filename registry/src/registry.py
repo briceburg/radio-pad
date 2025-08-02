@@ -5,10 +5,24 @@ from connexion.resolver import RestyResolver
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse, RedirectResponse
 
-options = SwaggerUIOptions(swagger_ui_path="/api-docs")
+# TODO: write unit tests for response validation
+in_unit_test = False
 
-app = connexion.AsyncApp(__name__, specification_dir="spec", swagger_ui_options=options)
-app.add_api("openapi.yaml", swagger_ui_options=options, resolver=RestyResolver("api"))
+options = SwaggerUIOptions(
+    swagger_ui_path="/api-docs",
+    swagger_ui_config={
+        "displayOperationId": False,
+        "defaultModelsExpandDepth": 0,
+    },
+)
+
+app = connexion.AsyncApp(__name__, specification_dir="spec")
+app.add_api(
+    "openapi.yaml",
+    validate_responses=in_unit_test,
+    swagger_ui_options=options,
+    resolver=RestyResolver("api"),
+)
 
 app.add_middleware(
     CORSMiddleware,

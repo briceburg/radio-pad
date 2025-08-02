@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlayerList Schema",
+  "definitions": {
+    "PlayerList": {
+      "title": "PlayerList",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the player",
+            "example": "briceburg-living-room"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the player",
+            "example": "Living Room"
+          }
+        },
+        "required": ["id", "name"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

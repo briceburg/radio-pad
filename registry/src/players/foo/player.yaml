@@ -1,5 +1,0 @@
----
-id: foo
-name: Foo Player
-stationsUrl: https://registry.radiopad.dev/players/FOO/stations.json
-switchboardUrl: wss://FOO.player-switchboard.radiopad.dev

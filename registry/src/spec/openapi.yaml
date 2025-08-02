@@ -7,12 +7,13 @@ servers:
   - url: /v1
 
 paths:
-  /players/{player_id}:
+  /players/{id}:
     get:
+      tags: [Players]
       summary: Get Player
       description: Returns a RadioPad Player by its ID.
       parameters:
-        - name: player_id
+        - name: id
           in: path
           required: true
           schema:
@@ -25,37 +26,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Player'
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/Player'
-        '404':
-          description: Player not found
-  /players/{player_id}/stations:
-    get:
-      summary: Get Player Stations
-      description: Returns the stations for a specific RadioPad Player.
-      operationId: api.players.get_stations
-      parameters:
-        - name: player_id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The ID of the player to retrieve stations for.
-      responses:
-        '200':
-          description: List of stations for the player
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StationList'
-            application/xml:
-              schema:
-                $ref: '#/components/schemas/StationList'
         '404':
           description: Player not found
   /players:
     get:
+      tags: [Players]
       summary: List Players
       description: Returns a list of RadioPad Players.
       parameters:
@@ -70,10 +45,45 @@ paths:
                 allOf:
                 - $ref: '#/components/schemas/PlayerList'
                 - $ref: '#/components/schemas/_Pagination'
-            application/xml:
+
+  /station-presets/{id}:
+    get:
+      tags: [Stations]
+      summary: Get Stations for a Preset
+      description: Returns the stations for a specific Preset ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the station preset to retrieve stations for.
+      responses:
+        '200':
+          description: List of stations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationList'
+        '404':
+          description: Preset not found
+
+  /station-presets:
+    get:
+      tags: [Stations]
+      summary: List Station Presets
+      description: Returns a list of available station presets.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: List of paginated Station Presets
+          content:
+            application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/PlayerList'
+                - $ref: '#/components/schemas/StationPresetsList'
                 - $ref: '#/components/schemas/_Pagination'
 
 components:
@@ -117,25 +127,17 @@ components:
       required: [page, per_page, total, total_pages]
 
     Player:
-      xml:
-        name: player
+      $ref: './schemas/Player.json#/definitions/Player'
+    PlayerList:
       type: object
       properties:
-        id:
-          type: string
-        name:
-          type: string
-        stationsUrl:
-          type: string
-          format: uri
-          example: https://registry.radiopad.dev/players/foo/stations
-        switchboardUrl:
-          type: string
-          format: uri
-          example: wss://foo.switchboard.radiopad.dev
-    PlayerList:
-      xml:
-        name: players
+        items:
+          $ref: './schemas/PlayerList.json#/definitions/PlayerList'
+        
+
+    StationList:
+      $ref: './schemas/StationList.json#/definitions/StationList'
+    StationPresetsList:
       type: object
       properties:
         items:
@@ -145,27 +147,10 @@ components:
             properties:
               id:
                 type: string
-                example: foo
-              name:
+                example: briceburg
+              lastUpdated:
                 type: string
-                example: bonjour foo
+                format: date-time
+                example: '2025-10-01T12:00:00Z'
+            required: [id, lastUpdated]
 
-    Station:
-      xml:
-        name: station
-      type: object
-      properties:
-        name:
-          type: string
-          example: wwoz
-        url:
-          type: string
-          format: uri
-          example: https://www.wwoz.org/listen/hi
-    StationList:
-      xml:
-        name: stations
-        wrapped: true
-      type: array
-      items:
-          $ref: '#/components/schemas/Station'
