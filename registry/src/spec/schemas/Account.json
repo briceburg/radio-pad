@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Account Schema",
+  "definitions": {
+    "Account": {
+      "title": "Account",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the account",
+          "example": "briceburg"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the account",
+          "example": "Brice B"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

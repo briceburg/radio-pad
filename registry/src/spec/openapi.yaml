@@ -6,41 +6,49 @@ info:
 servers:
   - url: /v1
 
-x-pagination-params: &paginationParams
-    - $ref: '#/components/parameters/Page'
-    - $ref: '#/components/parameters/PerPage'
-
 paths:
-  /players/{id}:
+  /accounts:
     get:
-      tags: [Players]
-      summary: Get Player
-      description: Returns a RadioPad Player by its ID.
+      tags: [Accounts]
+      summary: List Accounts.
       parameters:
-        - name: id
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated List of Accounts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/_PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        $ref: '#/components/schemas/AccountList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /players/{account}:
+    get:
+      operationId: api.players.search
+      tags: [Players]
+      summary: List Players belonging to an Account.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: account
           in: path
           required: true
           schema:
             type: string
-          description: The ID of the player to retrieve.
+          description: Player Account
+          example: "briceburg"
       responses:
         '200':
-          description: Player details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Player'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /players:
-    get:
-      tags: [Players]
-      summary: List Players
-      description: Returns a list of RadioPad Players.
-      parameters: *paginationParams
-      responses:
-        '200':
-          description: List of paginated Players
+          description: Paginated List of Players.
           content:
             application/json:
               schema:
@@ -50,38 +58,54 @@ paths:
                     properties:
                       items:
                         $ref: '#/components/schemas/PlayerList'
-
-  /station-presets/{id}:
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        
+  /players/{account}/{id}:
     get:
-      tags: [Stations]
-      summary: Get Stations for a Preset
-      description: Returns the stations for a specific Preset ID.
+      operationId: api.players.get
+      tags: [Players]
+      summary: Get Player.
       parameters:
+        - name: account
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Player Account
+          example: "briceburg"
         - name: id
           in: path
           required: true
           schema:
             type: string
-          description: The ID of the station preset to retrieve stations for.
+          description: Player Identifier
+          example: "living-room"
       responses:
         '200':
-          description: List of stations
+          description: Player Details.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StationList'
+                $ref: '#/components/schemas/Player'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  
 
   /station-presets:
     get:
       tags: [Stations]
-      summary: List Station Presets
-      description: Returns a list of available station presets.
-      parameters: *paginationParams
+      summary: List Station Presets.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: List of paginated Station Presets
+          description: Paginated List of Station Presets.
           content:
             application/json:
               schema:
@@ -91,6 +115,30 @@ paths:
                     properties:
                       items:
                         $ref: '#/components/schemas/StationPresetList'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /station-presets/{id}:
+    get:
+      tags: [Stations]
+      summary: Get Station Preset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the station preset to retrieve stations for.
+      responses:
+        '200':
+          description: Station Preset Details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   parameters:
@@ -125,7 +173,23 @@ components:
               error:
                 type: string
                 example: Not Found
+    InternalServerError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Schema construction error
   schemas:
+    Account:
+      $ref: './schemas/Account.json#/definitions/Account'
+
+    AccountList:
+      $ref: './schemas/AccountList.json#/definitions/AccountList'
+
     Player:
       $ref: './schemas/Player.json#/definitions/Player'
       

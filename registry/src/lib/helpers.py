@@ -1,7 +1,6 @@
 import logging
-from pathlib import Path
 
-BASE_DIR = Path(__file__).parent.parent
+from lib.schema import SchemaConstructionError, construct_from_schema
 
 
 def get_logger(name=None):
@@ -11,8 +10,20 @@ def get_logger(name=None):
     return logging.getLogger(name or "uvicorn.error")
 
 
-def paginate(items, page=1, per_page=10, max_per_page=100):
-    """Paginate a list of items, returning a dict with items and metadata."""
+logger = get_logger()
+
+
+def _handle_schema_error(e):
+    """Log a schema construction error and return a standardized error response."""
+    error_message = f"Schema construction error: {e}"
+    logger.error(error_message)
+    return {"error": error_message}, 500
+
+
+def build_paginated_response(
+    raw_items, schema_name, page=1, per_page=10, max_per_page=100
+):
+    """Build a paginated and schema-conformant response, handling errors gracefully."""
     try:
         page = int(page)
         per_page = int(per_page)
@@ -27,14 +38,28 @@ def paginate(items, page=1, per_page=10, max_per_page=100):
     if per_page > max_per_page:
         per_page = max_per_page
 
-    total = len(items)
+    total = len(raw_items)
     start = (page - 1) * per_page
     end = start + per_page
-    paged_items = items[start:end]
+    paginated_raw_items = raw_items[start:end]
+
+    try:
+        constructed_items = construct_from_schema(schema_name, paginated_raw_items)
+    except SchemaConstructionError as e:
+        return _handle_schema_error(e)
+
     return {
-        "items": paged_items,
+        "items": constructed_items,
         "page": page,
         "per_page": per_page,
         "total": total,
         "total_pages": (total + per_page - 1) // per_page,
     }
+
+
+def build_response(raw_item, schema_name):
+    """Build a schema-conformant response, handling errors gracefully."""
+    try:
+        return construct_from_schema(schema_name, raw_item)
+    except SchemaConstructionError as e:
+        return _handle_schema_error(e)

@@ -2,10 +2,9 @@ import json
 from datetime import datetime
 from types import MappingProxyType
 
-from lib.helpers import BASE_DIR, get_logger, paginate
+from lib.constants import BASE_DIR
+from lib.helpers import build_paginated_response, build_response, logger
 from lib.schema import validate_schema
-
-logger = get_logger()
 
 
 async def get(id: str):
@@ -15,12 +14,15 @@ async def get(id: str):
     if preset is None:
         return {"error": "Preset not found"}, 404
 
-    return preset
+    return build_response(preset, "StationList")
 
 
 async def search(page: int = 1, per_page: int = 10):
     """List all station presets - maps to GET /station-presets with pagination"""
-    return paginate(STATION_PRESETS_LIST, page, per_page)
+
+    return build_paginated_response(
+        list(STATION_PRESETS_LIST), "StationPresetList", page, per_page
+    )
 
 
 def _load_station_presets():

@@ -1,22 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "PlayerList Schema",
+  "title": "AccountList Schema",
   "definitions": {
-    "PlayerList": {
-      "title": "PlayerList",
+    "AccountList": {
+      "title": "AccountList",
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "Unique identifier for the player",
-            "example": "living-room"
+            "description": "Unique identifier for the account",
+            "example": "briceburg"
           },
           "name": {
             "type": "string",
-            "description": "Display name of the player",
-            "example": "Living Room"
+            "description": "Display name of the account",
+            "example": "Brice B"
           }
         },
         "required": ["id", "name"],

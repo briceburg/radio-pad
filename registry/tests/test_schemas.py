@@ -1,4 +1,6 @@
-from lib.schema import validate_schema
+import pytest
+
+from lib.schema import SchemaConstructionError, construct_from_schema, validate_schema
 
 
 def test_validate_schema_valid_stationlist():
@@ -42,5 +44,15 @@ def test_validate_schema_file_not_found():
     assert "does not exist" in err
 
 
-# TODO: Test other schemas,
-#   ...however this is mainly to test that lib.schema.validate_schema() is working.
+def test_construct_from_schema_invalid_object_raises_exception():
+    """Tests that an invalid object instance raises SchemaConstructionError."""
+    instance = {"foo": "bar"}
+    with pytest.raises(SchemaConstructionError):
+        construct_from_schema("Account", instance)
+
+
+def test_construct_from_schema_invalid_list_raises_exception():
+    """Tests that an invalid list instance raises SchemaConstructionError."""
+    instance = [{"foo": "bar"}]
+    with pytest.raises(SchemaConstructionError):
+        construct_from_schema("AccountList", instance)

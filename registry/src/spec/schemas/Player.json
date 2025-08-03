@@ -15,7 +15,7 @@
         "id": {
           "type": "string",
           "description": "Unique identifier for the player",
-          "example": "briceburg-living-room"
+          "example": "living-room"
         },
         "name": {
           "type": "string",
@@ -26,13 +26,13 @@
           "type": "string",
           "format": "uri",
           "description": "URL to the player's station list",
-          "example": "https://registry.radiopad.dev/v1/players/briceburg-living-room/stations"
+          "example": "https://registry.radiopad.dev/v1/stations/briceburg"
         },
         "switchboardUrl": {
           "type": "string",
           "format": "uri",
           "description": "WebSocket URL for the player's switchboard",
-          "example": "wss://briceburg-living-room.switchboard.radiopad.dev/"
+          "example": "wss://switchboard.radiopad.dev/briceburg/living-room"
         }
       },
       "additionalProperties": false
