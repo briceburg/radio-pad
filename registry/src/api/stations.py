@@ -8,17 +8,17 @@ from lib.schema import validate_schema
 
 
 async def get(id: str):
-    """Get a Station Preset by ID - maps to GET /station-presets/{id}"""
+    """Returns a StationList - maps to GET /stations/{id}"""
 
     preset = STATION_PRESETS.get(id)
     if preset is None:
-        return {"error": "Preset not found"}, 404
+        return {"error": "Station Preset not found"}, 404
 
     return build_response(preset, "StationList")
 
 
 async def search(page: int = 1, per_page: int = 10):
-    """List all station presets - maps to GET /station-presets with pagination"""
+    """Returns a paginated StationPresetList - maps to GET /stations"""
 
     return build_paginated_response(
         list(STATION_PRESETS_LIST), "StationPresetList", page, per_page

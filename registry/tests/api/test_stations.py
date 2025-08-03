@@ -1,5 +1,5 @@
 def test_get_station_presets(client):
-    response = client.get("/v1/station-presets")
+    response = client.get("/v1/stations")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
     data = response.json()
@@ -13,10 +13,10 @@ def test_get_station_presets(client):
 
 def test_get_station_presets_invalid_data_returns_500(client, monkeypatch):
     monkeypatch.setattr(
-        "api.station_presets.STATION_PRESETS_LIST",
+        "api.stations.STATION_PRESETS_LIST",
         [{"id": "briceburg"}],  # Invalid: missing lastUpdated
     )
-    response = client.get("/v1/station-presets")
+    response = client.get("/v1/stations")
     assert response.status_code == 500
 
 

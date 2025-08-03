@@ -6,12 +6,16 @@
       "title": "Player",
       "type": "object",
       "required": [
+        "account_id",
         "id",
-        "name",
-        "stationsUrl",
-        "switchboardUrl"
+        "name"
       ],
       "properties": {
+        "account_id": {
+          "type": "string",
+          "description": "Unique identifier for the account this player belongs to",
+          "example": "briceburg"
+        },
         "id": {
           "type": "string",
           "description": "Unique identifier for the player",

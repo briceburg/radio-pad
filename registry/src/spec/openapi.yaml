@@ -96,7 +96,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   
 
-  /station-presets:
+  /stations:
     get:
       tags: [Stations]
       summary: List Station Presets.
@@ -117,10 +117,10 @@ paths:
                         $ref: '#/components/schemas/StationPresetList'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /station-presets/{id}:
+  /stations/{id}:
     get:
       tags: [Stations]
-      summary: Get Station Preset.
+      summary: Get Stations List.
       parameters:
         - name: id
           in: path
@@ -195,6 +195,9 @@ components:
       
     PlayerList:
       $ref: './schemas/PlayerList.json#/definitions/PlayerList'
+
+    Station:
+      $ref: './schemas/Station.json#/definitions/Station'
 
     StationList:
       $ref: './schemas/StationList.json#/definitions/StationList'
