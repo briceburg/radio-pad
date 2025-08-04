@@ -13,7 +13,7 @@ def test_get_players(client):
 
 def test_get_players_invalid_data_returns_500(client, monkeypatch):
     monkeypatch.setattr(
-        "api.players.PLAYERS",
+        "data.store._STORE._players",
         {"briceburg": {"living-room": {"name": None}}},  # Invalid: name is null
     )
     response = client.get("/v1/players/briceburg")

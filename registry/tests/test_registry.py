@@ -15,6 +15,7 @@ def test_swagger_ui_renders(client):
     response = client.get("/v1/api-docs")
     assert response.status_code == 200
 
+
 def test_openapi_json_renders(client):
     response = client.get("/v1/openapi.json")
     assert response.status_code == 200

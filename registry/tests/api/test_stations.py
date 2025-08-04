@@ -11,12 +11,13 @@ def test_get_station_presets(client):
     assert isinstance(data["items"], list)
 
 
-def test_get_station_presets_invalid_data_returns_500(client, monkeypatch):
+def test_get_station_list_invalid_data_returns_500(client, monkeypatch):
+    """Test that getting a station list with invalid data returns a 500 error."""
     monkeypatch.setattr(
-        "api.stations.STATION_PRESETS_LIST",
-        [{"id": "briceburg"}],  # Invalid: missing lastUpdated
+        "data.store._STORE._station_presets",
+        {"briceburg": [{"name": "invalid station"}]},  # Invalid: missing url
     )
-    response = client.get("/v1/stations")
+    response = client.get("/v1/stations/briceburg")
     assert response.status_code == 500
 
 

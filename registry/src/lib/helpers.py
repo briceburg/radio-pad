@@ -2,15 +2,9 @@ import logging
 
 from lib.schema import SchemaConstructionError, construct_from_schema
 
-
-def get_logger(name=None):
-    """Return a logger using the uvicorn.error logger by default.
-    Uvicorn's documentation and community recommend using 'uvicorn.error' for application logs and 'uvicorn.access' for HTTP access logs.
-    """
-    return logging.getLogger(name or "uvicorn.error")
-
-
-logger = get_logger()
+# Uvicorn's documentation and community recommend using 'uvicorn.error' for
+# application logs and 'uvicorn.access' for HTTP access logs.
+logger = logging.getLogger("uvicorn.error")
 
 
 def _handle_schema_error(e):
