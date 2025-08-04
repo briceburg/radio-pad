@@ -1,15 +1,19 @@
-from data.store import get_store
-from lib.helpers import build_paginated_response
+from fastapi import APIRouter
 
-store = get_store()
+from data.store import store
+from lib.pagination import paginate
+from models.account import Account
+from models.pagination import PaginatedList
+
+router = APIRouter()
 
 
-async def search(page: int = 1, per_page: int = 10):
-    """List all accounts - maps to GET /accounts"""
-
+@router.get("/accounts", response_model=PaginatedList[Account])
+async def list_accounts(page: int = 1, per_page: int = 10):
+    """List all accounts"""
     account_list = [
-        {"id": id, "name": account.get("name", id.replace("_", " ").title())}
+        Account(id=id, name=account.get("name", id.replace("_", " ").title()))
         for id, account in store.accounts.items()
     ]
 
-    return build_paginated_response(account_list, "AccountList", page, per_page)
+    return paginate(account_list, page, per_page)

@@ -1,31 +1,64 @@
-from data.store import get_store
-from lib.helpers import build_paginated_response, build_response
+from fastapi import APIRouter, HTTPException
 
-store = get_store()
+from data.store import store
+from lib.pagination import paginate
+from models.pagination import PaginatedList
+from models.player import Player, PlayerCreate
 
-
-async def get(account: str, id: str):
-    """Get a player by account and ID - maps to GET /players/{account}/{id}"""
-    players = store.players.get(account, {})
-    player = players.get(id)
-    if player is None:
-        return {"error": "Player not found"}, 404
-
-    player = dict(player)
-    player["id"] = id
-    player["account"] = account
-
-    if not player.get("stationsUrl"):
-        player["stationsUrl"] = f"https://registry.radiopad.dev/v1/stations/briceburg"
-    if not player.get("switchboardUrl"):
-        player["switchboardUrl"] = f"wss://switchboard.radiopad.dev/{account}/{id}"
-
-    return build_response(player, "Player")
+router = APIRouter()
 
 
-async def search(account: str, page: int = 1, per_page: int = 10):
-    """List all players for an account - maps to GET /players/{account} with pagination"""
-    players = store.players.get(account, {})
-    players_list = [{"id": id, "name": p.get("name")} for id, p in players.items()]
+@router.put("/players/{account_id}/{id}", response_model=Player)
+async def register_player(account_id: str, id: str, player_data: PlayerCreate):
+    """Register a player"""
+    player_dict = player_data.model_dump(exclude_unset=True)
+    store.register_player(account_id, id, player_dict)
 
-    return build_paginated_response(players_list, "PlayerList", page, per_page)
+    return Player(
+        id=id,
+        accountId=account_id,
+        name=player_data.name,
+        stationsUrl=player_data.stationsUrl
+        or f"https://registry.radiopad.dev/v1/stations/briceburg",
+        switchboardUrl=player_data.switchboardUrl
+        or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+    )
+
+
+@router.get("/players/{account_id}/{id}", response_model=Player)
+async def get_player(account_id: str, id: str):
+    """Get a player by account and ID"""
+    players = store.players.get(account_id, {})
+    player_data = players.get(id)
+    if player_data is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    return Player(
+        id=id,
+        accountId=account_id,
+        name=player_data.get("name"),
+        stationsUrl=player_data.get("stationsUrl")
+        or f"https://registry.radiopad.dev/v1/stations/briceburg",
+        switchboardUrl=player_data.get("switchboardUrl")
+        or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+    )
+
+
+@router.get("/players/{account_id}", response_model=PaginatedList[Player])
+async def list_players(account_id: str, page: int = 1, per_page: int = 10):
+    """List all players for an account"""
+    players = store.players.get(account_id, {})
+    player_list = [
+        Player(
+            id=id,
+            accountId=account_id,
+            name=p.get("name"),
+            stationsUrl=p.get("stationsUrl")
+            or f"https://registry.radiopad.dev/v1/stations/briceburg",
+            switchboardUrl=p.get("switchboardUrl")
+            or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+        )
+        for id, p in players.items()
+    ]
+
+    return paginate(player_list, page, per_page)

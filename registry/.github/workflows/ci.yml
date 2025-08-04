@@ -17,11 +17,13 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.13'
-
-    - name: CI
+    
+    - name: Install Dependencies
       run: |
         pip install -r requirements-dev.txt
-        bin/ci
+
+    - name: CI
+      run: bin/ci
 
   test:
     runs-on: ubuntu-latest
@@ -40,5 +42,4 @@ jobs:
         pip install -r requirements-dev.txt
 
     - name: Test
-      run: |
-        pytest
+      run: pytest

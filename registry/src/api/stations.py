@@ -1,29 +1,33 @@
-from datetime import datetime
+from fastapi import APIRouter, HTTPException
 
-from data.store import get_store
-from lib.helpers import build_paginated_response, build_response
+from data.store import store
+from lib.pagination import paginate
+from models.pagination import PaginatedList
+from models.station import StationList
+from models.station_preset import StationPreset
 
-store = get_store()
+router = APIRouter()
 
 
-async def get(id: str):
-    """Returns a StationList - maps to GET /stations/{id}"""
-
+@router.get("/stations/{id}", response_model=StationList)
+async def get_station_list(id: str):
+    """Returns a StationList"""
     preset = store.station_presets.get(id)
     if preset is None:
-        return {"error": "Station Preset not found"}, 404
+        raise HTTPException(status_code=404, detail="Station Preset not found")
 
-    return build_response(preset, "StationList")
+    return {"stations": preset}
 
 
-async def search(page: int = 1, per_page: int = 10):
-    """Returns a paginated StationPresetList - maps to GET /stations"""
-
-    station_presets_list = tuple(
-        {"id": k, "lastUpdated": datetime.now().isoformat(timespec="seconds")}
-        for k in store.station_presets.keys()
-    )
-
-    return build_paginated_response(
-        list(station_presets_list), "StationPresetList", page, per_page
-    )
+@router.get("/station-presets", response_model=PaginatedList[StationPreset])
+async def list_station_presets(page: int = 1, per_page: int = 10):
+    """Returns a paginated list of station presets"""
+    presets = [
+        StationPreset(
+            id=id,
+            lastUpdated="2025-08-04T00:00:00",
+            stations=StationList(stations=stations),
+        )
+        for id, stations in store.station_presets.items()
+    ]
+    return paginate(presets, page, per_page)

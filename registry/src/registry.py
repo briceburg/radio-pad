@@ -1,45 +1,39 @@
-import connexion
-from connexion.middleware import MiddlewarePosition
-from connexion.options import SwaggerUIOptions
-from connexion.resolver import RestyResolver
-from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import PlainTextResponse, RedirectResponse
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
+from starlette.responses import RedirectResponse
+
+from api.router import router as api_router
+from data.store import DataStore, store
 
 
-def create_app(in_unit_test=False):
-    options = SwaggerUIOptions(
-        swagger_ui_path="/api-docs",
-        swagger_ui_config={
-            "displayOperationId": False,
-            "defaultModelsExpandDepth": 0,
-        },
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handles application startup and shutdown events."""
+    store.initialize(DataStore())
+    yield
+
+
+def create_app():
+    app = FastAPI(
+        lifespan=lifespan, swagger_ui_parameters={"defaultModelsExpandDepth": 0}
     )
 
-    app = connexion.AsyncApp(__name__, specification_dir="spec")
-    app.add_api(
-        "openapi.yaml",
-        validate_responses=in_unit_test,
-        swagger_ui_options=options,
-        resolver=RestyResolver("api"),
-    )
+    app.include_router(api_router, prefix="/v1")
 
-    app.add_middleware(
-        CORSMiddleware,
-        position=MiddlewarePosition.BEFORE_EXCEPTION,
-        allow_origins=["*"],
-        allow_credentials=False,
-    )
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return RedirectResponse("/docs")
 
-    app.add_url_rule(
-        "/", "root_redirect", lambda req: RedirectResponse("/v1/api-docs/")
-    )
-    app.add_url_rule("/healthz", "health", lambda req: PlainTextResponse("ok"))
+    @app.get("/healthz", include_in_schema=False)
+    async def healthz():
+        return {"status": "ok"}
+
     return app
 
 
 app = create_app()
 
 if __name__ == "__main__":
-    from pathlib import Path
-
-    app.run(f"{Path(__file__).stem}:app", port=8080)
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

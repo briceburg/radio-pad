@@ -5,7 +5,7 @@ A simple data store for maintaining the available accounts, players, and station
 import json
 
 from lib.constants import BASE_DIR
-from lib.helpers import logger
+from lib.logging import logger
 
 
 class DataStore:
@@ -57,13 +57,27 @@ class DataStore:
         """Return a dictionary of station presets."""
         return self._station_presets
 
+    def register_player(self, account_id: str, player_id: str, player_data: dict):
+        """Registers or updates a player for a given account."""
+        if account_id not in self._players:
+            self._players[account_id] = {}
+        self._players[account_id][player_id] = player_data
 
-_STORE = None
+
+class StoreProxy:
+    """A proxy object that forwards attribute access to the real DataStore."""
+
+    def __init__(self):
+        self._store = None
+
+    def initialize(self, store: DataStore):
+        """Initializes the proxy with the real DataStore instance."""
+        self._store = store
+
+    def __getattr__(self, name):
+        if self._store is None:
+            raise RuntimeError("DataStore has not been initialized")
+        return getattr(self._store, name)
 
 
-def get_store():
-    """Return a singleton instance of the DataStore."""
-    global _STORE
-    if _STORE is None:
-        _STORE = DataStore()
-    return _STORE
+store = StoreProxy()

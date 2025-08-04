@@ -12,7 +12,9 @@ from registry import create_app
 
 @pytest.fixture
 def client():
-    # hint to app that we're in unit test mode,
-    # enables connexion response validation.
-    app = create_app(in_unit_test=True)
-    return TestClient(app)
+    app = create_app()
+    # Using a `with` statement for the TestClient ensures that the app's
+    # lifespan events (startup and shutdown) are correctly triggered.
+    # This is crucial for initializing resources like our data store.
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
