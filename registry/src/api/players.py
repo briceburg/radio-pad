@@ -16,11 +16,7 @@ async def register_player(account_id: str, id: str, player_data: PlayerCreate):
     return Player(
         id=id,
         accountId=account_id,
-        name=player_data.name,
-        stationsUrl=player_data.stationsUrl
-        or f"https://registry.radiopad.dev/v1/stations/briceburg",
-        switchboardUrl=player_data.switchboardUrl
-        or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+        **player_dict,
     )
 
 
@@ -35,11 +31,7 @@ async def get_player(account_id: str, id: str):
     return Player(
         id=id,
         accountId=account_id,
-        name=player_data.get("name"),
-        stationsUrl=player_data.get("stationsUrl")
-        or f"https://registry.radiopad.dev/v1/stations/briceburg",
-        switchboardUrl=player_data.get("switchboardUrl")
-        or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+        **player_data,
     )
 
 
@@ -52,11 +44,7 @@ async def list_players(account_id: str, page: int = 1, per_page: int = 10):
             Player(
                 id=id,
                 accountId=account_id,
-                name=p.get("name"),
-                stationsUrl=p.get("stationsUrl")
-                or f"https://registry.radiopad.dev/v1/stations/briceburg",
-                switchboardUrl=p.get("switchboardUrl")
-                or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+                **p,
             )
             for id, p in paginated_players.items
         ],

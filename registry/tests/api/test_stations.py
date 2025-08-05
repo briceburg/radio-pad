@@ -7,31 +7,26 @@ def test_get_station_presets(client):
     assert "page" in data
     assert "per_page" in data
     assert "total" in data
+    assert data["total"] == 2
     assert isinstance(data["items"], list)
 
 
-def test_get_station_list_invalid_data_returns_500(client, monkeypatch):
+def test_get_station_list_invalid_data_returns_500(client, mock_store):
     """Test that getting a station list with invalid data returns a 500 error."""
-    from data.store import store
-
-    monkeypatch.setattr(
-        store,
-        "_store",
-        type(
-            "MockStore",
-            (),
-            {"station_presets": {"briceburg": [{"name": "invalid station"}]}},
-        ),
-    )
-    response = client.get("/v1/stations/briceburg")
+    mock_store._station_presets = {
+        "preset1": {"id": "preset1", "stations": [{"name": "invalid station"}]}
+    }
+    response = client.get("/v1/stations/preset1")
     assert response.status_code == 500
 
 
-# TODO: add preset fixtures to further exercise. check for 404s.
+def test_get_station_list_not_found(client):
+    response = client.get("/v1/stations/does-not-exist")
+    assert response.status_code == 404
 
 
 def test_get_station_list(client):
-    response = client.get("/v1/stations/briceburg")
+    response = client.get("/v1/stations/preset1")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
     data = response.json()

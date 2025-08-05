@@ -12,8 +12,6 @@ from models.pagination import PaginatedList
 T = TypeVar("T")
 
 
-
-
 class DataStore:
     """A simple data store for maintaining the available accounts, players, and station presets."""
 
@@ -46,9 +44,7 @@ class DataStore:
                 }
         logger.info("Loaded %d station presets", len(self._station_presets))
 
-    def _paginate(
-        self, items: List[T], page: int, per_page: int
-    ) -> PaginatedList[T]:
+    def _paginate(self, items: List[T], page: int, per_page: int) -> PaginatedList[T]:
         """Paginates a list of items and returns a PaginatedList model instance."""
         total = len(items)
         start = (page - 1) * per_page
@@ -95,8 +91,14 @@ class DataStore:
         """Return a paginated list of station presets."""
         return self._paginate(list(self.station_presets.values()), page, per_page)
 
+    def ensure_account(self, account_id: str):
+        """Ensures an account exists."""
+        if account_id not in self._accounts:
+            self._accounts[account_id] = {}
+
     def register_player(self, account_id: str, player_id: str, player_data: dict):
         """Registers or updates a player for a given account."""
+        self.ensure_account(account_id)
         if account_id not in self._players:
             self._players[account_id] = {}
         self._players[account_id][player_id] = player_data

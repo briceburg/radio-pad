@@ -7,6 +7,7 @@ def test_list_accounts(client):
     assert "page" in data
     assert "per_page" in data
     assert "total" in data
+    assert data["total"] == 2
     assert isinstance(data["items"], list)
     for account in data["items"]:
         assert "id" in account
