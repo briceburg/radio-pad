@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
 from data.store import store
-from lib.pagination import paginate
 from models.pagination import PaginatedList
 from models.player import Player, PlayerCreate
 
@@ -47,18 +46,21 @@ async def get_player(account_id: str, id: str):
 @router.get("/players/{account_id}", response_model=PaginatedList[Player])
 async def list_players(account_id: str, page: int = 1, per_page: int = 10):
     """List all players for an account"""
-    players = store.players.get(account_id, {})
-    player_list = [
-        Player(
-            id=id,
-            accountId=account_id,
-            name=p.get("name"),
-            stationsUrl=p.get("stationsUrl")
-            or f"https://registry.radiopad.dev/v1/stations/briceburg",
-            switchboardUrl=p.get("switchboardUrl")
-            or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
-        )
-        for id, p in players.items()
-    ]
-
-    return paginate(player_list, page, per_page)
+    paginated_players = store.get_paginated_players(account_id, page, per_page)
+    return PaginatedList(
+        items=[
+            Player(
+                id=id,
+                accountId=account_id,
+                name=p.get("name"),
+                stationsUrl=p.get("stationsUrl")
+                or f"https://registry.radiopad.dev/v1/stations/briceburg",
+                switchboardUrl=p.get("switchboardUrl")
+                or f"wss://switchboard.radiopad.dev/{account_id}/{id}",
+            )
+            for id, p in paginated_players.items
+        ],
+        total=paginated_players.total,
+        page=paginated_players.page,
+        per_page=paginated_players.per_page,
+    )

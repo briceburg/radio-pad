@@ -11,7 +11,8 @@ from data.store import DataStore, store
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles application startup and shutdown events."""
-    store.initialize(DataStore())
+    if store._store is None:
+        store.initialize(DataStore())
     yield
 
 
