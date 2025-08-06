@@ -12,21 +12,21 @@ def test_store_is_singleton_proxy():
 def test_datastore_loads_station_presets():
     """Test that the DataStore loads station presets correctly."""
     real_store = DataStore()
-    assert len(real_store._station_presets) > 0
-    assert "briceburg" in real_store._station_presets
+    assert len(real_store.presets._presets) > 0
+    assert "briceburg" in real_store.presets._presets
 
 
 def test_datastore_has_accounts_and_players():
     """Test that the DataStore has accounts and players."""
     real_store = DataStore()
-    assert len(real_store.accounts) > 0
-    assert "briceburg" in real_store.accounts
-    assert len(real_store.get_players("briceburg")) > 0
-    assert len(real_store.get_players("otheruser")) > 0
+    assert len(real_store.accounts._accounts) > 0
+    assert "briceburg" in real_store.accounts._accounts
+    assert len(real_store.accounts._get_raw_players("briceburg")) > 0
+    assert len(real_store.accounts._get_raw_players("otheruser")) > 0
 
 
 def test_proxy_initialization():
     """Test that the proxy can be initialized and forwards calls."""
     real_store = DataStore()
     store.initialize(real_store)
-    assert store.accounts is real_store.accounts
+    assert store.accounts._accounts is real_store.accounts._accounts

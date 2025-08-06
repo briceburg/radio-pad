@@ -27,7 +27,7 @@ async def register_account_preset(
 ):
     """Create or update an account station preset."""
     preset_dict = preset_data.model_dump(exclude_unset=True)
-    preset = store.register_station_preset(preset_id, preset_dict, account_id)
+    preset = store.presets.register(preset_id, preset_dict, account_id)
     return preset
 
 
@@ -40,7 +40,7 @@ async def register_account_preset(
 async def register_global_preset(preset_id: str, preset_data: StationPresetCreate):
     """Create or update a global station preset."""
     preset_dict = preset_data.model_dump(exclude_unset=True)
-    preset = store.register_station_preset(preset_id, preset_dict)
+    preset = store.presets.register(preset_id, preset_dict)
     return preset
 
 
@@ -52,7 +52,7 @@ async def register_global_preset(preset_id: str, preset_data: StationPresetCreat
 )
 async def get_account_preset(account_id: str, preset_id: str):
     """Get a single account station preset by its ID."""
-    preset = store.get_station_preset(preset_id, account_id)
+    preset = store.presets.get(preset_id, account_id)
     if preset is None:
         raise HTTPException(status_code=404, detail="Station preset not found")
     return preset
@@ -66,7 +66,7 @@ async def get_account_preset(account_id: str, preset_id: str):
 )
 async def get_global_preset(preset_id: str):
     """Get a single global station preset by its ID."""
-    preset = store.get_station_preset(preset_id)
+    preset = store.presets.get(preset_id)
     if preset is None:
         raise HTTPException(status_code=404, detail="Station preset not found")
     return preset
@@ -88,7 +88,7 @@ async def list_account_presets(
     By default, only presets owned by the account are returned.
     Set `include_globals=true` to include global presets.
     """
-    paginated_presets = store.get_paginated_station_presets(
+    paginated_presets = store.presets.list(
         **pagination, account_id=account_id, include_globals=include_globals
     )
     return paginated_presets
@@ -102,5 +102,5 @@ async def list_account_presets(
 )
 async def list_global_presets(pagination: dict = Depends(get_pagination_params)):
     """List all available global station presets."""
-    paginated_presets = store.get_paginated_station_presets(**pagination)
+    paginated_presets = store.presets.list(**pagination)
     return paginated_presets

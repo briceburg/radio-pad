@@ -17,7 +17,7 @@ from registry import create_app
 @pytest.fixture
 def mock_store(monkeypatch):
     store = DataStore()
-    store._accounts = {
+    store.accounts._accounts = {
         "testuser1": {
             "players": {
                 "player1": {"name": "Player 1"},
@@ -30,7 +30,7 @@ def mock_store(monkeypatch):
             }
         },
     }
-    store._station_presets = {
+    store.presets._presets = {
         "briceburg": StationPreset(
             id="briceburg",
             name="Briceburg",

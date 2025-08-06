@@ -16,7 +16,7 @@ def test_list_players_invalid_data_returns_500(client, mock_store):
     Test that the API returns a 500 error if the data in the store is invalid.
     """
     # Inject invalid data directly into the mock store's internal structure
-    mock_store._accounts["testuser1"]["players"]["player1"] = {"name": None}
+    mock_store.accounts._accounts["testuser1"]["players"]["player1"] = {"name": None}
     response = client.get("/v1/accounts/testuser1/players")
     assert response.status_code == 500
 
@@ -76,7 +76,7 @@ def test_update_player_preserves_existing_data(client, mock_store):
     """
     # Arrange: Add more data to an existing player in the mock store
     original_stations_url = "https://original.url/stations.json"
-    mock_store._accounts["testuser1"]["players"]["player1"][
+    mock_store.accounts._accounts["testuser1"]["players"]["player1"][
         "stationsUrl"
     ] = original_stations_url
 

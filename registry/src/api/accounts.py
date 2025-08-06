@@ -11,7 +11,7 @@ router = APIRouter()
 async def register_account(id: str, account_data: AccountCreate):
     """Register an account"""
     account_dict = account_data.model_dump(exclude_unset=True)
-    account = store.register_account(id, account_dict)
+    account = store.accounts.register(id, account_dict)
 
     return Account(id=id, name=account.get("name", id.replace("_", " ").title()))
 
@@ -19,4 +19,4 @@ async def register_account(id: str, account_data: AccountCreate):
 @router.get("/accounts", response_model=PaginatedList[Account])
 async def list_accounts(page: int = 1, per_page: int = 10):
     """List all accounts"""
-    return store.get_paginated_accounts(page, per_page)
+    return store.accounts.list(page, per_page)
