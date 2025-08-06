@@ -20,8 +20,6 @@ def create_app():
     app = FastAPI(
         lifespan=lifespan,
         swagger_ui_parameters={"defaultModelsExpandDepth": 0},
-        # Exclude fields with `None` values from API responses globally
-        response_model_exclude_none=True,
     )
 
     app.include_router(api_router, prefix="/v1")

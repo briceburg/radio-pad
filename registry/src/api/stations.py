@@ -9,7 +9,11 @@ from models.station_preset import StationPreset, StationPresetCreate
 router = APIRouter()
 
 
-@router.put("/station-presets/{id}", response_model=StationPreset)
+@router.put(
+    "/station-presets/{id}",
+    response_model=StationPreset,
+    response_model_exclude_none=True,
+)
 async def register_station_preset(
     id: str, preset_data: StationPresetCreate, account_id: Optional[str] = None
 ):
@@ -23,7 +27,11 @@ async def register_station_preset(
     return preset
 
 
-@router.get("/station-presets/{id}", response_model=StationPreset)
+@router.get(
+    "/station-presets/{id}",
+    response_model=StationPreset,
+    response_model_exclude_none=True,
+)
 async def get_station_preset(id: str):
     """Get a single station preset by its ID."""
     preset = store.get_station_preset(id)
@@ -32,7 +40,11 @@ async def get_station_preset(id: str):
     return preset
 
 
-@router.get("/station-presets", response_model=PaginatedList[StationPreset])
+@router.get(
+    "/station-presets",
+    response_model=PaginatedList[StationPreset],
+    response_model_exclude_none=True,
+)
 async def list_station_presets(
     page: int = 1, per_page: int = 10, account_id: Optional[str] = None
 ):
@@ -41,7 +53,5 @@ async def list_station_presets(
     If account_id is provided, it includes global presets and presets
     owned by that account.
     """
-    paginated_presets = store.get_paginated_station_presets(
-        page, per_page, account_id
-    )
+    paginated_presets = store.get_paginated_station_presets(page, per_page, account_id)
     return paginated_presets

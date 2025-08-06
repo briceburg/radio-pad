@@ -29,9 +29,7 @@ class StationPreset(BaseModel):
 
     id: str = Field(..., json_schema_extra={"example": "briceburg"})
     name: str = Field(..., json_schema_extra={"example": "Briceburg Default"})
-    stations: List[Station] 
+    stations: List[Station]
 
     # when a preset is missing an account ID, it is considered a global preset
-    account_id: Optional[str] = Field(
-        None, json_schema_extra={"example": "briceburg"}
-    )
+    account_id: Optional[str] = Field(None, json_schema_extra={"example": "briceburg"})

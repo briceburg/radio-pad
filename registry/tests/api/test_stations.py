@@ -1,8 +1,3 @@
-import pytest
-
-from models.station_preset import StationPreset
-
-
 def test_list_station_presets(client):
     """Test listing global station presets."""
     response = client.get("/v1/station-presets")
@@ -10,7 +5,7 @@ def test_list_station_presets(client):
     data = response.json()
     assert data["total"] == 1  # Only the global 'briceburg' preset
     assert data["items"][0]["id"] == "briceburg"
-    assert data["items"][0]["account_id"] is None
+    assert data["items"][0].get("account_id") is None
 
 
 def test_get_station_preset(client):
@@ -21,6 +16,8 @@ def test_get_station_preset(client):
     assert data["id"] == "briceburg"
     assert data["name"] == "Briceburg"
     assert len(data["stations"]) > 0
+    # Global presets should not have an account_id
+    assert "account_id" not in data
 
 
 def test_get_station_preset_not_found(client):
@@ -103,9 +100,12 @@ def test_list_station_presets_for_account(client):
     assert response.status_code == 200
     data = response.json()
     assert data["total"] == 2  # briceburg (global) + my-preset (custom)
-    ids = {item["id"] for item in data["items"]}
-    assert "briceburg" in ids
-    assert "my-preset" in ids
+    for item in data["items"]:
+        if item["id"] == "briceburg":
+            # Global presets should not have an account_id
+            assert "account_id" not in item
+        elif item["id"] == "my-preset":
+            assert item["account_id"] == "testuser1"
 
     # List presets for testuser2 (should only see global)
     response = client.get("/v1/station-presets?account_id=testuser2")
@@ -113,6 +113,7 @@ def test_list_station_presets_for_account(client):
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["id"] == "briceburg"
+    assert "account_id" not in data["items"][0]
 
 
 def test_register_preset_with_empty_stations(client):

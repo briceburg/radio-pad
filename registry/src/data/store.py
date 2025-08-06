@@ -39,7 +39,9 @@ class DataStore:
                 self._station_presets[preset_id] = StationPreset(
                     id=preset_id,
                     name=preset_id.replace("_", " ").title(),
-                    stations=[Station(title=s["name"], url=s["url"]) for s in stations_data],
+                    stations=[
+                        Station(title=s["name"], url=s["url"]) for s in stations_data
+                    ],
                 )
         logger.info("Loaded %d station presets", len(self._station_presets))
 
@@ -99,9 +101,7 @@ class DataStore:
                 if p.account_id is None or p.account_id == account_id
             ]
         else:
-            items = [
-                p for p in self._station_presets.values() if p.account_id is None
-            ]
+            items = [p for p in self._station_presets.values() if p.account_id is None]
         return self._paginate(items, page, per_page)
 
     def ensure_account(self, account_id: str):
@@ -116,10 +116,12 @@ class DataStore:
         account.update(account_data)
         return account
 
-    def register_player(self, account_id: str, player_id: str, player_data: dict) -> dict:
+    def register_player(
+        self, account_id: str, player_id: str, player_data: dict
+    ) -> dict:
         """Registers or updates a player for a given account."""
         self.ensure_account(account_id)
-        
+
         player = self.get_player(account_id, player_id) or {}
         player.update(player_data)
 
