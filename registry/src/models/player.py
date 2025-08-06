@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator
 class PlayerCreate(BaseModel):
     """
     Request body model for creating/updating a player via the PUT endpoint.
-    The server will provide default station and switchboard URLs if not provided.
+    The Player validator provides default station and switchboard URLs.
     """
 
     name: str = Field(..., json_schema_extra={"example": "Living Room"})

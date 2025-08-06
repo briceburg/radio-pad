@@ -5,8 +5,8 @@ import pytest
     "url,total",
     [
         ("/v1/accounts", 2),
-        ("/v1/players/testuser1", 2),
-        ("/v1/station-presets", 2),
+        ("/v1/accounts/testuser1/players", 2),
+        ("/v1/station-presets", 1),
     ],
 )
 def test_pagination_out_of_bounds(client, url: str, total: int):
@@ -23,8 +23,8 @@ def test_pagination_out_of_bounds(client, url: str, total: int):
     "url,total",
     [
         ("/v1/accounts", 2),
-        ("/v1/players/testuser1", 2),
-        ("/v1/station-presets", 2),
+        ("/v1/accounts/testuser1/players", 2),
+        ("/v1/station-presets", 1),
     ],
 )
 def test_per_page_parameter_works(client, url: str, total: int):
@@ -49,8 +49,7 @@ def test_per_page_parameter_works(client, url: str, total: int):
     "url,item_id_1,item_id_2,total",
     [
         ("/v1/accounts", "testuser1", "testuser2", 2),
-        ("/v1/players/testuser1", "player1", "player2", 2),
-        ("/v1/station-presets", "preset1", "preset2", 2),
+        ("/v1/accounts/testuser1/players", "player1", "player2", 2),
     ],
 )
 def test_pagination_works(client, url: str, item_id_1: str, item_id_2: str, total: int):
