@@ -12,16 +12,13 @@ die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 
 paths=(src/ tests/)
 
-log "🧹 [black] Checking code style..."
-black --check "${paths[@]}" || \
-  die "black failed. use 'black ${paths[*]}' to fix."
+log "🧹 [ruff] Linting (no fixes)..."
+ruff check "${paths[@]}" || die "ruff lint failed. run: ruff check --fix ${paths[*]}"
 
-log "📚 [isort] Checking import order..."
-isort --check --diff "${paths[@]}" || \
-  die "isort failed. use 'isort ${paths[*]}' to fix."
+log "🎨 [ruff] Formatting check..."
+ruff format --check "${paths[@]}" || die "ruff format failed. run: ruff format ${paths[*]}"
 
-log "🧽 [autoflake] Checking for unused imports and variables..."
-autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --recursive "${paths[@]}" || \
-  die "autoflake failed. use 'autoflake -i --remove-all-unused-imports --remove-unused-variables ${paths[*]}' to fix."
+log "🔍 [mypy] Static type checking..."
+mypy src || die "mypy failed."
 
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

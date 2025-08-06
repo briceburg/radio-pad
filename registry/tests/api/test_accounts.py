@@ -1,49 +1,41 @@
-def test_list_accounts(client):
-    response = client.get("/v1/accounts")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/json"
-    data = response.json()
-    assert "items" in data
-    assert "page" in data
-    assert "per_page" in data
-    assert "total" in data
-    assert data["total"] == 2
-    assert isinstance(data["items"], list)
+import pytest
+
+from tests.api._helpers import assert_paginated, get_json, put_json
+
+
+def test_list_accounts(ro_client):
+    data = get_json(ro_client, "/v1/accounts")
+    assert_paginated(data, total=2)
     for account in data["items"]:
-        assert "id" in account
-        assert "name" in account
+        assert "id" in account and "name" in account
 
 
 def test_register_account(client):
     """Test that a new account can be created."""
-    response = client.put("/v1/accounts/new-account", json={"name": "New Account"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "new-account"
-    assert data["name"] == "New Account"
-
-    # Verify with a GET request
-    response = client.get("/v1/accounts")
-    data = response.json()
+    put_json(client, "/v1/accounts/new-account", {"name": "New Account"})
+    data = get_json(client, "/v1/accounts")
     assert data["total"] == 3
     assert "new-account" in [item["id"] for item in data["items"]]
 
 
 def test_update_account(client):
     """Test that an existing account can be updated."""
-    response = client.put("/v1/accounts/testuser1", json={"name": "Updated Name"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "testuser1"
-    assert data["name"] == "Updated Name"
-
-    # Verify with a GET request
-    response = client.get("/v1/accounts")
-    data = response.json()
+    put_json(client, "/v1/accounts/testuser1", {"name": "Updated Name"})
+    data = get_json(client, "/v1/accounts")
     assert data["total"] == 2
-    for item in data["items"]:
-        if item["id"] == "testuser1":
-            assert item["name"] == "Updated Name"
-            break
-    else:
-        assert False, "testuser1 not found in accounts list"
+    assert any(item["id"] == "testuser1" and item["name"] == "Updated Name" for item in data["items"])
+
+
+@pytest.mark.parametrize(
+    "invalid_id",
+    ["Invalid", "has space", "UPPER", "mixedCase", "trailing-", "-leading"],
+)
+def test_account_invalid_id_rejected(client, invalid_id):
+    resp = client.put(f"/v1/accounts/{invalid_id}", json={"name": "Bad"})
+    assert resp.status_code == 422
+
+
+def test_account_partial_update_no_unintended_field_loss(client):
+    """Accounts only have name now; omitting future required fields should 422 (guard)."""
+    resp = client.put("/v1/accounts/another-account", json={})
+    assert resp.status_code == 422

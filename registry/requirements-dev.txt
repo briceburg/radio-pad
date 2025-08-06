@@ -1,6 +1,6 @@
-autoflake
-black
-isort
+ruff
+mypy
 pytest
 starlette
 httpx
+hypothesis

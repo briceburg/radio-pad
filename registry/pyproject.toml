@@ -1,8 +1,36 @@
-[tool.isort]
-profile = "black"
-
 [tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
 markers = [
     "functional: marks tests as functional (requires a running server)",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+  "E","F","I","UP","B","Q","RUF"
+]
+ignore = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+
+[tool.mypy]
+python_version = "3.13"
+plugins = []
+strict = true
+warn_unused_configs = true
+warn_return_any = true
+warn_unreachable = true
+show_error_codes = true
+ignore_missing_imports = true
+allow_redefinition = false
+no_implicit_optional = true
+pretty = true
+exclude = ["venv/", "tmp/"]
 

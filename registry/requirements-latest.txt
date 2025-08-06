@@ -1,4 +1,5 @@
 fastapi
+fastapi-utils[all]
 pydantic
 uvicorn[standard]
 python-multipart

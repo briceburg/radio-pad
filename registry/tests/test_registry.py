@@ -1,10 +1,11 @@
-def test_root(client):
-    response = client.get("/")
-    assert response.status_code == 200
+def test_root_and_healthz(client):
+    # Root should redirect to /docs
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers.get("location") == "/docs"
 
-
-def test_healthz(client):
-    response = client.get("/healthz")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
+    # Health endpoint
+    h = client.get("/healthz")
+    assert h.status_code == 204
+    assert h.content == b""
+    assert h.headers.get("cache-control") == "no-store"
