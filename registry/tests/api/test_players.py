@@ -28,7 +28,7 @@ def test_register_player(client):
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Test Player"
-    assert data["stationsUrl"] == "https://registry.radiopad.dev/v1/stations/briceburg"
+    assert data["stationsUrl"] == "https://registry.radiopad.dev/v1/presets/briceburg"
 
 
 def test_register_player_for_new_account(client):

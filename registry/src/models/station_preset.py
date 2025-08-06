@@ -17,19 +17,32 @@ class Station(BaseModel):
     )
 
 
-class StationPresetCreate(BaseModel):
-    """Request body model for creating/updating a station preset."""
+class StationPresetBase(BaseModel):
+    """Base model for station presets, containing common fields."""
 
     name: str = Field(..., json_schema_extra={"example": "My Favorite Stations"})
+    category: Optional[str] = Field(None, json_schema_extra={"example": "News"})
+    description: Optional[str] = Field(
+        None,
+        json_schema_extra={"example": "A collection of my favorite news stations."},
+    )
+
+
+class StationPresetCreate(StationPresetBase):
+    """Request body model for creating/updating a station preset."""
+
     stations: List[Station]
+    account_id: Optional[str] = Field(None, json_schema_extra={"example": "briceburg"})
 
 
-class StationPreset(BaseModel):
-    """The full station preset model as stored and returned by the API."""
+class StationPresetSummary(StationPresetBase):
+    """A summary of a station preset, excluding the list of stations."""
 
     id: str = Field(..., json_schema_extra={"example": "briceburg"})
-    name: str = Field(..., json_schema_extra={"example": "Briceburg Default"})
-    stations: List[Station]
-
-    # when a preset is missing an account ID, it is considered a global preset
     account_id: Optional[str] = Field(None, json_schema_extra={"example": "briceburg"})
+
+
+class StationPreset(StationPresetSummary):
+    """The full station preset model as stored and returned by the API."""
+
+    stations: List[Station]

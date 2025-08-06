@@ -6,7 +6,7 @@ import pytest
     [
         ("/v1/accounts", 2),
         ("/v1/accounts/testuser1/players", 2),
-        ("/v1/station-presets", 1),
+        ("/v1/presets", 1),
     ],
 )
 def test_pagination_out_of_bounds(client, url: str, total: int):
@@ -24,7 +24,7 @@ def test_pagination_out_of_bounds(client, url: str, total: int):
     [
         ("/v1/accounts", 2),
         ("/v1/accounts/testuser1/players", 2),
-        ("/v1/station-presets", 1),
+        ("/v1/presets", 1),
     ],
 )
 def test_per_page_parameter_works(client, url: str, total: int):

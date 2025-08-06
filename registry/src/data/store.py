@@ -7,7 +7,9 @@ from typing import List, TypeVar
 
 from lib.constants import BASE_DIR
 from lib.logging import logger
+from models.account import Account
 from models.pagination import PaginatedList
+from models.player import Player
 from models.station_preset import Station, StationPreset
 
 T = TypeVar("T")
@@ -66,7 +68,11 @@ class DataStore:
 
     def get_paginated_accounts(self, page: int, per_page: int):
         """Return a paginated list of accounts."""
-        return self._paginate(list(self.accounts.items()), page, per_page)
+        accounts = [
+            Account(id=id, name=account.get("name", id.replace("_", " ").title()))
+            for id, account in self.accounts.items()
+        ]
+        return self._paginate(accounts, page, per_page)
 
     def get_players(self, account_id: str) -> dict:
         """Return a dictionary of players for a given account."""
@@ -79,30 +85,59 @@ class DataStore:
 
     def get_paginated_players(self, account_id: str, page: int, per_page: int):
         """Return a paginated list of players for a given account."""
-        players = self.get_players(account_id)
-        return self._paginate(list(players.items()), page, per_page)
+        players = [
+            Player(id=id, accountId=account_id, **p)
+            for id, p in self.get_players(account_id).items()
+        ]
+        return self._paginate(players, page, per_page)
 
-    def get_station_preset(self, preset_id: str) -> StationPreset | None:
-        """Return a single station preset by its ID."""
-        return self._station_presets.get(preset_id)
+    def get_station_preset(
+        self, preset_id: str, account_id: str | None = None
+    ) -> StationPreset | None:
+        """
+        Return a single station preset by its ID.
+        If account_id is provided, it only returns the preset if it's owned
+        by that account or if it's a global preset.
+        """
+        preset = self._station_presets.get(preset_id)
+        if not preset:
+            return None
+
+        # A global preset is always returned
+        if preset.account_id is None:
+            return preset
+
+        # An account-specific preset is returned only if the account matches
+        if account_id and preset.account_id == account_id:
+            return preset
+
+        return None
 
     def get_paginated_station_presets(
-        self, page: int, per_page: int, account_id: str | None = None
+        self,
+        page: int,
+        per_page: int,
+        account_id: str | None = None,
+        include_globals: bool = False,
     ):
         """
         Return a paginated list of station presets.
-        If account_id is provided, it includes global presets and presets
-        matching the account_id. Otherwise, only global presets are returned.
+        - If account_id is provided, it returns presets for that account.
+        - If include_globals is True, it also includes global presets.
+        - If account_id is None, it returns only global presets.
         """
+        results = []
         if account_id:
-            items = [
-                p
-                for p in self._station_presets.values()
-                if p.account_id is None or p.account_id == account_id
-            ]
-        else:
-            items = [p for p in self._station_presets.values() if p.account_id is None]
-        return self._paginate(items, page, per_page)
+            results.extend(
+                p for p in self._station_presets.values() if p.account_id == account_id
+            )
+
+        if include_globals or not account_id:
+            results.extend(
+                p for p in self._station_presets.values() if p.account_id is None
+            )
+
+        return self._paginate(results, page, per_page)
 
     def ensure_account(self, account_id: str):
         """Ensures an account exists."""
@@ -132,6 +167,9 @@ class DataStore:
         self, preset_id: str, preset_data: dict, account_id: str | None = None
     ) -> StationPreset:
         """Registers or updates a station preset."""
+        if account_id:
+            preset_data["account_id"] = account_id
+
         existing_preset = self.get_station_preset(preset_id)
         if existing_preset:
             # Update existing preset
@@ -141,12 +179,17 @@ class DataStore:
                 existing_preset.stations = [
                     Station(**s) for s in preset_data["stations"]
                 ]
+            if "account_id" in preset_data:
+                existing_preset.account_id = preset_data["account_id"]
+            if "category" in preset_data:
+                existing_preset.category = preset_data["category"]
+            if "description" in preset_data:
+                existing_preset.description = preset_data["description"]
             preset = existing_preset
         else:
             # Create new preset
             preset = StationPreset(
                 id=preset_id,
-                account_id=account_id,
                 **preset_data,
             )
         self._station_presets[preset_id] = preset

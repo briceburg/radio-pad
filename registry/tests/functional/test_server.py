@@ -49,10 +49,10 @@ def test_real_server_omits_none_values():
         }
 
         # Use httpx to make a real HTTP request to the running server
+        preset_data["account_id"] = "testuser1"
         response = httpx.put(
-            f"http://127.0.0.1:8000/v1/station-presets/{preset_id}",
+            f"http://127.0.0.1:8000/v1/accounts/testuser1/presets/{preset_id}",
             json=preset_data,
-            params={"account_id": "testuser1"},
         )
 
         assert response.status_code == 200
