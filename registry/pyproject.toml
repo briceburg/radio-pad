@@ -1,10 +1,12 @@
 [tool.pytest.ini_options]
+cache_dir = "tmp/.pytest_cache"
 pythonpath = ["src", "tests"]
 markers = [
     "functional: marks tests as functional (requires a running server)",
 ]
 
 [tool.ruff]
+cache-dir = "tmp/.ruff_cache"
 line-length = 120
 target-version = "py313"
 
@@ -21,6 +23,7 @@ line-ending = "lf"
 skip-magic-trailing-comma = false
 
 [tool.mypy]
+cache_dir = "tmp/.mypy_cache"
 python_version = "3.13"
 plugins = []
 strict = true

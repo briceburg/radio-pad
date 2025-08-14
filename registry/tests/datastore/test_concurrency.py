@@ -1,13 +1,14 @@
 import pytest
 
-from datastore.backends import JSONFileStore
-from datastore.core import ConcurrencyError, ModelStore
-from models.account import Account
+from datastore.backends import LocalBackend
+from datastore.core import ModelStore
+from datastore.exceptions import ConcurrencyError
+from models import Account
 
 
 def test_merge_upsert_conflict_raises_concurrency_error(tmp_path, monkeypatch):
     """Simulate a write-write race: merge_upsert should pass stale ETag and raise ConcurrencyError."""
-    backend = JSONFileStore(str(tmp_path))
+    backend = LocalBackend(str(tmp_path))
     repo = ModelStore(backend, model=Account, path_template="accounts/{id}")
 
     # Seed initial value

@@ -1,16 +1,15 @@
-from __future__ import annotations
-
 import json
-from typing import Any
+from typing import Any, cast
 
-import botocore
 import boto3
+import botocore
+from botocore.client import BaseClient
 
-from datastore.core.helpers import compute_etag, strip_id
-from lib.types import JsonDoc, PagedResult, ValueWithETag
+from datastore.core import compute_etag, strip_id
+from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
-class S3FileStore:
+class S3Backend:
     """S3-backed ObjectStore implementation.
 
     Notes:
@@ -19,7 +18,7 @@ class S3FileStore:
     - For optimistic concurrency we return/compare backend tokens (VersionId if available else ETag).
     """
 
-    def __init__(self, bucket: str, prefix: str = "", client: boto3.client | None = None) -> None:
+    def __init__(self, bucket: str, prefix: str = "", client: BaseClient | None = None) -> None:
         self.bucket = bucket
         self.prefix = prefix.strip("/")
         self.client = client or boto3.client("s3")
@@ -33,7 +32,8 @@ class S3FileStore:
 
     def _get_head(self, key: str) -> dict[str, Any] | None:
         try:
-            return self.client.head_object(Bucket=self.bucket, Key=key)
+            # boto3 client methods are untyped (Any); cast to the expected mapping
+            return cast(dict[str, Any], self.client.head_object(Bucket=self.bucket, Key=key))
         except botocore.exceptions.ClientError as e:
             code = e.response.get("Error", {}).get("Code")
             if code in ("404", "NotFound"):
@@ -81,7 +81,9 @@ class S3FileStore:
         for k in keys[start:end]:
             # fetch each object
             obj_id = k.split("/")[-1].rsplit(".json", 1)[0]
-            data, _ = self.get(obj_id, *(k[len(self.prefix)+1:].split("/")[:-1] if self.prefix else k.split("/")[:-1]))
+            data, _ = self.get(
+                obj_id, *(k[len(self.prefix) + 1 :].split("/")[:-1] if self.prefix else k.split("/")[:-1])
+            )
             if data is None:
                 continue
             data["id"] = obj_id

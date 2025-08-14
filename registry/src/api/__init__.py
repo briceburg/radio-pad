@@ -1,5 +1,3 @@
-# Package marker for api modules
+from .api import RegistryAPI
 
-from .router import router
-
-__all__ = ["router"]
+__all__ = ["RegistryAPI"]

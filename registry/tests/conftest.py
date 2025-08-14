@@ -6,9 +6,7 @@ from starlette.testclient import TestClient
 
 from datastore import DataStore
 from lib.constants import BASE_DIR
-from models.account import Account
-from models.player import Player
-from models.station_preset import GlobalStationPreset, Station
+from models import Account, GlobalStationPreset, Player, Station
 from registry import create_app
 
 
@@ -61,7 +59,7 @@ def client(mock_store):
     app = create_app()
 
     # Override shared dependency
-    from api.dependencies import get_store
+    from api.types import get_store
 
     app.dependency_overrides[get_store] = lambda: mock_store
     # Prevent lifespan from creating and seeding its own DataStore
@@ -90,7 +88,7 @@ def ro_mock_store(unit_tests_root: Path):
 def ro_client(ro_mock_store):
     """Session-scoped TestClient bound to the read-only store."""
     app = create_app()
-    from api.dependencies import get_store
+    from api.types import get_store
 
     app.dependency_overrides[get_store] = lambda: ro_mock_store
     # Prevent lifespan seeding; use our seeded read-only store

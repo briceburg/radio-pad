@@ -3,10 +3,9 @@ from __future__ import annotations
 from string import Formatter
 from typing import Any, Protocol, Self
 
-from datastore.core.exceptions import ConcurrencyError
-from datastore.core.interfaces import ObjectStore
-from datastore.types import PathParams
-from models.pagination import PaginatedList
+from ..core import ObjectStore
+from ..exceptions import ConcurrencyError
+from ..types import PagedResult, PathParams
 
 
 class ModelWithId(Protocol):
@@ -108,9 +107,10 @@ class ModelStore[T: ModelWithId]:
             base.update({k: path_params[k] for k in self._required_keys})
         return self._model.model_validate({**base, **payload})
 
-    def list(self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10) -> PaginatedList[T]:
+    def list(self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10) -> PagedResult[T]:
         comps = self._dir_components(path_params=path_params)
         items, total = self._backend.list(*comps, page=page, per_page=per_page)
+
         param_vals = {k: path_params[k] for k in self._required_keys} if path_params else {}
         reserved = self._reserved_keys
         models: list[T] = []
@@ -120,7 +120,8 @@ class ModelStore[T: ModelWithId]:
             base: dict[str, Any] = {"id": file_id, **param_vals}
             models.append(self._model.model_validate({**base, **payload}))
 
-        return PaginatedList.from_paged(models, total=total, page=page, per_page=per_page)
+        # Return internal transport shape: (items, total_count)
+        return models, total
 
     def save(self, model_obj: T, *, path_params: PathParams | None = None) -> T:
         if self._required_keys and path_params is None:

@@ -1,8 +1,8 @@
-from __future__ import annotations
-
 import hashlib
 import json
 from typing import Any
+
+# TODO: bake these into the model_store?
 
 
 def canonical_json(data: dict[str, Any]) -> str:

@@ -1,12 +1,16 @@
 from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, Path, Query, Request
+from pydantic import Field
 
 from datastore import DataStore
-from lib.types import PageNumber, Slug
-from models.pagination import PaginationParams
+from lib.constants import MAX_PER_PAGE
+from lib.types import Slug
 
-MAX_PER_PAGE = 100
+from .models import PaginationParams
+
+type PageNumber = Annotated[int, Field(ge=1, description="Page number (>=1)")]
+"""1-based page number (>= 1)."""
 
 
 def get_store(request: Request) -> DataStore:
@@ -16,10 +20,6 @@ def get_store(request: Request) -> DataStore:
     return cast(DataStore, ds)
 
 
-# Typed alias for injecting the DataStore (easy to override in tests via get_store)
-DS = Annotated[DataStore, Depends(get_store)]
-
-
 def pagination(
     page: PageNumber = Query(1, description="Page number (>=1)"),
     per_page: int = Query(10, ge=1, le=MAX_PER_PAGE, description="Items per page (1-100)"),
@@ -27,23 +27,8 @@ def pagination(
     return PaginationParams(page=page, per_page=per_page)
 
 
-# Annotated alias for pagination dependency
+DS = Annotated[DataStore, Depends(get_store)]
 PageParams = Annotated[PaginationParams, Depends(pagination)]
-
-
-# Common path param aliases
 AccountId = Annotated[Slug, Path(..., description="Account ID (slug)")]
 PlayerId = Annotated[Slug, Path(..., description="Player ID (slug)")]
 PresetId = Annotated[Slug, Path(..., description="Preset ID (slug)")]
-
-
-__all__ = [
-    "DS",
-    "MAX_PER_PAGE",
-    "AccountId",
-    "PageParams",
-    "PlayerId",
-    "PresetId",
-    "get_store",
-    "pagination",
-]

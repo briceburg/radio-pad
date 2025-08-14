@@ -1,11 +1,13 @@
 from fastapi import APIRouter
 
-from api.dependencies import DS, AccountId, PageParams
-from api.errors import NotFoundError
-from api.responses import ERROR_404, ERROR_409
-from models import Account, AccountCreate, PaginatedList
+from models import Account, AccountCreate
 
-router = APIRouter(prefix="/accounts", responses=ERROR_404)
+from ..exceptions import NotFoundError
+from ..models import PaginatedList
+from ..responses import ERROR_409
+from ..types import DS, AccountId, PageParams
+
+router = APIRouter(prefix="/accounts")
 
 
 @router.put("/{account_id}", response_model=Account, responses=ERROR_409)
@@ -36,5 +38,5 @@ async def list_accounts(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[Account]:
-    pl = ds.accounts.list(page=paging.page, per_page=paging.per_page)
-    return pl
+    items, total = ds.accounts.list(page=paging.page, per_page=paging.per_page)
+    return PaginatedList.from_paged(items, total=total, page=paging.page, per_page=paging.per_page)

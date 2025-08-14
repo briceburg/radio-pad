@@ -38,8 +38,8 @@ def test_custom_seed_idempotency(tmp_path, monkeypatch):
     (seed_dir / "presets" / "jazz.json").write_text(json.dumps({"name": "Jazz", "stations": []}))
 
     data_dir = tmp_path / "data"
-    monkeypatch.setenv("DATA_PATH", str(data_dir))
-    monkeypatch.setenv("SEED_PATH", str(seed_dir))
+    monkeypatch.setenv("REGISTRY_PATH_DATA", str(data_dir))
+    monkeypatch.setenv("REGISTRY_PATH_SEED", str(seed_dir))
 
     app = create_app()
     with TestClient(app) as client:

@@ -13,7 +13,7 @@ from lib.constants import BASE_DIR
 
 
 def run_server(data_path: str, host: str, port: int):
-    os.environ["DATA_PATH"] = data_path
+    os.environ["REGISTRY_PATH_DATA"] = data_path
     uvicorn.run("registry:app", host=host, port=port, log_level="warning")
 
 

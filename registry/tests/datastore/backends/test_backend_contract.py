@@ -8,26 +8,27 @@ import pytest
 def object_store(request, tmp_path):
     """Parameterized backend fixture providing a compatible ObjectStore.
 
-    - json: JSONFileStore rooted at a temporary directory
-    - s3: S3FileStore with moto-backed S3 bucket (versioning enabled)
+    - json: LocalBackend rooted at a temporary directory
+    - s3: S3Backend with moto-backed S3 bucket (versioning enabled)
     """
     if request.param == "json":
-        from datastore.backends.json_file_store import JSONFileStore
+        from datastore.backends.local import LocalBackend
 
-        store = JSONFileStore(str(tmp_path))
-        yield store
+        backend = LocalBackend(str(tmp_path))
+        yield backend
     else:
         pytest.importorskip("moto")
         from moto import mock_aws  # type: ignore
-        from datastore.backends.s3_store import S3FileStore
+
+        from datastore.backends.s3 import S3Backend
 
         with mock_aws():
             client = boto3.client("s3", region_name="us-east-1")
             bucket = "contract-tests"
             client.create_bucket(Bucket=bucket)
             client.put_bucket_versioning(Bucket=bucket, VersioningConfiguration={"Status": "Enabled"})
-            store = S3FileStore(bucket=bucket, prefix="contract", client=client)
-            yield store
+            backend = S3Backend(bucket=bucket, prefix="contract", client=client)
+            yield backend
 
 
 def test_contract_round_trip_and_id_strip(object_store):

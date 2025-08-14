@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+cd "$PROJECT_ROOT"
+find src tests -type d -name "__pycache__" -exec rm -rf {} +
+find src tests -type f -name "*.pyc" -exec rm -f {} +
+rm -rf "$PROJECT_ROOT/tmp"

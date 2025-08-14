@@ -1,6 +1,6 @@
 from typing import Any
 
-from models import ErrorDetail
+from .models import ErrorDetail
 
 # Reusable error response specs
 ERROR_404: dict[int | str, dict[str, Any]] = {

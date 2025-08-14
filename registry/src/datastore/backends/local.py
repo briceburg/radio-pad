@@ -1,16 +1,14 @@
-from __future__ import annotations
-
 import json
 import os
 from pathlib import Path
 from typing import Any
 
-from datastore.core.helpers import compute_etag, strip_id
-from lib.types import JsonDoc, PagedResult, ValueWithETag
+from datastore.core import compute_etag, strip_id
+from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
-class JSONFileStore:
-    """A file-based store for JSON data."""
+class LocalBackend:
+    """Local Filesystem based ObjectStore implementation."""
 
     def __init__(self, base_path: str) -> None:
         self.base_path = Path(base_path)

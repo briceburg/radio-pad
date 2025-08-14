@@ -1,17 +1,20 @@
-from __future__ import annotations
+from collections.abc import Mapping
+from typing import Any
 
-# This module has been consolidated into lib.types.
-# Import the public types from lib and re-export them for convenience.
-from lib.types import (
-    ItemId,
-    JsonDoc,
-    PathParams,
-    PathTemplate,
-)
+type ETag = str
+"""Opaque entity tag used for optimistic concurrency (HTTP-style ETag)."""
 
-__all__ = [
-    "ItemId",
-    "JsonDoc",
-    "PathParams",
-    "PathTemplate",
-]
+type JsonDoc = dict[str, Any]
+"""Opaque JSON object as stored at rest (no reserved fields like 'id')."""
+
+
+type PathParams = Mapping[str, str]
+"""Mapping of required path parameters extracted from a path template (e.g., {'account_id': 'a1'})."""
+
+type PagedResult[T] = tuple[list[T], int]
+"""Low-level page slice returned by stores: (items, total_count).
+Use models.PaginatedList for API responses; this is an internal transport shape.
+"""
+
+type ValueWithETag[T] = tuple[T | None, ETag | None]
+"""Pair (value, etag) as returned by ObjectStore.get; both None when the object doesn't exist."""

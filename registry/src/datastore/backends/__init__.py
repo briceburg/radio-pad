@@ -1,4 +1,4 @@
-from .json_file_store import JSONFileStore
-from .s3_store import S3FileStore
+from .local import LocalBackend
+from .s3 import S3Backend
 
-__all__ = ["JSONFileStore", "S3FileStore"]
+__all__ = ["LocalBackend", "S3Backend"]

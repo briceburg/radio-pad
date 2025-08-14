@@ -1,20 +1,17 @@
-import os
-
 import boto3
 import pytest
 
 from datastore import DataStore
 
-
 pytest.importorskip("moto")
-from moto import mock_aws  # type: ignore  # noqa: E402
+from moto import mock_aws  # type: ignore
 
 
 @pytest.fixture()
 def s3_env(monkeypatch):
-    monkeypatch.setenv("DATA_BACKEND", "s3")
-    monkeypatch.setenv("S3_BUCKET", "test-bucket")
-    monkeypatch.setenv("S3_PREFIX", "it")
+    monkeypatch.setenv("REGISTRY_BACKEND", "s3")
+    monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", "test-bucket")
+    monkeypatch.setenv("REGISTRY_BACKEND_S3_PREFIX", "it")
     yield
 
 
@@ -27,7 +24,7 @@ def test_s3_save_noop_with_versioning_keeps_version_id(s3_env):
         s3.put_bucket_versioning(Bucket="test-bucket", VersioningConfiguration={"Status": "Enabled"})
 
         ds = DataStore()
-        backend = ds.backend  # S3FileStore via DATA_BACKEND env
+        backend = ds.backend
 
         # Initial write
         backend.save("alpha", {"x": 1}, "no-op")

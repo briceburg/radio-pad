@@ -2,7 +2,7 @@ import pytest
 from fastapi import status
 from fastapi.routing import APIRoute
 
-from models.pagination import PaginatedList
+from api.models.pagination import PaginatedList
 from tests.api._helpers import get_json
 
 EXPECTED_PAGINATED_ENDPOINTS = {
