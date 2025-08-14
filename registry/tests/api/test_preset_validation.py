@@ -1,7 +1,5 @@
 from http import HTTPStatus
 
-from tests.api._helpers import put_json
-
 
 def test_preset_rejects_duplicate_station_names(client):
     payload = {

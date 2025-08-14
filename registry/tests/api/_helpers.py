@@ -1,15 +1,13 @@
-from typing import Any
-
 # Common slug cases reused across tests
 INVALID_SLUGS = [
-    "Invalid",      # uppercase first letter
-    "has space",    # whitespace
-    "UPPER",        # all caps
-    "mixedCase",    # camel/mixed
-    "trailing-",    # trailing dash
-    "-leading",     # leading dash
-    "bad_id",       # underscore
-    "bad--id",      # double dash
+    "Invalid",  # uppercase first letter
+    "has space",  # whitespace
+    "UPPER",  # all caps
+    "mixedCase",  # camel/mixed
+    "trailing-",  # trailing dash
+    "-leading",  # leading dash
+    "bad_id",  # underscore
+    "bad--id",  # double dash
 ]
 
 VALID_SLUG_EDGE_CASES = [

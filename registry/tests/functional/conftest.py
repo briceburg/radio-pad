@@ -70,7 +70,7 @@ def functional_client(functional_tests_root: Path):
             server_process.terminate()
             server_process.join(timeout=2)
         if server_process.is_alive():
-            # Fallback to kill if terminate didn’t stop it promptly
+            # Fallback to kill if terminate didn't stop it promptly
             server_process.kill()
             server_process.join(timeout=2)
         if functional_data.exists():

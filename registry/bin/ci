@@ -12,13 +12,13 @@ die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 
 paths=(src/ tests/)
 
-log "🧹 [ruff] Linting (no fixes)..."
-ruff check "${paths[@]}" || die "ruff lint failed. run: ruff check --fix ${paths[*]}"
+log "🔍 [mypy] Static type checking..."
+mypy src || die "mypy failed."
 
 log "🎨 [ruff] Formatting check..."
 ruff format --check "${paths[@]}" || die "ruff format failed. run: ruff format ${paths[*]}"
 
-log "🔍 [mypy] Static type checking..."
-mypy src || die "mypy failed."
+log "🧹 [ruff] Linting (no fixes)..."
+ruff check "${paths[@]}" || die "ruff lint failed. run: ruff check --fix ${paths[*]}"
 
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

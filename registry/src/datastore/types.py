@@ -4,14 +4,14 @@ from __future__ import annotations
 # Import the public types from lib and re-export them for convenience.
 from lib.types import (
     ItemId,
+    JsonDoc,
     PathParams,
     PathTemplate,
-    JsonDoc,
 )
 
 __all__ = [
-    "PathParams",
-    "JsonDoc",
     "ItemId",
+    "JsonDoc",
+    "PathParams",
     "PathTemplate",
 ]

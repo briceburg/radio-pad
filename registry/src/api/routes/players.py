@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from api.dependencies import DS, AccountId, PlayerId, PageParams
+from api.dependencies import DS, AccountId, PageParams, PlayerId
 from api.errors import NotFoundError
 from api.responses import ERROR_404, ERROR_409
 from models import Account, PaginatedList, Player, PlayerCreate

@@ -1,9 +1,8 @@
 import pytest
 
-from datastore.core import ModelStore
 from datastore.backends import JSONFileStore
+from datastore.core import ConcurrencyError, ModelStore
 from models.account import Account
-from datastore.core import ConcurrencyError
 
 
 def test_merge_upsert_conflict_raises_concurrency_error(tmp_path, monkeypatch):

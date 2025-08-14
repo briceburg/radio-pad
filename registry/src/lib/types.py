@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, NewType, TypeVar, Annotated
+from collections.abc import Mapping
+from typing import Annotated, Any, NewType, TypeVar
+
 from pydantic import Field
+
 from lib.constants import SLUG_PATTERN
 
 T = TypeVar("T")
@@ -22,7 +25,7 @@ type ETag = str
 """Opaque entity tag used for optimistic concurrency (HTTP-style ETag)."""
 
 type ValueWithETag[T] = tuple[T | None, ETag | None]
-"""Pair (value, etag) as returned by ObjectStore.get; both None when the object doesn’t exist."""
+"""Pair (value, etag) as returned by ObjectStore.get; both None when the object doesn't exist."""
 
 type PathParams = Mapping[str, str]
 """Mapping of required path parameters extracted from a path template (e.g., {'account_id': 'a1'})."""
@@ -42,21 +45,28 @@ PathTemplate.__doc__ = (
 )
 
 __all__ = [
-    "PagedResult",
     "ETag",
-    "ValueWithETag",
-    "PathParams",
-    "JsonDoc",
     "ItemId",
-    "PathTemplate",
-    # Constrained types
-    "Slug",
-    "WsUrl",
+    "JsonDoc",
     "PageNumber",
+    "PagedResult",
+    "PathParams",
+    "PathTemplate",
+    "Slug",
+    "ValueWithETag",
+    "WsUrl",
 ]
 
 # Constrained types for Pydantic models and FastAPI params
-type Slug = Annotated[str, Field(pattern=SLUG_PATTERN, min_length=1, max_length=64, description="Slug: lowercase letters, numbers, hyphens")]
+type Slug = Annotated[
+    str,
+    Field(
+        pattern=SLUG_PATTERN,
+        min_length=1,
+        max_length=64,
+        description="Slug: lowercase letters, numbers, hyphens",
+    ),
+]
 """Lowercase slug: letters, numbers, and single hyphens (no leading/trailing)."""
 
 type WsUrl = Annotated[str, Field(pattern=r"^(ws|wss)://.+$", description="WebSocket URL (ws:// or wss://)")]

@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 
@@ -27,6 +26,7 @@ def _seed_store(ds: DataStore) -> None:
             stations=[Station(name="WWOZ", url="https://www.wwoz.org/listen/hi")],
         )
     )
+
 
 @pytest.fixture(scope="session")
 def unit_tests_root() -> Path:
@@ -91,6 +91,7 @@ def ro_client(ro_mock_store):
     """Session-scoped TestClient bound to the read-only store."""
     app = create_app()
     from api.dependencies import get_store
+
     app.dependency_overrides[get_store] = lambda: ro_mock_store
     # Prevent lifespan seeding; use our seeded read-only store
     app.state.store = ro_mock_store

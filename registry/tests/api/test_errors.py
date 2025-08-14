@@ -1,7 +1,9 @@
 from http import HTTPStatus
 
 from starlette.testclient import TestClient
+
 from models import PlayerCreate
+
 
 def test_error_detail_shape_for_not_found(client: TestClient):
     # Non-existent account
@@ -19,6 +21,7 @@ def test_error_detail_shape_for_not_found(client: TestClient):
     body2 = r2.json()
     assert body2["code"] == "not_found"
     assert body2["details"]["player_id"] == "missing-player"
+
 
 def test_conflict_error_shape_and_status(client: TestClient):
     # Create a player

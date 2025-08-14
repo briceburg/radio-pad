@@ -1,13 +1,12 @@
 import pytest
 
 from tests.api._helpers import (
+    INVALID_SLUGS,
+    VALID_ACCOUNT_ITEM_SLUG_PAIRS,
     assert_item_fields,
     assert_paginated,
     get_json,
     put_json,
-    INVALID_SLUGS,
-    VALID_SLUG_EDGE_CASES,
-    VALID_ACCOUNT_ITEM_SLUG_PAIRS,
 )
 
 
@@ -127,6 +126,3 @@ def test_player_valid_slug_edge_cases(client, account_id, player_id):
     data = resp.json()
     assert data["id"] == player_id
     assert data["account_id"] == account_id
-
-
-    

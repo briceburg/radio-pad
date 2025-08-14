@@ -3,8 +3,8 @@ from __future__ import annotations
 from string import Formatter
 from typing import Any, Protocol, Self
 
-from datastore.core.interfaces import ObjectStore
 from datastore.core.exceptions import ConcurrencyError
+from datastore.core.interfaces import ObjectStore
 from datastore.types import PathParams
 from models.pagination import PaginatedList
 
@@ -119,7 +119,8 @@ class ModelStore[T: ModelWithId]:
             payload = {k: v for k, v in item.items() if k not in reserved}
             base: dict[str, Any] = {"id": file_id, **param_vals}
             models.append(self._model.model_validate({**base, **payload}))
-        return PaginatedList(items=models, total=total, page=page, per_page=per_page)
+
+        return PaginatedList.from_paged(models, total=total, page=page, per_page=per_page)
 
     def save(self, model_obj: T, *, path_params: PathParams | None = None) -> T:
         if self._required_keys and path_params is None:

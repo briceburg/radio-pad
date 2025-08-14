@@ -47,14 +47,11 @@ class DataStore:
 
 
 __all__ = [
-    "DataStore",
-    # Core abstractions
-    "ModelStore",
-    # Backends
-    "JSONFileStore",
-    # Domain stores
-    "Accounts",
-    "Players",
-    "GlobalPresets",
     "AccountPresets",
+    "Accounts",
+    "DataStore",
+    "GlobalPresets",
+    "JSONFileStore",
+    "ModelStore",
+    "Players",
 ]

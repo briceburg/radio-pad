@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
 from typing import Any
-from lib.types import JsonDoc, PagedResult, ValueWithETag
+
 from datastore.core.helpers import compute_etag, strip_id
+from lib.types import JsonDoc, PagedResult, ValueWithETag
 
 
 class JSONFileStore:

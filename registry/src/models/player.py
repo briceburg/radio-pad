@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from lib.types import Slug, WsUrl
 

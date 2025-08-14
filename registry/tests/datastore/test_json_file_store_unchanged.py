@@ -1,6 +1,4 @@
-import json
 from pathlib import Path
-from time import sleep
 
 from datastore.backends.json_file_store import JSONFileStore
 

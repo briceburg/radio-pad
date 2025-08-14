@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from api.dependencies import DS, AccountId, PageParams
 from api.errors import NotFoundError

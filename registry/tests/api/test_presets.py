@@ -1,13 +1,13 @@
 import pytest
 
 from tests.api._helpers import (
+    INVALID_SLUGS,
+    VALID_ACCOUNT_ITEM_SLUG_PAIRS,
+    VALID_SLUG_EDGE_CASES,
     assert_item_fields,
     assert_paginated,
     get_json,
     put_json,
-    INVALID_SLUGS,
-    VALID_SLUG_EDGE_CASES,
-    VALID_ACCOUNT_ITEM_SLUG_PAIRS,
 )
 
 # -------------------- Global Presets --------------------
@@ -185,9 +185,7 @@ def test_preset_create_validation_failures(client, url_template, body):
 """Positive edge-case slug acceptance across both global and account scopes."""
 
 # Build a combined parameter set for both scopes to reduce duplication
-EDGE_CASE_PARAMS = [
-    ("/v1/presets/{preset_id}", {}, preset_id) for preset_id in VALID_SLUG_EDGE_CASES
-] + [
+EDGE_CASE_PARAMS = [("/v1/presets/{preset_id}", {}, preset_id) for preset_id in VALID_SLUG_EDGE_CASES] + [
     (
         "/v1/accounts/{account_id}/presets/{preset_id}",
         {"account_id": account_id},

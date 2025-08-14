@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from api.dependencies import DS, AccountId, PresetId, PageParams
+from api.dependencies import DS, AccountId, PageParams, PresetId
 from api.errors import NotFoundError
 from api.responses import ERROR_404, ERROR_409
 from models import (
@@ -15,7 +15,12 @@ account_presets = APIRouter(prefix="/accounts/{account_id}/presets", responses=E
 global_presets = APIRouter(prefix="/presets", responses=ERROR_404)
 
 
-@account_presets.put("/{preset_id}", response_model=AccountStationPreset, response_model_exclude_none=True, responses=ERROR_409)
+@account_presets.put(
+    "/{preset_id}",
+    response_model=AccountStationPreset,
+    response_model_exclude_none=True,
+    responses=ERROR_409,
+)
 async def register_account_preset(
     account_id: AccountId,
     preset_id: PresetId,
@@ -39,8 +44,17 @@ async def get_account_preset(
     return preset
 
 
-@account_presets.get("", response_model=PaginatedList[AccountStationPreset], response_model_exclude_none=True, include_in_schema=False)
-@account_presets.get("/", response_model=PaginatedList[AccountStationPreset], response_model_exclude_none=True)
+@account_presets.get(
+    "",
+    response_model=PaginatedList[AccountStationPreset],
+    response_model_exclude_none=True,
+    include_in_schema=False,
+)
+@account_presets.get(
+    "/",
+    response_model=PaginatedList[AccountStationPreset],
+    response_model_exclude_none=True,
+)
 async def list_account_presets(
     account_id: AccountId,
     ds: DS,
@@ -50,7 +64,12 @@ async def list_account_presets(
     return pl
 
 
-@global_presets.put("/{preset_id}", response_model=GlobalStationPreset, response_model_exclude_none=True, responses=ERROR_409)
+@global_presets.put(
+    "/{preset_id}",
+    response_model=GlobalStationPreset,
+    response_model_exclude_none=True,
+    responses=ERROR_409,
+)
 async def register_global_preset(
     preset_id: PresetId,
     ds: DS,
@@ -72,8 +91,17 @@ async def get_global_preset(
     return preset
 
 
-@global_presets.get("", response_model=PaginatedList[GlobalStationPreset], response_model_exclude_none=True, include_in_schema=False)
-@global_presets.get("/", response_model=PaginatedList[GlobalStationPreset], response_model_exclude_none=True)
+@global_presets.get(
+    "",
+    response_model=PaginatedList[GlobalStationPreset],
+    response_model_exclude_none=True,
+    include_in_schema=False,
+)
+@global_presets.get(
+    "/",
+    response_model=PaginatedList[GlobalStationPreset],
+    response_model_exclude_none=True,
+)
 async def list_global_presets(
     ds: DS,
     paging: PageParams,

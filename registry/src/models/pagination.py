@@ -1,7 +1,7 @@
 import math
 from typing import TypeVar
 
-from pydantic import BaseModel, model_validator, Field
+from pydantic import BaseModel, Field, model_validator
 
 T = TypeVar("T")
 
@@ -49,16 +49,20 @@ class PaginatedList[T](BaseModel):
         first = _qs(1)
         last = _qs(last_page)
         # prev: if out-of-bounds high, point to last page; else normal prev when available
+        prev: str | None
         if self.page > last_page:
             prev = _qs(last_page)
+        elif self.prev_page:
+            prev = _qs(self.prev_page)
         else:
-            prev = _qs(self.prev_page) if self.prev_page else None
+            prev = None
         # next: only when within bounds and not on last
-        nxt = _qs(self.page + 1) if self.page < last_page else None
+        nxt: str | None = _qs(self.page + 1) if self.page < last_page else None
 
         self.links = PaginationLinks(first=first, last=last, prev=prev, next=nxt)
         return self
 
     @classmethod
     def from_paged(cls, items: list[T], total: int, page: int, per_page: int) -> "PaginatedList[T]":
-        return cls(items=items, total=total, page=page, per_page=per_page)
+        # Use pydantic's model_validate to avoid stricter mypy signature checks
+        return cls.model_validate({"items": items, "total": total, "page": page, "per_page": per_page})

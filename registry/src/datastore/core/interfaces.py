@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 
-from lib.types import JsonDoc, ValueWithETag, PagedResult
+from lib.types import JsonDoc, PagedResult, ValueWithETag
 
 
 class ObjectStore(Protocol):

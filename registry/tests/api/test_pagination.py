@@ -1,13 +1,9 @@
 import pytest
 from fastapi import status
-from urllib.parse import urlparse, parse_qs
-import math
-
-from models.pagination import PaginatedList
-from tests.api._helpers import get_json, put_json, get_response
-from typing import get_origin
 from fastapi.routing import APIRoute
 
+from models.pagination import PaginatedList
+from tests.api._helpers import get_json
 
 EXPECTED_PAGINATED_ENDPOINTS = {
     "/v1/accounts",
@@ -29,7 +25,13 @@ def _discover_paginated_paths(app) -> set[str]:
         if isinstance(r, APIRoute) and "GET" in (r.methods or set()):
             rm = getattr(r, "response_model", None)
             name = getattr(rm, "__name__", str(rm)) if rm else ""
-            if rm and ("PaginatedList" in name or getattr(rm, "model_fields", None) and {"items","total","page","per_page"}.issubset(rm.model_fields.keys())):
+            if rm and (
+                "PaginatedList" in name
+                or (
+                    getattr(rm, "model_fields", None)
+                    and {"items", "total", "page", "per_page"}.issubset(rm.model_fields.keys())
+                )
+            ):
                 discovered.add(_normalize_path(r.path))
     return discovered
 
@@ -187,9 +189,6 @@ def test_pagination_invalid_values_rejected(ro_client, raw_page, raw_per):
     assert detail
 
 
-    
-
-
 @pytest.mark.parametrize(
     "url,total",
     [
@@ -212,7 +211,6 @@ def test_link_object_out_of_bounds_single_page(ro_client, url: str, total: int):
 def test_detect_new_paginated_endpoints(client):
     discovered = _discover_paginated_paths(client.app)
     extras = discovered - EXPECTED_PAGINATED_ENDPOINTS
-    assert not extras, (
-        "New paginated endpoints detected; please add them to pagination tests: "
-        + ", ".join(sorted(extras))
+    assert not extras, "New paginated endpoints detected; please add them to pagination tests: " + ", ".join(
+        sorted(extras)
     )

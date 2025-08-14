@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from lib.constants import BASE_DIR
 
 
