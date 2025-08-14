@@ -113,11 +113,9 @@ class S3FileStore:
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
         key = self._key_for(object_id, *path_parts)
-        try:
-            self.client.delete_object(Bucket=self.bucket, Key=key)
-        except botocore.exceptions.ClientError as e:
-            code = e.response.get("Error", {}).get("Code")
-            if code in ("404", "NotFound"):
-                return False
-            raise
+        # Check existence first to provide consistent semantics with filesystem backend
+        head = self._get_head(key)
+        if head is None:
+            return False
+        self.client.delete_object(Bucket=self.bucket, Key=key)
         return True
