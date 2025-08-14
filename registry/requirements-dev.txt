@@ -1,6 +1,7 @@
-ruff
-mypy
-pytest
-starlette
 httpx
 hypothesis
+moto[s3]
+mypy
+pytest
+ruff
+starlette

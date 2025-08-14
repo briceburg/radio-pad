@@ -1,8 +1,9 @@
 from pathlib import Path
+import os
 
 from lib import BASE_DIR, logger
 
-from .backends import JSONFileStore
+from .backends import JSONFileStore, S3FileStore
 from .core import ModelStore
 from .stores.accounts import Accounts
 from .stores.players import Players
@@ -16,7 +17,16 @@ class DataStore:
         # Provide sensible defaults so tests can construct without args
         self.data_path = Path(data_path) if data_path else BASE_DIR / "tmp" / "data"
         self.seed_path = Path(seed_path) if seed_path else BASE_DIR / "data"
-        self.backend = JSONFileStore(str(self.data_path))
+        # Backend selection via env var: DATA_BACKEND in ("json", "s3").
+        backend_choice = os.environ.get("DATA_BACKEND", "json").lower()
+        if backend_choice == "s3":
+            bucket = os.environ.get("S3_BUCKET")
+            prefix = os.environ.get("S3_PREFIX", "")
+            if not bucket:
+                raise ValueError("S3 backend selected but S3_BUCKET is not set")
+            self.backend = S3FileStore(bucket=bucket, prefix=prefix)
+        else:
+            self.backend = JSONFileStore(str(self.data_path))
         self.accounts = Accounts(self.backend)
         self.players = Players(self.backend)
         self.global_presets = GlobalPresets(self.backend)
