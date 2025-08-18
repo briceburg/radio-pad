@@ -22,8 +22,8 @@ def test_id_not_serialized_on_disk(backend: LocalBackend, temp_data_path: Path):
     with open(file_path) as f:
         on_disk = json.load(f)
     assert "id" not in on_disk
-    items, total = backend.list(*path_parts)
-    assert total == 2
+    items = backend.list(*path_parts)
+    assert len(items) == 2
     assert sorted([i["id"] for i in items]) == ["alpha", "beta"]
 
 

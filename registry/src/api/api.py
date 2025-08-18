@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handles application startup and shutdown events."""
     if not hasattr(app.state, "store"):
         ds = DataStore(
-            data_path=os.environ.get("REGISTRY_PATH_DATA", str(BASE_DIR / "tmp" / "data")),
-            seed_path=os.environ.get("REGISTRY_PATH_SEED", str(BASE_DIR / "data")),
+            data_path=os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data")),
+            seed_path=os.environ.get("REGISTRY_SEED_PATH", str(BASE_DIR / "data")),
         )
         ds.seed()
         app.state.store = ds  # expose for dependencies

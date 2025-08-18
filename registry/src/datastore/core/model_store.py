@@ -1,20 +1,12 @@
 from __future__ import annotations
 
 from string import Formatter
-from typing import Any, Protocol, Self
+from typing import Any
 
 from ..core import ObjectStore
 from ..exceptions import ConcurrencyError
 from ..types import PagedResult, PathParams
-
-
-class ModelWithId(Protocol):
-    id: str
-
-    def model_dump(self, *, mode: str = "json") -> dict[str, Any]: ...
-
-    @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> Self: ...
+from .interfaces import ModelWithId
 
 
 class ModelStore[T: ModelWithId]:
@@ -109,7 +101,7 @@ class ModelStore[T: ModelWithId]:
 
     def list(self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10) -> PagedResult[T]:
         comps = self._dir_components(path_params=path_params)
-        items, total = self._backend.list(*comps, page=page, per_page=per_page)
+        items = self._backend.list(*comps, page=page, per_page=per_page)
 
         param_vals = {k: path_params[k] for k in self._required_keys} if path_params else {}
         reserved = self._reserved_keys
@@ -120,8 +112,7 @@ class ModelStore[T: ModelWithId]:
             base: dict[str, Any] = {"id": file_id, **param_vals}
             models.append(self._model.model_validate({**base, **payload}))
 
-        # Return internal transport shape: (items, total_count)
-        return models, total
+        return models
 
     def save(self, model_obj: T, *, path_params: PathParams | None = None) -> T:
         if self._required_keys and path_params is None:
@@ -148,7 +139,7 @@ class ModelStore[T: ModelWithId]:
         data = {k: v for k, v in model.model_dump(mode="json").items() if k not in reserved}
         try:
             self._backend.save(object_id, data, *comps, if_match=version if current is not None else None)
-        except ValueError as e:  # backend conflict (e.g., ETag mismatch)
+        except ConcurrencyError as e:  # backend conflict (e.g., ETag mismatch)
             raise ConcurrencyError("Conditional save failed") from e
         return model
 

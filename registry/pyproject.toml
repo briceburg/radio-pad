@@ -1,8 +1,10 @@
 [tool.pytest.ini_options]
+addopts = "-m 'not performance'"
 cache_dir = "tmp/.pytest_cache"
 pythonpath = ["src", "tests"]
 markers = [
     "functional: marks tests as functional (requires a running server)",
+    "performance: marks tests as performance-related",
 ]
 
 [tool.ruff]

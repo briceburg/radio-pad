@@ -38,8 +38,8 @@ def test_custom_seed_idempotency(tmp_path, monkeypatch):
     (seed_dir / "presets" / "jazz.json").write_text(json.dumps({"name": "Jazz", "stations": []}))
 
     data_dir = tmp_path / "data"
-    monkeypatch.setenv("REGISTRY_PATH_DATA", str(data_dir))
-    monkeypatch.setenv("REGISTRY_PATH_SEED", str(seed_dir))
+    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(data_dir))
+    monkeypatch.setenv("REGISTRY_SEED_PATH", str(seed_dir))
 
     app = create_app()
     with TestClient(app) as client:
@@ -48,12 +48,15 @@ def test_custom_seed_idempotency(tmp_path, monkeypatch):
         presets = client.get("/v1/presets").json()
         assert any(p["id"] == "jazz" for p in presets["items"])
 
-    acct_file = data_dir / "accounts" / "acct-seeded.json"
-    acct_file.write_text(json.dumps({"name": "Modified"}))
+        # Modify the data via the API
+        client.put("/v1/accounts/acct-seeded", json={"name": "Modified"})
 
+    # Create a new app instance to trigger re-seeding on startup
     app2 = create_app()
-    with TestClient(app2) as client:
-        accounts2 = client.get("/v1/accounts").json()
-        assert any(a["id"] == "acct-seeded" for a in accounts2["items"])
-        assert acct_file.read_text() == json.dumps({"name": "Modified"})
-    assert (data_dir / "presets" / "jazz.json").is_file()
+    with TestClient(app2) as client2:
+        # Verify the seeded data was not overwritten
+        acct = client2.get("/v1/accounts/acct-seeded").json()
+        assert acct["name"] == "Modified"
+        # Verify other seed data still exists
+        presets = client2.get("/v1/presets").json()
+        assert any(p["id"] == "jazz" for p in presets["items"])

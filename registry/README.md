@@ -16,19 +16,20 @@ bin/registry
 
 see the swagger API docs by visiting: http://localhost:8000/
 
-
 ### Environment Variables
 
 name | description | default
 --- | --- | ---
 REGISTRY_BACKEND | datastore backend, either `s3` or `local` | `local`
+REGISTRY_BACKEND_PATH | datastore location. required when backend is `local`. | `tmp/data`
+REGISTRY_BACKEND_PREFIX | prefix to apply to objects/files. | `registry-v1`
 REGISTRY_BACKEND_S3_BUCKET | name of S3 bucket. required when backend is `s3` | `None`
-REGISTRY_BACKEND_S3_PREFIX | path prefix of objects in S3 bucket | `registry-v1/`
 REGISTRY_BIND_HOST | host to bind to | `localhost`
 REGISTRY_BIND_PORT | port to bind to | `8000`
 REGISTRY_LOG_LEVEL | uvicorn log level, e.g. `debug`, `error` | `info`
-REGISTRY_PATH_DATA | datastore location | `tmp/data`
-REGISTRY_PATH_SEED | location of seed data for the datastore | `data`
+REGISTRY_SEED_PATH | location of data to seed the datastore with. | `data`
+
+> relative paths are relative to the project root.
 
 ### Backend selection
 
@@ -74,8 +75,22 @@ To run the tests, first install the development dependencies:
 pip install -r requirements-dev.txt
 ```
 
-Then, run the tests using pytest:
+Then, run the default test suite using pytest:
 
 ```sh
 pytest
+```
+
+### Performance Tests
+
+The suite includes performance tests that are disabled by default. To run them, use the `performance` marker:
+
+```sh
+pytest -m performance
+```
+
+To view the output from performance tests, set the log level:
+
+```sh
+pytest -m performance --log-cli-level=INFO
 ```

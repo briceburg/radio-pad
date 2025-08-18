@@ -11,8 +11,8 @@ type JsonDoc = dict[str, Any]
 type PathParams = Mapping[str, str]
 """Mapping of required path parameters extracted from a path template (e.g., {'account_id': 'a1'})."""
 
-type PagedResult[T] = tuple[list[T], int]
-"""Low-level page slice returned by stores: (items, total_count).
+type PagedResult[T] = list[T]
+"""Low-level page slice returned by stores: a list of items for the current page.
 Use models.PaginatedList for API responses; this is an internal transport shape.
 """
 

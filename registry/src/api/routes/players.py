@@ -44,5 +44,5 @@ async def list_players(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[Player]:
-    items, total = ds.players.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    return PaginatedList.from_paged(items, total=total, page=paging.page, per_page=paging.per_page)
+    items = ds.players.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
+    return PaginatedList.from_paged(items, page=paging.page, per_page=paging.per_page)

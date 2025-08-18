@@ -34,7 +34,7 @@ def unit_tests_root() -> Path:
     return root
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def mock_store(unit_tests_root: Path):
     """
     Fixture to create a clean DataStore for each test, using a dedicated
@@ -48,13 +48,23 @@ def mock_store(unit_tests_root: Path):
     data_dir.mkdir(parents=True, exist_ok=True)
 
     test_store = DataStore(data_path=str(data_dir))
-    _seed_store(test_store)
     yield test_store
     # Clean up the temporary directory after the test
     shutil.rmtree(data_dir)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
+def seeded_store(mock_store: DataStore):
+    """Cleans and re-seeds the mock_store for each test."""
+    data_dir = Path(mock_store.data_path)
+    if data_dir.exists():
+        shutil.rmtree(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    _seed_store(mock_store)
+    return mock_store
+
+
+@pytest.fixture(scope="session")
 def client(mock_store):
     app = create_app()
 

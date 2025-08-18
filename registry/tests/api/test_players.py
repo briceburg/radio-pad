@@ -12,7 +12,8 @@ from tests.api._helpers import (
 
 def test_get_players(ro_client):
     data = get_json(ro_client, "/v1/accounts/testuser1/players")
-    assert_paginated(data, total=2)
+    assert_paginated(data)
+    assert len(data["items"]) == 2
 
 
 def test_register_player(client):

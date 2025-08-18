@@ -4,4 +4,3 @@ moto[s3]
 mypy
 pytest
 ruff
-starlette

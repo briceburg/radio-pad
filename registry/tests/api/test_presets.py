@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import pytest
 
 from tests.api._helpers import (
@@ -111,7 +113,8 @@ def test_list_account_presets(client):
         {"name": "List One", "stations": [{"name": "A", "url": "https://a.com"}]},
     )
     data = get_json(client, f"/v1/accounts/{account_id}/presets")
-    assert_paginated(data, total=1)
+    assert_paginated(data)
+    assert len(data["items"]) == 1
     assert_item_fields(data["items"][0], id="list-one", account_id=account_id)
 
 
@@ -247,3 +250,31 @@ def test_preset_partial_update_persists_other_fields(client, url_tpl, ctx):
         description="Desc",
         **({"account_id": ctx["account_id"]} if ctx else {}),
     )
+
+
+def test_preset_rejects_duplicate_station_names(client):
+    payload = {
+        "name": "Dup Names",
+        "stations": [
+            {"name": "Same", "url": "https://a.example/stream"},
+            {"name": "same", "url": "https://b.example/stream"},
+        ],
+    }
+    resp = client.put("/v1/presets/dup-names", json=payload)
+    assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    body = resp.json()
+    assert any("Duplicate station name" in (err.get("msg") or str(err)) for err in body.get("detail", []))
+
+
+def test_preset_rejects_duplicate_station_urls(client):
+    payload = {
+        "name": "Dup URLs",
+        "stations": [
+            {"name": "A", "url": "https://same.example/stream"},
+            {"name": "B", "url": "https://same.example/stream"},
+        ],
+    }
+    resp = client.put("/v1/presets/dup-urls", json=payload)
+    assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    body = resp.json()
+    assert any("Duplicate station URL" in (err.get("msg") or str(err)) for err in body.get("detail", []))

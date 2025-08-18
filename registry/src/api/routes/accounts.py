@@ -38,5 +38,5 @@ async def list_accounts(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[Account]:
-    items, total = ds.accounts.list(page=paging.page, per_page=paging.per_page)
-    return PaginatedList.from_paged(items, total=total, page=paging.page, per_page=paging.per_page)
+    items = ds.accounts.list(page=paging.page, per_page=paging.per_page)
+    return PaginatedList.from_paged(items, page=paging.page, per_page=paging.per_page)

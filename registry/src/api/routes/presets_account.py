@@ -55,7 +55,5 @@ async def list_account_presets(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[AccountStationPreset]:
-    items, total = ds.account_presets.list(
-        path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page
-    )
-    return PaginatedList.from_paged(items, total=total, page=paging.page, per_page=paging.per_page)
+    items = ds.account_presets.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
+    return PaginatedList.from_paged(items, page=paging.page, per_page=paging.per_page)

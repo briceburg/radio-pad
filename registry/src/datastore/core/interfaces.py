@@ -1,6 +1,15 @@
-from typing import Protocol
+from typing import Any, Protocol, Self
 
 from ..types import JsonDoc, PagedResult, ValueWithETag
+
+
+class ModelWithId(Protocol):
+    id: str
+
+    def model_dump(self, *, mode: str = "json") -> dict[str, Any]: ...
+
+    @classmethod
+    def model_validate(cls, data: dict[str, Any]) -> Self: ...
 
 
 class ObjectStore(Protocol):

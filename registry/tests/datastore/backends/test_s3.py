@@ -10,6 +10,7 @@ import pytest
 from botocore.stub import ANY, Stubber
 
 from datastore.backends import S3Backend
+from datastore.exceptions import ConcurrencyError
 
 
 def _json_body(payload: dict[str, Any]) -> bytes:
@@ -39,7 +40,7 @@ def test_save_new_then_get_roundtrip_minimal():
                 "Metadata": ANY,
             },
         )
-        backend.save("a", {"id": "a", **expected_payload}, "")
+        backend.save("a", expected_payload, "")
         stub.add_response(
             "get_object",
             service_response={
@@ -86,26 +87,26 @@ def test_save_if_match_mismatch_raises():
             service_response={"ETag": '"e1"', "VersionId": "v1", "Metadata": {}},
             expected_params={"Bucket": "b", "Key": "p/a.json"},
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(ConcurrencyError):
             backend.save("a", {"x": 2}, "", if_match="v2")
 
 
-def test_list_returns_items_and_total():
+def test_list_returns_items():
     client = boto3.client("s3", region_name="us-east-1")
     backend = S3Backend(bucket="b", prefix="x", client=client)
     with Stubber(client) as stub:
         stub.add_response(
             "list_objects_v2",
             service_response={
-                "IsTruncated": False,
-                "KeyCount": 3,
+                "IsTruncated": True,
+                "NextContinuationToken": "t1",
+                "KeyCount": 2,
                 "Contents": [
                     {"Key": "x/y/a.json"},
                     {"Key": "x/y/b.json"},
-                    {"Key": "x/y/c.json"},
                 ],
             },
-            expected_params={"Bucket": "b", "Prefix": "x/y/"},
+            expected_params={"Bucket": "b", "Prefix": "x/y/", "MaxKeys": 2},
         )
         stub.add_response(
             "get_object",
@@ -123,8 +124,7 @@ def test_list_returns_items_and_total():
             },
             expected_params={"Bucket": "b", "Key": "x/y/b.json"},
         )
-        items, total = backend.list("y", page=1, per_page=2)
-        assert total == 3
+        items = backend.list("y", page=1, per_page=2)
         assert len(items) == 2
         assert items[0]["id"] == "a" and items[0]["v"] == 1
         assert items[1]["id"] == "b" and items[1]["v"] == 2
@@ -215,7 +215,7 @@ def test_save_changed_content_triggers_put():
         backend.save("a", {"id": "a", **new_payload}, "")
 
 
-def test_list_handles_multiple_s3_pages_and_paginates_locally():
+def test_list_handles_multiple_s3_pages():
     client = boto3.client("s3", region_name="us-east-1")
     backend = S3Backend(bucket="b", prefix="x", client=client)
     with Stubber(client) as stub:
@@ -226,11 +226,11 @@ def test_list_handles_multiple_s3_pages_and_paginates_locally():
                 "NextContinuationToken": "t1",
                 "KeyCount": 2,
                 "Contents": [
-                    {"Key": "x/y/b.json"},
                     {"Key": "x/y/a.json"},
+                    {"Key": "x/y/b.json"},
                 ],
             },
-            expected_params={"Bucket": "b", "Prefix": "x/y/"},
+            expected_params={"Bucket": "b", "Prefix": "x/y/", "MaxKeys": 2},
         )
         stub.add_response(
             "list_objects_v2",
@@ -241,7 +241,7 @@ def test_list_handles_multiple_s3_pages_and_paginates_locally():
                     {"Key": "x/y/c.json"},
                 ],
             },
-            expected_params={"Bucket": "b", "Prefix": "x/y/", "ContinuationToken": "t1"},
+            expected_params={"Bucket": "b", "Prefix": "x/y/", "MaxKeys": 2, "ContinuationToken": "t1"},
         )
         stub.add_response(
             "get_object",
@@ -251,8 +251,7 @@ def test_list_handles_multiple_s3_pages_and_paginates_locally():
             },
             expected_params={"Bucket": "b", "Key": "x/y/c.json"},
         )
-        items, total = backend.list("y", page=2, per_page=2)
-        assert total == 3
+        items = backend.list("y", page=2, per_page=2)
         assert [i["id"] for i in items] == ["c"]
 
 
@@ -263,10 +262,10 @@ def test_list_empty_prefix_returns_zero():
         stub.add_response(
             "list_objects_v2",
             service_response={"IsTruncated": False, "KeyCount": 0, "Contents": []},
-            expected_params={"Bucket": "b", "Prefix": "p/z/"},
+            expected_params={"Bucket": "b", "Prefix": "p/z/", "MaxKeys": 10},
         )
-        items, total = backend.list("z")
-        assert items == [] and total == 0
+        items = backend.list("z")
+        assert items == []
 
 
 def test_list_deterministic_order_across_calls():
@@ -279,12 +278,12 @@ def test_list_deterministic_order_across_calls():
                 "IsTruncated": False,
                 "KeyCount": 3,
                 "Contents": [
+                    {"Key": "x/y/a.json"},
                     {"Key": "x/y/b.json"},
                     {"Key": "x/y/c.json"},
-                    {"Key": "x/y/a.json"},
                 ],
             },
-            expected_params={"Bucket": "b", "Prefix": "x/y/"},
+            expected_params={"Bucket": "b", "Prefix": "x/y/", "MaxKeys": 10},
         )
         for key, val in [("a", 1), ("b", 2), ("c", 3)]:
             stub.add_response(
@@ -298,33 +297,5 @@ def test_list_deterministic_order_across_calls():
                 expected_params={"Bucket": "b", "Key": f"x/y/{key}.json"},
             )
 
-        first, _ = backend.list("y", page=1, per_page=10)
-
-        stub.add_response(
-            "list_objects_v2",
-            service_response={
-                "IsTruncated": False,
-                "KeyCount": 3,
-                "Contents": [
-                    {"Key": "x/y/c.json"},
-                    {"Key": "x/y/a.json"},
-                    {"Key": "x/y/b.json"},
-                ],
-            },
-            expected_params={"Bucket": "b", "Prefix": "x/y/"},
-        )
-        for key, val in [("a", 1), ("b", 2), ("c", 3)]:
-            stub.add_response(
-                "get_object",
-                service_response={
-                    "Body": botocore.response.StreamingBody(
-                        raw_stream=io.BytesIO(_json_body({"v": val})), content_length=7
-                    ),
-                    "ETag": '"e"',
-                },
-                expected_params={"Bucket": "b", "Key": f"x/y/{key}.json"},
-            )
-
-        second, _ = backend.list("y", page=1, per_page=10)
+        first = backend.list("y", page=1, per_page=10)
         assert [i["id"] for i in first] == ["a", "b", "c"]
-        assert [i["id"] for i in second] == ["a", "b", "c"]

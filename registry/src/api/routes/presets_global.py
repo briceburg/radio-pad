@@ -52,5 +52,5 @@ async def list_global_presets(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[GlobalStationPreset]:
-    items, total = ds.global_presets.list(page=paging.page, per_page=paging.per_page)
-    return PaginatedList.from_paged(items, total=total, page=paging.page, per_page=paging.per_page)
+    items = ds.global_presets.list(page=paging.page, per_page=paging.per_page)
+    return PaginatedList.from_paged(items, page=paging.page, per_page=paging.per_page)

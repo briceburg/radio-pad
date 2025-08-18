@@ -47,11 +47,9 @@ def get_response(client, path: str, expected: int = 200):
     return resp
 
 
-def assert_paginated(payload: dict, total: int | None = None):
-    for key in ("items", "total", "page", "per_page"):
+def assert_paginated(payload: dict):
+    for key in ("items", "page", "per_page"):
         assert key in payload, f"Missing pagination key {key}"
-    if total is not None:
-        assert payload["total"] == total
 
 
 def assert_item_fields(item: dict, **expected):

@@ -5,7 +5,8 @@ from tests.api._helpers import assert_paginated, get_json, put_json
 
 def test_list_accounts(ro_client):
     data = get_json(ro_client, "/v1/accounts")
-    assert_paginated(data, total=2)
+    assert_paginated(data)
+    assert len(data["items"]) == 2
     for account in data["items"]:
         assert "id" in account and "name" in account
 
@@ -14,7 +15,7 @@ def test_register_account(client):
     """Test that a new account can be created."""
     put_json(client, "/v1/accounts/new-account", {"name": "New Account"})
     data = get_json(client, "/v1/accounts")
-    assert data["total"] == 3
+    assert len(data["items"]) == 3
     assert "new-account" in [item["id"] for item in data["items"]]
 
 
@@ -22,7 +23,7 @@ def test_update_account(client):
     """Test that an existing account can be updated."""
     put_json(client, "/v1/accounts/testuser1", {"name": "Updated Name"})
     data = get_json(client, "/v1/accounts")
-    assert data["total"] == 2
+    assert len(data["items"]) == 2
     assert any(item["id"] == "testuser1" and item["name"] == "Updated Name" for item in data["items"])
 
 

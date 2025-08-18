@@ -20,15 +20,15 @@ class DataStore:
         self.seed_path = Path(seed_path) if seed_path else BASE_DIR / "data"
 
         backend_choice = os.environ.get("REGISTRY_BACKEND", "local").lower()
+        self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", "registry-v1")
         self.backend: ObjectStore
         if backend_choice == "s3":
             bucket = os.environ.get("REGISTRY_BACKEND_S3_BUCKET", "").lower()
-            prefix = os.environ.get("REGISTRY_BACKEND_S3_PREFIX", "registry-v1/")
             if not bucket:
                 raise ValueError("S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set")
-            self.backend = S3Backend(bucket=bucket, prefix=prefix)
+            self.backend = S3Backend(bucket=bucket, prefix=self.prefix)
         else:
-            self.backend = LocalBackend(str(self.data_path))
+            self.backend = LocalBackend(str(self.data_path), prefix=self.prefix)
 
         self.accounts = Accounts(self.backend)
         self.players = Players(self.backend)
@@ -52,7 +52,8 @@ class DataStore:
                 if not filename.endswith(".json"):
                     continue
                 seed_file = Path(dirpath) / filename
-                target_file = self.data_path / seed_file.relative_to(self.seed_path)
+                target_base = self.data_path / self.prefix
+                target_file = target_base / seed_file.relative_to(self.seed_path)
                 if not target_file.exists():
                     target_file.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy(seed_file, target_file)
