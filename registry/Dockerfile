@@ -5,5 +5,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-ENV PYTHONPATH=/app/src
-CMD ["uvicorn", "registry:app", "--host", "0.0.0.0", "--port", "8080"]
+ENV \
+  PYTHONPATH=/app/src \
+  REGISTRY_BIND_HOST=0.0.0.0 \
+  REGISTRY_BIND_PORT=8000
+
+CMD ["bin/docker-entrypoint.sh"]
