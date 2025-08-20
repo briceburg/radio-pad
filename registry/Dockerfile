@@ -10,4 +10,4 @@ ENV \
   REGISTRY_BIND_HOST=0.0.0.0 \
   REGISTRY_BIND_PORT=8000
 
-CMD ["bin/docker-entrypoint.sh"]
+CMD ["bin/docker/entrypoint.sh"]

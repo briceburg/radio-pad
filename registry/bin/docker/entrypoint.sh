@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-CPU_COUNT=$(nproc)
+CPU_COUNT=$(bin/docker/get_cpus.sh)
 UVICORN_WORKERS=${UVICORN_WORKERS:-${WORKERS:-$CPU_COUNT}}
 
 if [ "$#" -gt 0 ]; then

@@ -13,7 +13,7 @@ die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 paths=(src/ tests/)
 
 log "🔍 [mypy] Static type checking..."
-mypy src || die "mypy failed."
+mypy "${paths[@]}" || die "mypy failed."
 
 log "🎨 [ruff] Formatting check..."
 ruff format --check "${paths[@]}" || die "ruff format failed. run: ruff format ${paths[*]}"
