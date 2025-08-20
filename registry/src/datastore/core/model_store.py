@@ -3,7 +3,7 @@ from __future__ import annotations
 from string import Formatter
 from typing import Any
 
-from ..core import ObjectStore
+from ..core import ObjectStore, match_path_template
 from ..exceptions import ConcurrencyError
 from ..types import PagedResult, PathParams
 from .interfaces import ModelWithId
@@ -51,6 +51,7 @@ class ModelStore[T: ModelWithId]:
         id_field = last[1:-1]
         if id_field != "id":
             raise ValueError("last placeholder must be '{id}'")
+        self._path_template = f"{normalized}.json"
         # directory template excludes the final '{id}' segment
         self._dir_template = "/".join(segments[:-1])
         # collect required keys from the directory template
@@ -62,6 +63,12 @@ class ModelStore[T: ModelWithId]:
                     raise ValueError("'id' cannot appear in the directory portion of path_template")
                 req_keys.append(field_name)
         self._required_keys: tuple[str, ...] = tuple(req_keys)
+
+    def match(self, path: str) -> dict[str, str] | None:
+        """Matches a path against the store's template, extracting params."""
+        path_stem = path.removesuffix(".json")
+        template_stem = self._path_template.removesuffix(".json")
+        return match_path_template(path_stem, template_stem)
 
     @property
     def _reserved_keys(self) -> set[str]:

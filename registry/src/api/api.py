@@ -6,7 +6,6 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from datastore import DataStore
-from lib.constants import BASE_DIR
 
 from .models import ErrorDetail
 from .routes import presets_account, presets_global
@@ -16,10 +15,7 @@ from .routes import presets_account, presets_global
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handles application startup and shutdown events."""
     if not hasattr(app.state, "store"):
-        ds = DataStore(
-            data_path=os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data")),
-            seed_path=os.environ.get("REGISTRY_SEED_PATH", str(BASE_DIR / "data")),
-        )
+        ds = DataStore()
         ds.seed()
         app.state.store = ds  # expose for dependencies
     yield

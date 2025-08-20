@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from starlette.testclient import TestClient
 
-from datastore import DataStore
+from datastore import DataStore, LocalBackend
 from lib.constants import BASE_DIR
 from models import Account, GlobalStationPreset, Player, Station
 from registry import create_app
@@ -47,7 +47,8 @@ def mock_store(unit_tests_root: Path):
         shutil.rmtree(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    test_store = DataStore(data_path=str(data_dir))
+    backend = LocalBackend(base_path=str(data_dir))
+    test_store = DataStore(backend=backend)
     yield test_store
     # Clean up the temporary directory after the test
     shutil.rmtree(data_dir)
@@ -56,7 +57,8 @@ def mock_store(unit_tests_root: Path):
 @pytest.fixture(autouse=True)
 def seeded_store(mock_store: DataStore):
     """Cleans and re-seeds the mock_store for each test."""
-    data_dir = Path(mock_store.data_path)
+    # We know this is a LocalBackend because we set it up in mock_store
+    data_dir = mock_store.backend.base_path  # type: ignore
     if data_dir.exists():
         shutil.rmtree(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -88,7 +90,8 @@ def ro_mock_store(unit_tests_root: Path):
     if data_dir.exists():
         shutil.rmtree(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    store = DataStore(data_path=str(data_dir))
+    backend = LocalBackend(base_path=str(data_dir))
+    store = DataStore(backend=backend)
     _seed_store(store)
     yield store
     # optional cleanup: keep for post-run inspection

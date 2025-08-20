@@ -5,6 +5,7 @@ pythonpath = ["src", "tests"]
 markers = [
     "functional: marks tests as functional (requires a running server)",
     "performance: marks tests as performance-related",
+    "s3: marks tests as S3-backend-specific",
 ]
 
 [tool.ruff]

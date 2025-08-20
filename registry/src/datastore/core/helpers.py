@@ -1,10 +1,13 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 # TODO: bake these into the model_store?
+
+_template_placeholder_re = re.compile(r"\{([^}]+)\}")
 
 
 def canonical_json(data: dict[str, Any]) -> str:
@@ -79,3 +82,14 @@ def deconstruct_storage_path(full_key: str, *, prefix: str) -> tuple[str, tuple[
         prefix_parts = prefix.split("/")
         path_parts_from_key = path_parts_from_key[len(prefix_parts) :]
     return obj_id, path_parts_from_key
+
+
+def match_path_template(path: str, template: str) -> dict[str, str] | None:
+    """Matches a path against a template, extracting placeholder values using regex.
+
+    Returns a dictionary of extracted values if the path matches the template,
+    otherwise returns None.
+    """
+    regex_pattern = _template_placeholder_re.sub(r"(?P<\1>[^/]+)", template)
+    match = re.fullmatch(regex_pattern, path)
+    return match.groupdict() if match else None

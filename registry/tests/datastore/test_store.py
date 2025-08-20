@@ -1,29 +1,31 @@
 import json
 
 from datastore import DataStore
+from datastore.backends import LocalBackend
 from models.account import Account
 
 
 def test_datastore_initialization():
     """DataStore initializes component stores."""
-    real_store = DataStore()
+    real_store = DataStore(backend=LocalBackend(base_path="/tmp/fake"))
     assert real_store.accounts is not None
     assert real_store.players is not None
     assert real_store.global_presets is not None
     assert real_store.account_presets is not None
 
 
-def test_datastore_isolation():
+def test_datastore_isolation(tmp_path):
     """Separate DataStore instances have independent backends and roots."""
-    store1 = DataStore()
-    store2 = DataStore()
+    store1 = DataStore(backend=LocalBackend(base_path=str(tmp_path / "s1")))
+    store2 = DataStore(backend=LocalBackend(base_path=str(tmp_path / "s2")))
     assert store1 is not store2
     assert store1.backend is not store2.backend
 
 
 def test_seed_no_error(tmp_path):
     """Calling seed on an empty seed path logs error but does not raise."""
-    ds = DataStore(data_path=str(tmp_path / "data"), seed_path=str(tmp_path / "missing-seed"))
+    backend = LocalBackend(base_path=str(tmp_path / "data"))
+    ds = DataStore(backend=backend, seed_path=str(tmp_path / "missing-seed"))
     ds.seed()  # Should not raise even if seed path missing
 
 
@@ -36,7 +38,8 @@ def test_seed_copies_json_and_is_idempotent(tmp_path):
     (seed_dir / "accounts" / "acct1.json").write_text(json.dumps({"name": "Account One"}))
     (seed_dir / "presets" / "rock.json").write_text(json.dumps({"name": "Rock", "stations": []}))
 
-    ds = DataStore(data_path=str(data_dir), seed_path=str(seed_dir))
+    backend = LocalBackend(base_path=str(data_dir))
+    ds = DataStore(backend=backend, seed_path=str(seed_dir))
     ds.seed()
 
     # assert data was loaded by querying the datastore

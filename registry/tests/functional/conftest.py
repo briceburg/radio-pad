@@ -5,9 +5,11 @@ import socket
 import time
 from pathlib import Path
 
+import boto3
 import httpx
 import pytest
 import uvicorn
+from moto import mock_aws
 
 from lib.constants import BASE_DIR
 
@@ -15,6 +17,16 @@ from lib.constants import BASE_DIR
 def run_server(data_path: str, host: str, port: int):
     os.environ["REGISTRY_BACKEND_PATH"] = data_path
     uvicorn.run("registry:app", host=host, port=port, log_level="warning")
+
+
+@pytest.fixture(scope="session")
+def s3_test_bucket():
+    """Session-scoped fixture to create a mock S3 bucket for testing."""
+    with mock_aws():
+        bucket_name = "test-registry-bucket"
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=bucket_name)
+        yield bucket_name
 
 
 @pytest.fixture(scope="session")
