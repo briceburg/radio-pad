@@ -37,12 +37,6 @@ async def get_global_preset(
 
 
 @router.get(
-    "",
-    response_model=PaginatedList[GlobalStationPreset],
-    response_model_exclude_none=True,
-    include_in_schema=False,
-)
-@router.get(
     "/",
     response_model=PaginatedList[GlobalStationPreset],
     response_model_exclude_none=True,

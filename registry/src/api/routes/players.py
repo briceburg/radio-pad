@@ -36,7 +36,6 @@ async def get_player(
     return player
 
 
-@router.get("", response_model=PaginatedList[Player], include_in_schema=False)
 @router.get("/", response_model=PaginatedList[Player])
 async def list_players(
     account_id: AccountId,

@@ -31,7 +31,6 @@ async def get_account(
     return account
 
 
-@router.get("", response_model=PaginatedList[Account], include_in_schema=False)
 @router.get("/", response_model=PaginatedList[Account])
 async def list_accounts(
     ds: DS,

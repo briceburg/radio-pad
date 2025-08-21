@@ -39,12 +39,6 @@ async def get_account_preset(
 
 
 @router.get(
-    "",
-    response_model=PaginatedList[AccountStationPreset],
-    response_model_exclude_none=True,
-    include_in_schema=False,
-)
-@router.get(
     "/",
     response_model=PaginatedList[AccountStationPreset],
     response_model_exclude_none=True,

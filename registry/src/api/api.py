@@ -27,7 +27,7 @@ class RegistryAPI(FastAPI):
         super().__init__(
             lifespan=lifespan,
             swagger_ui_parameters={"defaultModelsExpandDepth": 0},
-            redirect_slashes=False,
+            redirect_slashes=True,
         )
 
         from datastore.exceptions import ConcurrencyError
