@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -6,6 +5,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from datastore import DataStore
+from lib.logging import silence_access_logs
 
 from .models import ErrorDetail
 from .routes import presets_account, presets_global
@@ -61,3 +61,5 @@ class RegistryAPI(FastAPI):
         async def healthz() -> Response:
             # 204 No Content, explicit no-store to avoid caching
             return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+        silence_access_logs("/healthz")
