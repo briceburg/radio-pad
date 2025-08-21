@@ -8,10 +8,8 @@ from models.player import PlayerCreate
 from models.station_preset import AccountStationPresetCreate, GlobalStationPresetCreate
 
 from .backends import LocalBackend, S3Backend
-from .core.interfaces import ObjectStore
-from .stores.accounts import Accounts
-from .stores.players import Players
-from .stores.presets import AccountPresets, GlobalPresets
+from .core import ObjectStore, SeedableStore, seedable
+from .stores import AccountPresets, Accounts, GlobalPresets, Players
 
 
 class DataStore:
@@ -51,11 +49,9 @@ class DataStore:
     def seed(self) -> None:
         """
         Seeds the datastore with initial data from the data-seed directory.
-        Only seeds data if it doesn't already exist in the target datastore.
+        Only seeds data if it doesn't already exist in the backend.
         """
         import json
-
-        from .core import SeedableStore
 
         if not self.seed_path.is_dir():
             logger.error(f"Seed path does not exist: {self.seed_path}")
@@ -63,10 +59,10 @@ class DataStore:
 
         # Heterogeneous list of stores; length and order not critical
         stores: list[SeedableStore] = [
-            self.accounts,
-            self.players,
-            self.global_presets,
-            self.account_presets,
+            seedable(self.accounts),
+            seedable(self.players),
+            seedable(self.global_presets),
+            seedable(self.account_presets),
         ]
 
         for dirpath, _, filenames in os.walk(self.seed_path):

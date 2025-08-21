@@ -1,16 +1,12 @@
 import hashlib
 import json
 import os
-import re
 from pathlib import Path
-from typing import Any
 
-# TODO: bake these into the model_store?
-
-_template_placeholder_re = re.compile(r"\{([^}]+)\}")
+from ..types import JsonDoc
 
 
-def canonical_json(data: dict[str, Any]) -> str:
+def canonical_json(data: JsonDoc) -> str:
     """Return a stable, canonical JSON string for hashing and comparisons.
 
     - Keys are sorted
@@ -20,13 +16,13 @@ def canonical_json(data: dict[str, Any]) -> str:
     return json.dumps(data, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
 
 
-def compute_etag(data: dict[str, Any]) -> str:
+def compute_etag(data: JsonDoc) -> str:
     """Compute a SHA-256 hex digest over the canonical JSON representation."""
     payload = canonical_json(data).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
-def strip_id(data: dict[str, Any]) -> dict[str, Any]:
+def strip_id(data: JsonDoc) -> JsonDoc:
     """Return a shallow copy of the mapping without the 'id' field.
 
     Storage backends should not persist the 'id' inside the document body; the
@@ -47,7 +43,7 @@ def extract_object_id_from_path(path: str) -> str:
     return Path(path).stem
 
 
-def atomic_write_json_file(path: Path, data: dict[str, Any]) -> None:
+def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
     """Writes a JSON file atomically by writing to a temp file and then renaming."""
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
@@ -82,14 +78,3 @@ def deconstruct_storage_path(full_key: str, *, prefix: str) -> tuple[str, tuple[
         prefix_parts = prefix.split("/")
         path_parts_from_key = path_parts_from_key[len(prefix_parts) :]
     return obj_id, path_parts_from_key
-
-
-def match_path_template(path: str, template: str) -> dict[str, str] | None:
-    """Matches a path against a template, extracting placeholder values using regex.
-
-    Returns a dictionary of extracted values if the path matches the template,
-    otherwise returns None.
-    """
-    regex_pattern = _template_placeholder_re.sub(r"(?P<\1>[^/]+)", template)
-    match = re.fullmatch(regex_pattern, path)
-    return match.groupdict() if match else None
