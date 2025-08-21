@@ -1,4 +1,7 @@
-def test_root_and_healthz(client):
+from starlette.testclient import TestClient
+
+
+def test_root_and_healthz(client: TestClient) -> None:
     # Root should redirect to /docs
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307

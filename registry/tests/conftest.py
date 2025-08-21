@@ -1,7 +1,9 @@
 import shutil
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from starlette.testclient import TestClient
 
 from datastore import DataStore, LocalBackend
@@ -12,16 +14,18 @@ from registry import create_app
 
 def _seed_store(ds: DataStore) -> None:
     """Pre-populate a DataStore with consistent test data."""
-    ds.accounts.save(Account(id="testuser1", name="Test User 1"))
-    ds.accounts.save(Account(id="testuser2", name="Test User 2"))
-    ds.players.save(Player(id="player1", account_id="testuser1", name="Player 1"))
-    ds.players.save(Player(id="player2", account_id="testuser1", name="Player 2"))
-    ds.players.save(Player(id="player3", account_id="testuser2", name="Player 3"))
+    ds.accounts.save(Account.model_validate({"id": "testuser1", "name": "Test User 1"}))
+    ds.accounts.save(Account.model_validate({"id": "testuser2", "name": "Test User 2"}))
+    ds.players.save(Player.model_validate({"id": "player1", "account_id": "testuser1", "name": "Player 1"}))
+    ds.players.save(Player.model_validate({"id": "player2", "account_id": "testuser1", "name": "Player 2"}))
+    ds.players.save(Player.model_validate({"id": "player3", "account_id": "testuser2", "name": "Player 3"}))
     ds.global_presets.save(
-        GlobalStationPreset(
-            id="briceburg",
-            name="Briceburg",
-            stations=[Station(name="WWOZ", url="https://www.wwoz.org/listen/hi")],
+        GlobalStationPreset.model_validate(
+            {
+                "id": "briceburg",
+                "name": "Briceburg",
+                "stations": [Station.model_validate({"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"})],
+            }
         )
     )
 
@@ -30,12 +34,13 @@ def _seed_store(ds: DataStore) -> None:
 def unit_tests_root() -> Path:
     """Root directory for unit test data under <project>/tmp/tests/unit."""
     root = BASE_DIR / "tmp" / "tests" / "unit"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    if not root.exists():
+        root.mkdir(parents=True, exist_ok=True)
+    return Path(root)
 
 
 @pytest.fixture(scope="session")
-def mock_store(unit_tests_root: Path):
+def mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     """
     Fixture to create a clean DataStore for each test, using a dedicated
     tmp/tests/unit/api/data directory. This ensures test isolation while allowing inspection
@@ -55,10 +60,11 @@ def mock_store(unit_tests_root: Path):
 
 
 @pytest.fixture(autouse=True)
-def seeded_store(mock_store: DataStore):
+def seeded_store(mock_store: DataStore) -> DataStore:
     """Cleans and re-seeds the mock_store for each test."""
     # We know this is a LocalBackend because we set it up in mock_store
-    data_dir = mock_store.backend.base_path  # type: ignore
+    assert isinstance(mock_store.backend, LocalBackend)
+    data_dir = mock_store.backend.base_path
     if data_dir.exists():
         shutil.rmtree(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +73,7 @@ def seeded_store(mock_store: DataStore):
 
 
 @pytest.fixture(scope="session")
-def client(mock_store):
+def client(mock_store: DataStore) -> Generator[TestClient]:
     app = create_app()
 
     # Override shared dependency
@@ -84,7 +90,7 @@ def client(mock_store):
 
 
 @pytest.fixture(scope="session")
-def ro_mock_store(unit_tests_root: Path):
+def ro_mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     """Session-scoped DataStore for read-only tests (seeded once)."""
     data_dir = unit_tests_root / "api" / "ro_data"
     if data_dir.exists():
@@ -98,7 +104,7 @@ def ro_mock_store(unit_tests_root: Path):
 
 
 @pytest.fixture(scope="session")
-def ro_client(ro_mock_store):
+def ro_client(ro_mock_store: DataStore) -> Generator[TestClient]:
     """Session-scoped TestClient bound to the read-only store."""
     app = create_app()
     from api.types import get_store
@@ -108,3 +114,11 @@ def ro_client(ro_mock_store):
     app.state.store = ro_mock_store
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
+
+
+@pytest.fixture(scope="session")
+def session_monkeypatch() -> Generator[MonkeyPatch]:
+    """Session-scoped monkeypatch fixture to avoid pytest-mock dependency."""
+    mp = MonkeyPatch()
+    yield mp
+    mp.undo()

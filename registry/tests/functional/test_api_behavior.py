@@ -1,8 +1,9 @@
+import httpx
 import pytest
 
 
 @pytest.mark.functional
-def test_real_server_omits_none_values(functional_client):
+def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     """
     A functional test to verify the real Uvicorn server omits None values
     from the JSON response, which confirms `response_model_exclude_none=True`

@@ -6,6 +6,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from datastore.backends import LocalBackend
+from datastore.types import JsonDoc
 
 
 @pytest.fixture
@@ -13,7 +14,7 @@ def backend(temp_data_path: Path) -> LocalBackend:
     return LocalBackend(str(temp_data_path))
 
 
-def test_id_not_serialized_on_disk(backend: LocalBackend, temp_data_path: Path):
+def test_id_not_serialized_on_disk(backend: LocalBackend, temp_data_path: Path) -> None:
     """Regression: ensure the 'id' field never stored inside JSON content."""
     path_parts = ("test", "id_strip")
     backend.save("alpha", {"id": "alpha", "value": 1}, *path_parts)
@@ -27,7 +28,7 @@ def test_id_not_serialized_on_disk(backend: LocalBackend, temp_data_path: Path):
     assert sorted([i["id"] for i in items]) == ["alpha", "beta"]
 
 
-def test_save_skips_when_unchanged(temp_data_path: Path, backend: LocalBackend):
+def test_save_skips_when_unchanged(temp_data_path: Path, backend: LocalBackend) -> None:
     path = ("skip",)
     obj_id = "same"
     payload = {"a": 1, "b": 2}
@@ -42,7 +43,7 @@ def test_save_skips_when_unchanged(temp_data_path: Path, backend: LocalBackend):
     assert first_mtime == second_mtime
 
 
-def test_save_still_writes_when_changed(temp_data_path: Path, backend: LocalBackend):
+def test_save_still_writes_when_changed(temp_data_path: Path, backend: LocalBackend) -> None:
     path = ("change",)
     obj_id = "obj"
     payload = {"a": 1}
@@ -68,7 +69,7 @@ safe_values = st.one_of(st.integers(), st.text(alphabet="abcdef012345", max_size
     path_parts=st.lists(safe_component, min_size=1, max_size=3),
 )
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=50)
-def test_round_trip(temp_data_path: Path, object_id, data, path_parts):
+def test_round_trip(temp_data_path: Path, object_id: str, data: JsonDoc, path_parts: list[str]) -> None:
     """Property-based test for saving and retrieving data (safe characters only).
     Note: 'id' key is stripped before persistence; adjust expectation accordingly.
     """

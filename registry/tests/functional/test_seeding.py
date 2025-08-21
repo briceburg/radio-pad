@@ -1,15 +1,17 @@
 import json
 
 import boto3
+import httpx
 import pytest
 from starlette.testclient import TestClient
 
 from registry import create_app
+from tests.functional.conftest import FunctionalTestBed
 
 
 @pytest.mark.functional
-def test_seeded_resources_are_loaded(functional_client):
-    """Verify seed data for accounts, players, and global presets loads on startup."""
+def test_seeded_resources_are_loaded(functional_client: httpx.Client) -> None:
+    """Verify default seed data for accounts, players, and global presets loads on startup."""
     # Accounts
     accounts_resp = functional_client.get("/v1/accounts")
     assert accounts_resp.status_code == 200
@@ -30,27 +32,22 @@ def test_seeded_resources_are_loaded(functional_client):
 
 
 @pytest.mark.functional
-def test_custom_seed_idempotency(tmp_path, monkeypatch):
+def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None:
     """Start app with custom seed dir, verify copy then idempotent on restart."""
-    seed_dir = tmp_path / "seed"
-    (seed_dir / "accounts").mkdir(parents=True)
-    (seed_dir / "presets").mkdir(parents=True)
-    (seed_dir / "accounts" / "acct-seeded.json").write_text(json.dumps({"name": "Seeded Account"}))
-    (seed_dir / "presets" / "jazz.json").write_text(json.dumps({"name": "Jazz", "stations": []}))
+    # Create custom seed data
+    functional_test_bed.create_seed_account("acct-seeded", "Seeded Account")
+    functional_test_bed.create_seed_global_preset("jazz", "Jazz")
+    functional_test_bed.configure_env()
 
-    data_dir = tmp_path / "data"
-    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(data_dir))
-    monkeypatch.setenv("REGISTRY_SEED_PATH", str(seed_dir))
-
+    # Create the app to trigger the initial seed
     app = create_app()
     with TestClient(app) as client:
         accounts = client.get("/v1/accounts").json()
         assert any(a["id"] == "acct-seeded" for a in accounts["items"])
 
         # Tamper with the data to ensure it is not overwritten on next startup
-        (data_dir / "registry-v1" / "accounts" / "acct-seeded.json").write_text(
-            json.dumps({"name": "TAMPERED"})
-        )
+        tampered_path = functional_test_bed.data_dir / "registry-v1" / "accounts" / "acct-seeded.json"
+        tampered_path.write_text(json.dumps({"name": "TAMPERED"}))
 
     # Re-create the app and client to trigger lifespan startup again
     app2 = create_app()
@@ -61,15 +58,12 @@ def test_custom_seed_idempotency(tmp_path, monkeypatch):
 
 @pytest.mark.functional
 @pytest.mark.s3
-def test_s3_seeding(s3_test_bucket, tmp_path, monkeypatch):
+def test_s3_seeding(s3_test_bucket: str, functional_test_bed: FunctionalTestBed) -> None:
     """Verify seeding works with the S3 backend."""
-    seed_dir = tmp_path / "seed"
-    (seed_dir / "accounts").mkdir(parents=True)
-    (seed_dir / "accounts" / "s3-acct.json").write_text(json.dumps({"name": "S3 Account"}))
-
-    monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
-    monkeypatch.setenv("REGISTRY_SEED_PATH", str(seed_dir))
+    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND", "s3")
+    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
+    functional_test_bed.create_seed_account("s3-acct", "S3 Account")
+    functional_test_bed.configure_env()
 
     # Create the app to trigger the seeding via the lifespan event
     app = create_app()
@@ -83,15 +77,12 @@ def test_s3_seeding(s3_test_bucket, tmp_path, monkeypatch):
 
 @pytest.mark.functional
 @pytest.mark.s3
-def test_s3_seed_idempotency(s3_test_bucket, tmp_path, monkeypatch):
+def test_s3_seed_idempotency(s3_test_bucket: str, functional_test_bed: FunctionalTestBed) -> None:
     """Verify S3 seeding does not overwrite existing data."""
-    seed_dir = tmp_path / "seed"
-    (seed_dir / "accounts").mkdir(parents=True)
-    (seed_dir / "accounts" / "s3-acct-idem.json").write_text(json.dumps({"name": "S3 Idempotent"}))
-
-    monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
-    monkeypatch.setenv("REGISTRY_SEED_PATH", str(seed_dir))
+    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND", "s3")
+    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
+    functional_test_bed.create_seed_account("s3-acct-idem", "S3 Idempotent")
+    functional_test_bed.configure_env()
 
     s3 = boto3.client("s3")
     key = "registry-v1/accounts/s3-acct-idem.json"

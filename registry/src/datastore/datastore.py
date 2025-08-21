@@ -3,12 +3,16 @@ from pathlib import Path
 
 from lib.constants import BASE_DIR
 from lib.logging import logger
+from models.account import AccountCreate
+from models.player import PlayerCreate
+from models.station_preset import AccountStationPresetCreate, GlobalStationPresetCreate
 
 from .backends import LocalBackend, S3Backend
 from .core.interfaces import ObjectStore
 from .stores.accounts import Accounts
 from .stores.players import Players
 from .stores.presets import AccountPresets, GlobalPresets
+
 
 class DataStore:
     """A container for the application's data stores."""
@@ -20,9 +24,7 @@ class DataStore:
     ) -> None:
         # Provide sensible defaults so tests can construct without args
         self.seed_path = (
-            Path(seed_path)
-            if seed_path
-            else Path(os.environ.get("REGISTRY_SEED_PATH", str(BASE_DIR / "data")))
+            Path(seed_path) if seed_path else Path(os.environ.get("REGISTRY_SEED_PATH", str(BASE_DIR / "data")))
         )
 
         if backend:
@@ -41,10 +43,10 @@ class DataStore:
                 data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))
                 self.backend = LocalBackend(base_path=data_path, prefix=self.prefix)
 
-        self.accounts = Accounts(self.backend)
-        self.players = Players(self.backend)
-        self.global_presets = GlobalPresets(self.backend)
-        self.account_presets = AccountPresets(self.backend)
+        self.accounts = Accounts(self.backend, create_model=AccountCreate)
+        self.players = Players(self.backend, create_model=PlayerCreate)
+        self.global_presets = GlobalPresets(self.backend, create_model=GlobalStationPresetCreate)
+        self.account_presets = AccountPresets(self.backend, create_model=AccountStationPresetCreate)
 
     def seed(self) -> None:
         """
@@ -53,11 +55,19 @@ class DataStore:
         """
         import json
 
+        from .core import SeedableStore
+
         if not self.seed_path.is_dir():
             logger.error(f"Seed path does not exist: {self.seed_path}")
             return
 
-        stores = [self.accounts, self.players, self.global_presets, self.account_presets]
+        # Heterogeneous list of stores; length and order not critical
+        stores: list[SeedableStore] = [
+            self.accounts,
+            self.players,
+            self.global_presets,
+            self.account_presets,
+        ]
 
         for dirpath, _, filenames in os.walk(self.seed_path):
             for filename in filenames:
@@ -79,7 +89,6 @@ class DataStore:
                         with seed_file.open("r", encoding="utf-8") as f:
                             data = json.load(f)
                         model_data = {"id": object_id, **params, **data}
-                        model_obj = store._model.model_validate(model_data)
-                        store.save(model_obj, path_params=path_params)
+                        store.seed(model_data, path_params=path_params)
                         logger.info(f"Seeded {relative_path}")
                         break

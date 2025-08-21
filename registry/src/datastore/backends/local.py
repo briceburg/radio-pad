@@ -1,6 +1,5 @@
 import itertools
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,6 @@ from datastore.core import (
 )
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
-from lib.constants import BASE_DIR
 
 
 class LocalBackend:

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from string import Formatter
-from typing import Any
+
+from pydantic import BaseModel
 
 from ..core import ObjectStore, match_path_template
 from ..exceptions import ConcurrencyError
-from ..types import PagedResult, PathParams
+from ..types import JsonDoc, PagedResult, PathParams
 from .interfaces import ModelWithId
 
 
-class ModelStore[T: ModelWithId]:
+class ModelStore[ReadModel: ModelWithId, CreateModel: BaseModel]:
     """
     Minimal, hierarchical repository backed by an ObjectStore (e.g., local fs, s3fs).
 
@@ -21,10 +22,10 @@ class ModelStore[T: ModelWithId]:
 
     Examples:
     - Flat collection:
-      ModelStore(backend, model=Station, path_template="stations/{id}")
+      ModelStore(backend, model=Station, create_model=StationCreate, path_template="stations/{id}")
 
     - Account-scoped:
-      ModelStore(backend, model=Preset, path_template="accounts/{account_id}/presets/{id}")
+      ModelStore(backend, model=Preset, create_model=PresetCreate, path_template="accounts/{account_id}/presets/{id}")
       store.get("preset-1", path_params={"account_id": "acct-123"})
 
     Notes:
@@ -35,11 +36,13 @@ class ModelStore[T: ModelWithId]:
         self,
         backend: ObjectStore,
         *,
-        model: type[T],
+        model: type[ReadModel],
+        create_model: type[CreateModel],
         path_template: str,
     ):
         self._backend = backend
         self._model = model
+        self._create_model = create_model
         # normalize and validate template
         normalized = path_template.strip().strip("/")
         segments = [s for s in normalized.split("/") if s]
@@ -83,45 +86,47 @@ class ModelStore[T: ModelWithId]:
         rendered = self._dir_template.format(**values)
         return tuple(c for c in rendered.split("/") if c)
 
-    def _path_params_from_model(self, model_obj: T) -> PathParams:
+    def _path_params_from_model(self, model_obj: ReadModel) -> PathParams:
         values: dict[str, str] = {}
         for key in self._required_keys:
-            if not hasattr(model_obj, key):
-                raise ValueError(f"Missing path param value for '{key}'")
+            # We can't use hasattr here because ReadModel is a protocol.
+            # Instead, we'll just try to access the attribute and let it raise.
             v = getattr(model_obj, key)
             if not isinstance(v, str):
                 raise TypeError(f"path param field '{key}' must be str, got {type(v).__name__}")
             values[key] = v
         return values
 
-    def get(self, object_id: str, *, path_params: PathParams | None = None) -> T | None:
+    def get(self, object_id: str, *, path_params: PathParams | None = None) -> ReadModel | None:
         comps = self._dir_components(path_params=path_params)
         data, _ = self._backend.get(object_id, *comps)
         if data is None:
             return None
         reserved = self._reserved_keys
         payload = {k: v for k, v in data.items() if k not in reserved}
-        base: dict[str, Any] = {"id": object_id}
+        base: dict[str, object] = {"id": object_id}
         if path_params:
             base.update({k: path_params[k] for k in self._required_keys})
         return self._model.model_validate({**base, **payload})
 
-    def list(self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10) -> PagedResult[T]:
+    def list(
+        self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10
+    ) -> PagedResult[ReadModel]:
         comps = self._dir_components(path_params=path_params)
         items = self._backend.list(*comps, page=page, per_page=per_page)
 
         param_vals = {k: path_params[k] for k in self._required_keys} if path_params else {}
         reserved = self._reserved_keys
-        models: list[T] = []
+        models: list[ReadModel] = []
         for item in items:
             file_id = item.get("id")
             payload = {k: v for k, v in item.items() if k not in reserved}
-            base: dict[str, Any] = {"id": file_id, **param_vals}
+            base: dict[str, object] = {"id": file_id, **param_vals}
             models.append(self._model.model_validate({**base, **payload}))
 
         return models
 
-    def save(self, model_obj: T, *, path_params: PathParams | None = None) -> T:
+    def save(self, model_obj: ReadModel, *, path_params: PathParams | None = None) -> ReadModel:
         if self._required_keys and path_params is None:
             path_params = self._path_params_from_model(model_obj)
         comps = self._dir_components(path_params=path_params)
@@ -130,25 +135,30 @@ class ModelStore[T: ModelWithId]:
         self._backend.save(model_obj.id, data, *comps)
         return model_obj
 
-    def merge_upsert(self, object_id: str, partial: dict[str, object], *, path_params: PathParams | None = None) -> T:
+    def merge_upsert(self, object_id: str, partial: CreateModel, *, path_params: PathParams | None = None) -> ReadModel:
         comps = self._dir_components(path_params=path_params)
         current, version = self._backend.get(object_id, *comps)
-        base: dict[str, Any] = {"id": object_id}
+        base: dict[str, object] = {"id": object_id}
         if path_params:
             base.update({k: path_params[k] for k in self._required_keys})
         merged = {
             **({} if current is None else current),
-            **partial,
+            **partial.model_dump(exclude_unset=True),
         }
         reserved = self._reserved_keys
         payload = {k: v for k, v in merged.items() if k not in reserved}
         model = self._model.model_validate({**base, **payload})
         data = {k: v for k, v in model.model_dump(mode="json").items() if k not in reserved}
         try:
-            self._backend.save(object_id, data, *comps, if_match=version if current is not None else None)
+            self._backend.save(model.id, data, *comps, if_match=version if current is not None else None)
         except ConcurrencyError as e:  # backend conflict (e.g., ETag mismatch)
             raise ConcurrencyError("Conditional save failed") from e
         return model
+
+    def seed(self, data: JsonDoc, *, path_params: PathParams | None = None) -> None:
+        """Create or overwrite a model instance from seed data in one call."""
+        model = self._model.model_validate(data)
+        self.save(model, path_params=path_params)
 
     # --- Additional convenience operations ---
     def exists(self, object_id: str, *, path_params: PathParams | None = None) -> bool:

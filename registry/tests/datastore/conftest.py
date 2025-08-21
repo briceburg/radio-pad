@@ -1,34 +1,31 @@
-import shutil
-import uuid
+import json
 from pathlib import Path
 
 import pytest
 
-from datastore import DataStore
+from datastore.types import JsonDoc
 
 
 @pytest.fixture
-def temp_data_path(unit_tests_root: Path) -> Path:
-    """Provide a project-level temporary data directory for datastore unit tests.
-    Uses <project>/tmp/tests/unit/datastore/data so artifacts are inspectable after runs.
-    Cleaned before each use for isolation.
-    """
-    base = unit_tests_root / "datastore" / "data"
-    if base.exists():
-        shutil.rmtree(base)
-    base.mkdir(parents=True, exist_ok=True)
-    return base
+def temp_data_path(tmp_path: Path) -> Path:
+    """Creates a temporary data path for datastore tests."""
+    data_path = tmp_path / "data"
+    data_path.mkdir()
+    return data_path
 
 
-@pytest.fixture
-def datastore_factory(unit_tests_root: Path):
-    """Factory to create isolated DataStore instances under <project>/tmp/tests/unit/datastore/stores/<uuid>."""
-    root_base = unit_tests_root / "datastore" / "stores"
-    root_base.mkdir(parents=True, exist_ok=True)
+class SeedCreator:
+    """Helper for creating seed data directories and files for tests."""
 
-    def _make(**kwargs):
-        store_root = root_base / uuid.uuid4().hex
-        store_root.mkdir()
-        return DataStore(data_path=str(store_root), **kwargs)
+    def __init__(self, root: Path):
+        self.root = root
 
-    return _make
+    def create_account(self, account_id: str, name: str) -> None:
+        accounts_dir = self.root / "accounts"
+        accounts_dir.mkdir(parents=True, exist_ok=True)
+        (accounts_dir / f"{account_id}.json").write_text(json.dumps({"name": name}))
+
+    def create_global_preset(self, preset_id: str, name: str, stations: list[JsonDoc] | None = None) -> None:
+        presets_dir = self.root / "presets"
+        presets_dir.mkdir(parents=True, exist_ok=True)
+        (presets_dir / f"{preset_id}.json").write_text(json.dumps({"name": name, "stations": stations or []}))

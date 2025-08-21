@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Generator
 
 import pytest
 
@@ -25,7 +26,7 @@ def make_record(path: str) -> logging.LogRecord:
 
 
 @pytest.fixture(autouse=True)
-def _reset_logging_state():
+def _reset_logging_state() -> Generator[None]:
     """Ensure tests are isolated from global logger/filter state."""
     prior_filters = list(access_logger.filters)
     prior_silenced = set(SILENCED_ENDPOINTS)
@@ -49,7 +50,7 @@ def _reset_logging_state():
         SILENCED_ENDPOINTS.update(prior_silenced)
 
 
-def test_silence_access_logs_registers_filter_once():
+def test_silence_access_logs_registers_filter_once() -> None:
     # Initially no SilentEndpointFilter should be attached by tests
     assert sum(isinstance(f, SilentEndpointFilter) for f in access_logger.filters) == 0
 
@@ -61,7 +62,7 @@ def test_silence_access_logs_registers_filter_once():
     assert sum(isinstance(f, SilentEndpointFilter) for f in access_logger.filters) == 1
 
 
-def test_silence_access_logs_accepts_str_and_iterable():
+def test_silence_access_logs_accepts_str_and_iterable() -> None:
     silence_access_logs("/one")
     assert "/one" in SILENCED_ENDPOINTS
     assert len(SILENCED_ENDPOINTS) == 1
@@ -70,7 +71,7 @@ def test_silence_access_logs_accepts_str_and_iterable():
     assert SILENCED_ENDPOINTS == {"/one", "/two", "/three"}
 
 
-def test_installed_filter_blocks_silenced_and_allows_others():
+def test_installed_filter_blocks_silenced_and_allows_others() -> None:
     silence_access_logs(["/healthz", "/quiet"])  # installs filter and registers endpoints
     # Get our installed filter instance
     f = next(f for f in access_logger.filters if isinstance(f, SilentEndpointFilter))

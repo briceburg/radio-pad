@@ -1,12 +1,13 @@
 import logging
 import time
+from collections.abc import Generator
 from pathlib import Path
 
 import boto3
 import pytest
 
 from datastore import DataStore
-from datastore.backends import S3Backend
+from datastore.backends import LocalBackend, S3Backend
 from models.account import Account
 from models.station_preset import GlobalStationPreset
 
@@ -15,12 +16,12 @@ NUM_PRESETS = 1000
 
 
 @pytest.mark.performance
-def test_pagination_performance(functional_tests_root: Path):
+def test_pagination_performance(functional_tests_root: Path) -> None:
     """
     Tests the pagination performance with a large number of records.
     """
     data_path = functional_tests_root / "perf_data"
-    datastore = DataStore(data_path=str(data_path))
+    datastore = DataStore(backend=LocalBackend(base_path=str(data_path)))
 
     # Seed a large number of accounts
     for i in range(NUM_ACCOUNTS):
@@ -31,15 +32,17 @@ def test_pagination_performance(functional_tests_root: Path):
     # Seed a large number of global presets
     for i in range(NUM_PRESETS):
         preset_id = f"global-preset-{i}"
-        preset = GlobalStationPreset(
-            id=preset_id,
-            name=f"Global Preset {i}",
-            stations=[
-                {
-                    "name": f"Station {i}",
-                    "url": f"http://example.com/stream-{i}",
-                }
-            ],
+        preset = GlobalStationPreset.model_validate(
+            {
+                "id": preset_id,
+                "name": f"Global Preset {i}",
+                "stations": [
+                    {
+                        "name": f"Station {i}",
+                        "url": f"http://example.com/stream-{i}",
+                    }
+                ],
+            }
         )
         datastore.global_presets.save(preset)
 
@@ -53,7 +56,7 @@ def test_pagination_performance(functional_tests_root: Path):
 
 
 @pytest.fixture
-def s3_backend():
+def s3_backend() -> Generator[S3Backend]:
     pytest.importorskip("moto")
     from moto import mock_aws
 
@@ -71,7 +74,7 @@ def s3_backend():
         (45, 100),
     ],
 )
-def test_s3_pagination_performance(s3_backend: S3Backend, page_to_fetch: int, per_page: int):
+def test_s3_pagination_performance(s3_backend: S3Backend, page_to_fetch: int, per_page: int) -> None:
     """
     Tests the pagination performance of the S3 backend with a large number of records.
     """

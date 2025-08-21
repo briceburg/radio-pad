@@ -19,10 +19,9 @@ router = APIRouter(prefix="/presets")
 async def register_global_preset(
     preset_id: PresetId,
     ds: DS,
-    preset_data: GlobalStationPresetCreate | None = None,
+    preset_data: GlobalStationPresetCreate,
 ) -> GlobalStationPreset:
-    partial = preset_data.model_dump(exclude_unset=True) if preset_data else {}
-    preset = ds.global_presets.merge_upsert(preset_id, partial)
+    preset = ds.global_presets.merge_upsert(preset_id, preset_data)
     return preset
 
 

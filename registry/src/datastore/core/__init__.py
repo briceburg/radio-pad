@@ -8,12 +8,14 @@ from .helpers import (
     normalize_etag,
     strip_id,
 )
-from .interfaces import ObjectStore
+from .interfaces import ModelWithId, ObjectStore, SeedableStore
 from .model_store import ModelStore
 
 __all__ = [
     "ModelStore",
+    "ModelWithId",
     "ObjectStore",
+    "SeedableStore",
     "atomic_write_json_file",
     "compute_etag",
     "construct_storage_path",

@@ -14,10 +14,9 @@ router = APIRouter(prefix="/accounts")
 async def register_account(
     account_id: AccountId,
     ds: DS,
-    account_data: AccountCreate | None = None,
+    account_data: AccountCreate,
 ) -> Account:
-    partial = account_data.model_dump(exclude_unset=True) if account_data else {}
-    account = ds.accounts.merge_upsert(account_id, partial)
+    account = ds.accounts.merge_upsert(account_id, account_data)
     return account
 
 

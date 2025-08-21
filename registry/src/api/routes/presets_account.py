@@ -20,10 +20,9 @@ async def register_account_preset(
     account_id: AccountId,
     preset_id: PresetId,
     ds: DS,
-    preset_data: AccountStationPresetCreate | None = None,
+    preset_data: AccountStationPresetCreate,
 ) -> AccountStationPreset:
-    partial = preset_data.model_dump(exclude_unset=True) if preset_data else {}
-    preset = ds.account_presets.merge_upsert(preset_id, partial, path_params={"account_id": account_id})
+    preset = ds.account_presets.merge_upsert(preset_id, preset_data, path_params={"account_id": account_id})
     return preset
 
 

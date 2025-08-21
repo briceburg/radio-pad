@@ -15,13 +15,12 @@ async def register_player(
     account_id: AccountId,
     player_id: PlayerId,
     ds: DS,
-    player_data: PlayerCreate | None = None,
+    player_data: PlayerCreate,
 ) -> Player:
     if not ds.accounts.exists(account_id):
         new_account = Account(id=account_id, name=account_id)
         ds.accounts.save(new_account)
-    partial = player_data.model_dump(exclude_unset=True) if player_data else {}
-    player = ds.players.merge_upsert(player_id, partial, path_params={"account_id": account_id})
+    player = ds.players.merge_upsert(player_id, player_data, path_params={"account_id": account_id})
     return player
 
 
