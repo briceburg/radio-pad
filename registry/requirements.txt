@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.10.0
-boto3==1.40.13
-botocore==1.40.13
+boto3==1.40.15
+botocore==1.40.15
 click==8.2.1
 fastapi==0.116.1
 h11==0.16.0
