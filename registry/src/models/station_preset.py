@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
-from lib.types import Slug
+from lib.types import Descriptor, Slug
 
 
 class Station(BaseModel):
@@ -18,8 +18,8 @@ class Station(BaseModel):
 class StationPresetBase(BaseModel):
     """Base model for station presets, containing common fields."""
 
-    name: str = Field(..., json_schema_extra={"example": "My Favorite Stations"})
-    category: str | None = Field(None, json_schema_extra={"example": "News"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "My Favorite Stations"})
+    category: Descriptor | None = Field(None, json_schema_extra={"example": "News"})
     description: str | None = Field(
         None,
         json_schema_extra={"example": "A collection of my favorite news stations."},
@@ -52,6 +52,23 @@ class AccountStationPresetCreate(StationPresetBase):
     """Request body model for creating an account station preset."""
 
     pass
+
+
+class GlobalStationPresetSummary(BaseModel):
+    """Abbreviated global station preset model for list endpoints."""
+
+    id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "My Favorite Stations"})
+    category: Descriptor | None = Field(None, json_schema_extra={"example": "News"})
+
+
+class AccountStationPresetSummary(BaseModel):
+    """Abbreviated account station preset model for list endpoints."""
+
+    id: Slug = Field(..., json_schema_extra={"example": "briceburg-my-favorites"})
+    account_id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "My Favorite Stations"})
+    category: Descriptor | None = Field(None, json_schema_extra={"example": "News"})
 
 
 class GlobalStationPreset(StationPresetBase):

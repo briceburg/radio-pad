@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field, field_validator
 
-from lib.types import Slug
+from lib.types import Descriptor, Slug
 
 
 class AccountBase(BaseModel):
     """Base model for accounts, containing common fields."""
 
-    name: str = Field(..., json_schema_extra={"example": "brice b"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "brice b"})
 
     @field_validator("name", mode="before")
     @classmethod
@@ -21,6 +21,13 @@ class AccountCreate(AccountBase):
     """Request body model for creating/updating an account via the PUT endpoint."""
 
     pass
+
+
+class AccountSummary(BaseModel):
+    """Abbreviated account model for list endpoints."""
+
+    id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "brice b"})
 
 
 class Account(AccountBase):

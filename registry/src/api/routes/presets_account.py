@@ -1,13 +1,13 @@
 from fastapi import APIRouter
 
-from models import AccountStationPreset, AccountStationPresetCreate
+from models import AccountStationPreset, AccountStationPresetCreate, AccountStationPresetSummary
 
 from ..exceptions import NotFoundError
 from ..models import PaginatedList
-from ..responses import ERROR_404, ERROR_409
+from ..responses import ERROR_409
 from ..types import DS, AccountId, PageParams, PresetId
 
-router = APIRouter(prefix="/accounts/{account_id}/presets", responses=ERROR_404)
+router = APIRouter(prefix="/accounts/{account_id}/presets")
 
 
 @router.put(
@@ -40,13 +40,20 @@ async def get_account_preset(
 
 @router.get(
     "/",
-    response_model=PaginatedList[AccountStationPreset],
+    response_model=PaginatedList[AccountStationPresetSummary],
     response_model_exclude_none=True,
 )
 async def list_account_presets(
     account_id: AccountId,
     ds: DS,
     paging: PageParams,
-) -> PaginatedList[AccountStationPreset]:
+) -> PaginatedList[AccountStationPresetSummary]:
     items = ds.account_presets.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    return PaginatedList.from_paged(items, page=paging.page, per_page=paging.per_page)
+    summary_items = [_to_summary(preset) for preset in items]
+    return PaginatedList.from_paged(summary_items, page=paging.page, per_page=paging.per_page)
+
+
+def _to_summary(preset: AccountStationPreset) -> AccountStationPresetSummary:
+    return AccountStationPresetSummary(
+        id=preset.id, account_id=preset.account_id, name=preset.name, category=preset.category
+    )

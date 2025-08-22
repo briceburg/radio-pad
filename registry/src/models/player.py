@@ -2,13 +2,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
-from lib.types import Slug, WsUrl
+from lib.types import Descriptor, Slug, WsUrl
 
 
 class PlayerBase(BaseModel):
     """Base model for players, containing common fields."""
 
-    name: str = Field(..., json_schema_extra={"example": "Living Room"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "Living Room"})
     stations_url: HttpUrl | None = Field(
         None,
         json_schema_extra={"example": "https://registry.radiopad.dev/v1/presets/briceburg"},
@@ -32,6 +32,14 @@ class PlayerCreate(PlayerBase):
     Request body model for creating/updating a player via the PUT endpoint.
     The Player validator provides default station and switchboard URLs.
     """
+
+
+class PlayerSummary(BaseModel):
+    """Abbreviated player model for list endpoints."""
+
+    id: Slug = Field(..., json_schema_extra={"example": "living-room"})
+    account_id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
+    name: Descriptor = Field(..., json_schema_extra={"example": "Living Room"})
 
 
 class Player(PlayerBase):
