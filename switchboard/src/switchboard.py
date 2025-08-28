@@ -32,6 +32,7 @@ from websockets.asyncio.server import ServerConnection, broadcast, serve
 CURRENT_STATION_BY_PLAYER = defaultdict(lambda: None)
 STATIONS_URL_BY_PLAYER = defaultdict(lambda: None)
 WEBSOCKETS_BY_PLAYER = defaultdict(set)
+LOGGER = logging.getLogger("switchboard")
 
 
 def get_connections(player_key: str) -> set:
@@ -57,6 +58,9 @@ async def switchboard(websocket):
     player_key = getattr(websocket, "player_key", None)
     if not player_key:
         return await websocket.close(code=1008, reason="Missing player identifier.")
+
+    # Track this established WebSocket connection.
+    WEBSOCKETS_BY_PLAYER[player_key].add(websocket)
 
     try:
         broadcast_all(player_key, "client_count")
@@ -107,6 +111,7 @@ async def switchboard(websocket):
         if getattr(websocket, "is_radio_pad", False):
             CURRENT_STATION_BY_PLAYER[player_key] = None
             broadcast_all(player_key, "station_playing")
+            LOGGER.info(f"RadioPad Player disconnected: {player_key}")
 
 
 async def switchboard_connect(
@@ -116,6 +121,17 @@ async def switchboard_connect(
     if request.path == "/healthz":
         return connection.respond(HTTPStatus.OK, "OK\n")
 
+    # Require a WebSocket upgrade to proceed with handshake
+    if not (
+        request.headers.get("Upgrade", "").lower() == "websocket"
+        and "upgrade" in request.headers.get("Connection", "").lower()
+    ):
+        return connection.respond(
+            HTTPStatus.UPGRADE_REQUIRED,
+            "WebSocket upgrade required for this endpoint.\n",
+        )
+
+    # Require account_id and player_id in the path
     try:
         account_id, player_id = request.path.strip("/").split("/")
         # TODO: validate account_id/player_id authn from registry
@@ -143,15 +159,14 @@ async def switchboard_connect(
             try:
                 broadcast_all(player_key, "stations_url", stations_url)
             except Exception as e:
-                logging.error(
+                LOGGER.error(
                     f"Failed to broadcast stations_url update for {player_key}: {e}"
                 )
 
-        logging.info(
+        LOGGER.info(
             f"RadioPad Player connected ({player_key}) with stations URL: {stations_url}"
         )
 
-    WEBSOCKETS_BY_PLAYER[player_key].add(connection)
     return None
 
 
@@ -175,18 +190,18 @@ async def main():
         int(os.environ.get("SWITCHBOARD_PORT", 1980)),
         process_request=switchboard_connect,
     ) as server:
-        logging.info("Switchboard running. Press Ctrl+C to stop.")
-        logging.info(
+        LOGGER.info("Switchboard running. Press Ctrl+C to stop.")
+        LOGGER.info(
             f"Listening on {server.sockets[0].getsockname()[0]}:{server.sockets[0].getsockname()[1]}"
         )
         await stop_event.wait()
-        logging.info("Switchboard shutting down...")
+        LOGGER.info("Switchboard shutting down...")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     try:
-        logging.info("Starting switchboard... Press Ctrl+C to stop.")
+        LOGGER.info("Starting switchboard... Press Ctrl+C to stop.")
         asyncio.run(main())
     except Exception as e:
-        logging.error(f"Switchboard exited with error: {e}")
+        LOGGER.error(f"Switchboard exited with error: {e}")
