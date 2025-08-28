@@ -29,43 +29,41 @@ from http import HTTPStatus
 import websockets
 from websockets.asyncio.server import ServerConnection, broadcast, serve
 
-CURRENT_STATION_BY_HOST = defaultdict(lambda: None)
-PARTITION_ENABLED = os.environ.get("SWITCHBOARD_PARTITION_BY_HTTP_HOST") == "true"
-STATIONS_URL_BY_HOST = defaultdict(str)
-WEBSOCKETS_BY_HOST = defaultdict(set)
+CURRENT_STATION_BY_PLAYER = defaultdict(lambda: None)
+STATIONS_URL_BY_PLAYER = defaultdict(lambda: None)
+WEBSOCKETS_BY_PLAYER = defaultdict(set)
 
 
-def get_host_key(websocket) -> str:
-    """Returns the host key for a given websocket, or '_global' if partitioning is disabled."""
-    if not PARTITION_ENABLED:
-        return "_global"
-    return getattr(websocket, "host")
+def get_connections(player_key: str) -> set:
+    return WEBSOCKETS_BY_PLAYER.get(player_key, set())
+
+
+def mkmsg(player_key: str, event: str, data=None) -> str:
+    if data is None:
+        if event == "station_playing":
+            data = CURRENT_STATION_BY_PLAYER[player_key]
+        elif event == "client_count":
+            data = len(get_connections(player_key))
+    return json.dumps({"event": event, "data": data})
+
+
+def broadcast_all(player_key: str, event: str, data=None) -> None:
+    connections = get_connections(player_key)
+    if connections:
+        broadcast(connections, mkmsg(player_key, event, data))
 
 
 async def switchboard(websocket):
-    host_key = get_host_key(websocket)
-
-    def mkmsg(event: str, data=None) -> str:
-        if data is None:
-            if event == "station_playing":
-                data = CURRENT_STATION_BY_HOST[host_key]
-            elif event == "client_count":
-                data = len(get_connections())
-
-        return json.dumps({"event": event, "data": data})
-
-    def get_connections():
-        return WEBSOCKETS_BY_HOST.get(host_key, set())
-
-    def broadcast_all(event: str, data=None):
-        connections = get_connections()
-        if connections:
-            broadcast(connections, mkmsg(event, data))
+    player_key = getattr(websocket, "player_key", None)
+    if not player_key:
+        return await websocket.close(code=1008, reason="Missing player identifier.")
 
     try:
-        broadcast_all("client_count")
-        await websocket.send(mkmsg("station_playing"))
-        await websocket.send(mkmsg("stations_url", STATIONS_URL_BY_HOST[host_key]))
+        broadcast_all(player_key, "client_count")
+        await websocket.send(mkmsg(player_key, "station_playing"))
+        await websocket.send(
+            mkmsg(player_key, "stations_url", STATIONS_URL_BY_PLAYER[player_key])
+        )
 
         async for msg in websocket:
             try:
@@ -85,10 +83,10 @@ async def switchboard(websocket):
                 )
 
             if event == "station_playing":
-                CURRENT_STATION_BY_HOST[host_key] = data
-                broadcast_all("station_playing")
+                CURRENT_STATION_BY_PLAYER[player_key] = data
+                broadcast_all(player_key, "station_playing")
             elif event == "station_request":
-                broadcast_all("station_request", data)
+                broadcast_all(player_key, "station_request", data)
             else:
                 return await websocket.close(
                     code=1007,
@@ -98,17 +96,17 @@ async def switchboard(websocket):
         # Suppress expected disconnect errors
         pass
     finally:
-        if websocket in WEBSOCKETS_BY_HOST[host_key]:
-            WEBSOCKETS_BY_HOST[host_key].remove(websocket)
-        if not WEBSOCKETS_BY_HOST[host_key]:
-            del WEBSOCKETS_BY_HOST[host_key]
+        if websocket in WEBSOCKETS_BY_PLAYER[player_key]:
+            WEBSOCKETS_BY_PLAYER[player_key].remove(websocket)
+        if not WEBSOCKETS_BY_PLAYER[player_key]:
+            del WEBSOCKETS_BY_PLAYER[player_key]
 
-        broadcast_all("client_count")
+        broadcast_all(player_key, "client_count")
 
         # if the disconnected client is the RadioPad Player, reset the current station
         if getattr(websocket, "is_radio_pad", False):
-            CURRENT_STATION_BY_HOST[host_key] = None
-            broadcast_all("station_playing")
+            CURRENT_STATION_BY_PLAYER[player_key] = None
+            broadcast_all(player_key, "station_playing")
 
 
 async def switchboard_connect(
@@ -118,22 +116,21 @@ async def switchboard_connect(
     if request.path == "/healthz":
         return connection.respond(HTTPStatus.OK, "OK\n")
 
-    if PARTITION_ENABLED:
-        host = request.headers.get("Host")
-        if not host:
-            return connection.respond(
-                HTTPStatus.BAD_REQUEST,
-                "Host header required, partitioning is enabled.\n",
-            )
-        host = host.split(":")[0].lower()  # strip port and normalize
-        setattr(connection, "host", host)
-        WEBSOCKETS_BY_HOST[host].add(connection)
-    else:
-        # When not partitioning, all connections go into the _global set
-        WEBSOCKETS_BY_HOST["_global"].add(connection)
+    try:
+        account_id, player_id = request.path.strip("/").split("/")
+        # TODO: validate account_id/player_id authn from registry
+    except ValueError:
+        return connection.respond(
+            HTTPStatus.BAD_REQUEST,
+            "Invalid path. Expected /{account_id}/{player_id}.\n",
+        )
+
+    player_key = f"{account_id}/{player_id}"
+    setattr(connection, "player_key", player_key)
 
     if request.headers.get("User-Agent", "").startswith("RadioPad/"):
         setattr(connection, "is_radio_pad", True)
+
         stations_url = request.headers.get("RadioPad-Stations-Url")
         if not stations_url:
             return connection.respond(
@@ -141,9 +138,20 @@ async def switchboard_connect(
                 "RadioPad-Stations-Url header required for RadioPad Player connections.\n",
             )
 
-        logging.info(f"RadioPad Player connected with stations URL: {stations_url}")
-        STATIONS_URL_BY_HOST[get_host_key(connection)] = stations_url
+        if STATIONS_URL_BY_PLAYER[player_key] != stations_url:
+            STATIONS_URL_BY_PLAYER[player_key] = stations_url
+            try:
+                broadcast_all(player_key, "stations_url", stations_url)
+            except Exception as e:
+                logging.error(
+                    f"Failed to broadcast stations_url update for {player_key}: {e}"
+                )
 
+        logging.info(
+            f"RadioPad Player connected ({player_key}) with stations URL: {stations_url}"
+        )
+
+    WEBSOCKETS_BY_PLAYER[player_key].add(connection)
     return None
 
 
@@ -168,8 +176,6 @@ async def main():
         process_request=switchboard_connect,
     ) as server:
         logging.info("Switchboard running. Press Ctrl+C to stop.")
-        if PARTITION_ENABLED:
-            logging.info("Partitioning by HTTP host is enabled.")
         logging.info(
             f"Listening on {server.sockets[0].getsockname()[0]}:{server.sockets[0].getsockname()[1]}"
         )

@@ -10,7 +10,6 @@ primary_region = 'iad' # https://fly.io/docs/reference/regions/
 
 [env]
   SWITCHBOARD_PORT = '1980'
-  SWITCHBOARD_PARTITION_BY_HTTP_HOST = 'true'
 
 [http_service]
   internal_port = 1980
