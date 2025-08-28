@@ -70,7 +70,7 @@ if __name__ == "__main__":
     try:
         # Load configuration
         player_config = config.make(
-            player_id=os.getenv("RADIOPAD_PLAYER_ID", "briceburg"),
+            player=os.getenv("RADIOPAD_PLAYER", "briceburg/living-room"),
             registry_url=os.getenv(
                 "RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev"
             ),

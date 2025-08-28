@@ -17,6 +17,9 @@ start the player via a script that automatically activates a python virtual envi
 
 ```sh
 ./bin/player
+
+# or to run as a particular player, use:
+RADIOPAD_PLAYER="briceburg/living-room" ./bin/player
 ```
 
 On a Raspberry Pi, you can start the listener at boot in a tmux session by adding the following to your auto-logged-in user's `.bashrc` file. the example assumes `radio-pad` exists it your PATH:
@@ -39,24 +42,33 @@ name | description | default
 `RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
-`RADIOPAD_PLAYER_ID` | Used to discover the station presets and switchboard URL. | `briceburg`
+`RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
 `RADIOPAD_REGISTRY_URL` | Player discovery URL. | `https://registry.radiopad.dev`
 `RADIOPAD_STATIONS_URL` | URL to load stations from. Must return a JSON list of stations. Discovered if not provided. | `None`
-`RADIOPAD_SWITCHBOARD_URL` | URL of switchboard. The switchboard enables remote-controls. Not needed for locally controlled players. Discovered if not provided. | `None`
+`RADIOPAD_SWITCHBOARD_URL` | URL of switchboard. The switchboard enables remote-controls. Discovered if not provided. | `None`
 
-### Editing Stations
+### Registry Discovery
 
-Modify and commit [stations.json](https://github.com/briceburg/radio-pad-registry/blob/main/src/players/briceburg/stations.json) files for your desired player in the registry. Changes are loaded by the player at startup, and the loaded station list is shared with connected controllers.
+Player details such as the available stations and the switchboard used to communicate with remote controls are "discovered" (via API requests to the [radio-pad-registry](https://github.com/briceburg/radio-pad-registry)) using the value of the `RADIOPAD_PLAYER` environment variable. 
 
-If you prefer to skip station discovery and roll your own list, set the RADIOPAD_STATIONS_URL environment variable to a URL that responds with your desired stations.
+E.g. if the `RADIOPAD_PLAYER` environment variable is set to `briceburg/living-room`, the station list + switchboard for this player is looked up via a GET request to https://registry.radiopad.dev/v1/accounts/briceburg/players/living-room
+
+#### Editing Stations
+
+Use the registry API to modify stations or edit the seed data directly, e.g. by editing the [briceburg preset](https://github.com/briceburg/radio-pad-registry/blob/main/data/presets/briceburg.json) used by the briceburg/living-room player.
+
+If you prefer to skip station discovery and roll your own list, set the RADIOPAD_STATIONS_URL environment variable to a URL that responds with your desired stations. Stations are expressed as JSON.
 
 Example configuration:
 
 ```json
-[
-  {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
-  {"name": "KEXP", "url": "https://kexp.org/stream", "color": 0x770077}
-]
+{
+  "name": "Casa Briceburg",
+  "stations": [
+    {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
+    {"name": "KEXP", "url": "https://kexp.org/stream", "color": 0x770077}
+  ]
+}
 ```
 
 ## Troubleshooting Sound
