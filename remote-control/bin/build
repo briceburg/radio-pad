@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -eo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel)/remote-control"
+
+cd "$PROJECT_ROOT"
+npm run build
+npx cap sync
+
+echo "to open android, run npx cap open android"

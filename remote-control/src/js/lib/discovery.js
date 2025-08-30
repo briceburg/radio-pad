@@ -34,10 +34,11 @@ async function fetchAllPages(startPath, registryUrl) {
 
 export async function discoverAccounts(registryUrl) {
   try {
-    const items = await fetchAllPages("/v1/accounts/", registryUrl);
-    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+    if (registryUrl) {
+      const items = await fetchAllPages("/v1/accounts/", registryUrl);
+      return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+    }
   } catch (e) {
-    // TODO: use toast / ui  notification error?
     console.error("Failed to fetch accounts from registry:", e);
   }
   return [];
@@ -45,27 +46,33 @@ export async function discoverAccounts(registryUrl) {
 
 export async function discoverPlayers(accountId, prefs) {
   try {
-    const registryUrl = await prefs.get("registryUrl", false);
-    const path = `/v1/accounts/${accountId}/players/`;
-    const items = await fetchAllPages(path, registryUrl);
-    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+    const registryUrl = await prefs.get("registryUrl");
+
+    if (registryUrl && accountId) {
+      const path = `/v1/accounts/${accountId}/players/`;
+      const items = await fetchAllPages(path, registryUrl);
+      return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+    }
   } catch (e) {
-    // TODO: use toast / ui  notification error?
     console.error("Failed to fetch players from registry:", e);
   }
   return [];
 }
 
 export async function discoverPlayer(playerId, prefs) {
-  const accountId = await prefs.get("accountId", false);
-  const registryUrl = await prefs.get("registryUrl", false);
-  const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
-  console.log("Discovering player from registry:", url);
   try {
-    const response = await fetch(url);
-    return await response.json();
+    const accountId = await prefs.get("accountId");
+    const registryUrl = await prefs.get("registryUrl");
+
+    if (registryUrl && accountId && playerId) {
+      const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
+      console.log("Discovering player from registry:", url);
+      const response = await fetch(url);
+      return await response.json();
+    }
   } catch (error) {
-    // TODO: use toast / ui  notification error?
     console.error("Error discovering player info from registry:", error);
   }
+
+  return null;
 }

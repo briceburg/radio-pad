@@ -28,16 +28,24 @@ export class RadioPadPreferences extends EventEmitter {
         placeholder: "Enter registry URL",
         default:
           import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
+        validate: (value) => {
+          try {
+            new URL(value);
+            return true;
+          } catch {
+            return false;
+          }
+        },
       },
       accountId: {
         type: "select",
         label: "Account",
-        default: import.meta.env.VITE_ACCOUNT_ID || "briceburg",
+        options: [],
       },
       playerId: {
         type: "select",
         label: "Player",
-        default: import.meta.env.VITE_PLAYER_ID || "living-room",
+        options: [],
       },
     },
   ) {
@@ -48,61 +56,63 @@ export class RadioPadPreferences extends EventEmitter {
     });
   }
 
+  async init() {
+    for (const [key, pref] of Object.entries(this.preferences)) {
+      const value = await this.get(key);
+      const defaultValue = this.preferences[key]?.default || null;
+      if (value === null && defaultValue !== null) {
+        this.set(key, defaultValue);
+      } else {
+        this.set(key, value);
+      }
+    }
+  }
+
+  async get(key) {
+    const result = await Preferences.get({ key });
+    return result.value;
+  }
+
+  async set(key, value) {
+    const pref = this.preferences[key];
+    if (value !== pref.value) {
+      if (pref.validate && !pref.validate(value)) {
+        console.warn(`Invalid value for preference ${key}: ${value}`);
+      } else {
+        pref.value = value;
+        await Preferences.set({ key, value });
+        await this.emitEvent("on-change", { key, value });
+      }
+    }
+  }
+
   async setOptions(key, options) {
     if (
       !Array.isArray(options) ||
       options.some(
         (opt) =>
+          !opt ||
           typeof opt !== "object" ||
-          opt === null ||
-          !("value" in opt) ||
-          !("label" in opt) ||
-          Object.keys(opt).length !== 2,
+          Object.keys(opt).sort().join() !== "label,value"
       )
     ) {
-      console.error(options);
-      throw new Error(
-        "Each option must be an object with only 'value' and 'label' fields.",
-      );
+      throw new Error("options must be an array of objects with 'label' and 'value' fields.");
     }
+
+    const prevOptions = JSON.stringify(this.preferences[key].options || []);
+    const newOptions = JSON.stringify(options);
 
     this.preferences[key].options = options;
-    const current = await this.get(key, false);
-
-    if (!options || options.length === 0) {
-      // If no options are available, unset the preference
-      await this.set(key, "");
-    } else if (!current || !options.some((opt) => opt.value === current)) {
-      // If current value is not set, or not in the list of options, set it to the first option
-      let firstOption = options[0];
-      await this.set(key, firstOption.value);
-    }
-  }
-
-  async init() {
-    for (const [key, pref] of Object.entries(this.preferences)) {
-      const value = await this.get(key);
-      if (value !== null) {
-        pref.value = value;
-      } else {
-        pref.value = pref.default || "";
+    if (options.length > 0) {
+      const current = await this.get(key);
+      if (!options.some((opt) => opt.value === current)) {
+        // If current value is not in the updated list of options, set it to the first option
+        await this.set(key, options[0].value);
       }
     }
-  }
 
-  async get(key, onChange = true) {
-    const result = await Preferences.get({ key });
-    if (onChange && result.value !== this.preferences[key]?.value) {
-      await this.emitEvent("on-change", { key, value: result.value });
-    }
-    return result.value;
-  }
-
-  async set(key, value) {
-    if (value !== this.preferences[key]?.value) {
-      this.preferences[key].value = value;
-      await Preferences.set({ key, value });
-      await this.emitEvent("on-change", { key, value });
+    if (prevOptions !== newOptions) {
+      await this.emitEvent("options-changed", { key, options });
     }
   }
 }
