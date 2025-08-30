@@ -48,12 +48,12 @@ export class RadioPadSwitchboard extends EventEmitter {
   sendStationRequest(stationName) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
-        JSON.stringify({ event: "station_request", data: stationName })
+        JSON.stringify({ event: "station_request", data: stationName }),
       );
     } else {
       this.emitEvent(
         "error",
-        "WebSocket not connected. Cannot send station request."
+        "WebSocket not connected. Cannot send station request.",
       );
     }
   }

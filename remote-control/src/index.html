@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
@@ -49,7 +49,8 @@
           <ion-header translucent="true">
             <ion-toolbar>
               <ion-title size="large">
-                Now Playing: <span id="now-playing">...</span>
+                <span id="stations-name"></span>:
+                <span id="now-playing">...</span>
               </ion-title>
               <ion-buttons slot="end">
                 <ion-button
@@ -80,15 +81,7 @@
           </ion-header>
           <ion-content fullscreen="true" class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
-            <ion-list id="settings-list">
-              <ion-item>
-                <ion-label position="stacked">Registry URL</ion-label>
-                <ion-input
-                  id="settings-registry-url"
-                  placeholder="Enter registry URL"
-                ></ion-input>
-              </ion-item>
-            </ion-list>
+            <ion-list id="settings-list" />
             <ion-button id="settings-save-button" expand="block"
               >Save</ion-button
             >

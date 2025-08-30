@@ -29,19 +29,54 @@ export class RadioPadPreferences extends EventEmitter {
         default:
           import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
       },
+      accountId: {
+        type: "select",
+        label: "Account",
+        default: import.meta.env.VITE_ACCOUNT_ID || "briceburg",
+      },
       playerId: {
         type: "select",
         label: "Player",
-        default: import.meta.env.VITE_PLAYER_ID || "briceburg",
+        default: import.meta.env.VITE_PLAYER_ID || "living-room",
       },
-    }
+    },
   ) {
     super();
     this.preferences = prefs;
-
     this.registerEvent("on-change", (data) => {
       console.log(`Preference changed: ${data.key} = ${data.value}`);
     });
+  }
+
+  async setOptions(key, options) {
+    if (
+      !Array.isArray(options) ||
+      options.some(
+        (opt) =>
+          typeof opt !== "object" ||
+          opt === null ||
+          !("value" in opt) ||
+          !("label" in opt) ||
+          Object.keys(opt).length !== 2,
+      )
+    ) {
+      console.error(options);
+      throw new Error(
+        "Each option must be an object with only 'value' and 'label' fields.",
+      );
+    }
+
+    this.preferences[key].options = options;
+    const current = await this.get(key, false);
+
+    if (!options || options.length === 0) {
+      // If no options are available, unset the preference
+      await this.set(key, "");
+    } else if (!current || !options.some((opt) => opt.value === current)) {
+      // If current value is not set, or not in the list of options, set it to the first option
+      let firstOption = options[0];
+      await this.set(key, firstOption.value);
+    }
   }
 
   async init() {
@@ -55,9 +90,9 @@ export class RadioPadPreferences extends EventEmitter {
     }
   }
 
-  async get(key) {
+  async get(key, onChange = true) {
     const result = await Preferences.get({ key });
-    if (result.value !== this.preferences[key]?.value) {
+    if (onChange && result.value !== this.preferences[key]?.value) {
       await this.emitEvent("on-change", { key, value: result.value });
     }
     return result.value;

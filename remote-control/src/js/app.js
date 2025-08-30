@@ -20,7 +20,11 @@ import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
 import { RadioPadSwitchboard } from "./lib/switchboard.js";
 import { RadioPadUI } from "./lib/ui.js";
-import { discoverPlayer, discoverPlayers } from "./lib/discovery.js";
+import {
+  discoverAccounts,
+  discoverPlayer,
+  discoverPlayers,
+} from "./lib/discovery.js";
 
 class RadioPad {
   constructor() {
@@ -31,20 +35,22 @@ class RadioPad {
 
     // PREFERENCE CHANGES
     this.PREFS.registerEvent("on-change", async (data) => {
-      console.log(`data: ${data.key} = ${data.value}`);
       switch (data.key) {
-        case "registryUrl":
-          this.PREFS.preferences.playerId.options = await discoverPlayers(
-            data.value
-          );
+        case "registryUrl": {
+          const accounts = await discoverAccounts(data.value);
+          await this.PREFS.setOptions("accountId", accounts);
           break;
-        case "playerId":
-          const registryUrl = await this.PREFS.get("registryUrl");
-          this.STATE.set(
-            "player",
-            await discoverPlayer(registryUrl, data.value)
-          );
+        }
+        case "accountId": {
+          const players = await discoverPlayers(data.value, this.PREFS);
+          await this.PREFS.setOptions("playerId", players);
           break;
+        }
+        case "playerId": {
+          const player = await discoverPlayer(data.value, this.PREFS);
+          this.STATE.set("player", player);
+          break;
+        }
       }
     });
 
@@ -55,9 +61,9 @@ class RadioPad {
           this.UI.highlightCurrentStation(data.value);
           break;
         case "player":
-          await this.SWITCHBOARD.connect(data.value.switchboardUrl);
+          await this.SWITCHBOARD.connect(data.value.switchboard_url);
           break;
-        case "stationsUrl":
+        case "stations_url":
           await this.loadStations(data.value);
           break;
       }
@@ -65,7 +71,7 @@ class RadioPad {
 
     // SWITCHBOARD EVENTS
     this.SWITCHBOARD.registerEvent("connect", (url) => {
-      this.UI.info(`✅ Connected`);
+      this.UI.info(`✅ Connected to ${this.STATE.get("player").name}`);
     });
     this.SWITCHBOARD.registerEvent("connecting", (url) => {
       this.UI.info(`🔄 Connecting...`);
@@ -80,7 +86,7 @@ class RadioPad {
       this.STATE.set("currentStation", stationName);
     });
     this.SWITCHBOARD.registerEvent("stations-url", (url) => {
-      this.STATE.set("stationsUrl", url);
+      this.STATE.set("stations_url", url);
     });
 
     // UI EVENTS
@@ -98,12 +104,13 @@ class RadioPad {
     this.UI.renderPreferences(this.PREFS);
   }
 
-  async loadStations(url) {
+  async loadStations(stations_url) {
     this.UI.renderSkeletonStations();
     try {
-      const response = await fetch(url);
-      const stations = await response.json();
-      this.UI.renderStations(stations, this.STATE.get("currentStation"));
+      const response = await fetch(stations_url);
+      const station_data = await response.json();
+      this.UI.renderStations(station_data);
+      this.UI.highlightCurrentStation(this.STATE.get("currentStation"));
     } catch (error) {
       // TODO: use toast / ui notification error?
       console.error("Error loading stations:", error);
