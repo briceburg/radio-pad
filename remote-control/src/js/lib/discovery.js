@@ -16,8 +16,50 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-export async function discoverPlayer(registryUrl, playerId) {
-  const url = `${registryUrl}/v1/players/${playerId}`;
+async function fetchAllPages(startPath, registryUrl) {
+  const items = [];
+  let url = new URL(startPath, registryUrl).toString();
+
+  while (url) {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (Array.isArray(data.items)) items.push(...data.items);
+
+    const next = data && data.links ? data.links.next : null;
+    url = next ? new URL(next, registryUrl).toString() : null;
+  }
+
+  return items;
+}
+
+export async function discoverAccounts(registryUrl) {
+  try {
+    const items = await fetchAllPages("/v1/accounts/", registryUrl);
+    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  } catch (e) {
+    // TODO: use toast / ui  notification error?
+    console.error("Failed to fetch accounts from registry:", e);
+  }
+  return [];
+}
+
+export async function discoverPlayers(accountId, prefs) {
+  try {
+    const registryUrl = await prefs.get("registryUrl", false);
+    const path = `/v1/accounts/${accountId}/players/`;
+    const items = await fetchAllPages(path, registryUrl);
+    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  } catch (e) {
+    // TODO: use toast / ui  notification error?
+    console.error("Failed to fetch players from registry:", e);
+  }
+  return [];
+}
+
+export async function discoverPlayer(playerId, prefs) {
+  const accountId = await prefs.get("accountId", false);
+  const registryUrl = await prefs.get("registryUrl", false);
+  const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
   console.log("Discovering player from registry:", url);
   try {
     const response = await fetch(url);
@@ -26,24 +68,4 @@ export async function discoverPlayer(registryUrl, playerId) {
     // TODO: use toast / ui  notification error?
     console.error("Error discovering player info from registry:", error);
   }
-}
-
-export async function discoverPlayers(registryUrl) {
-  let players = [];
-  let page = 1;
-  try {
-    do {
-      const url = `${registryUrl}/v1/players?page=${page}&per_page=50`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (Array.isArray(data.items)) {
-        players = players.concat(data.items);
-      }
-      page = data.page < data.total_pages ? data.page + 1 : -1;
-    } while (page !== -1);
-  } catch (e) {
-    // TODO: use toast / ui  notification error?
-    console.error("Failed to fetch players from registry:", e);
-  }
-  return players.map((p) => ({ value: p.id, label: p.name || p.id }));
 }

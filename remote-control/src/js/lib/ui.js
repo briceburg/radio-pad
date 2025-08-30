@@ -89,12 +89,12 @@ export class RadioPadUI extends EventEmitter {
     }
   }
 
-  renderStations(stations, currentStation) {
+  renderStations(station_data) {
     this.stationButtons = {};
     this._stationGrid.innerHTML = "";
 
     let ionRow;
-    stations.forEach((station, index) => {
+    station_data.stations.forEach((station, index) => {
       if (index % 3 === 0) {
         ionRow = document.createElement("ion-row");
         this._stationGrid.appendChild(ionRow);
@@ -112,7 +112,8 @@ export class RadioPadUI extends EventEmitter {
       ionRow.appendChild(ionCol);
     });
 
-    this.highlightCurrentStation(currentStation);
+    let stationsName = document.getElementById("stations-name");
+    stationsName.innerText = station_data.name;
   }
 
   renderSkeletonStations(rows = 3, cols = 3) {
@@ -135,7 +136,7 @@ export class RadioPadUI extends EventEmitter {
     Object.entries(this.stationButtons).forEach(([name, btn]) => {
       btn.setAttribute(
         "color",
-        name === currentStation ? "success" : "primary"
+        name === currentStation ? "success" : "primary",
       );
     });
     this._stopButton.disabled = !currentStation;

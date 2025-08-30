@@ -24,12 +24,12 @@ export class RadioPadState extends EventEmitter {
       player: {
         id: null,
         name: null,
-        stationsUrl: null,
-        switchboardUrl: null,
+        stations_url: null,
+        switchboard_url: null,
       },
-      stationsUrl: null,
+      stations_url: null,
       currentStation: null,
-    }
+    },
   ) {
     super();
     this.state = initialState;
