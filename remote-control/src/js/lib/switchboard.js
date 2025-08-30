@@ -27,10 +27,12 @@ export class RadioPadSwitchboard extends EventEmitter {
     this._lastUrl = null;
   }
 
-  async connect(url) {
-    this._lastUrl = url;
+  async connect(url = null) {
+    if (url) {
+      this._lastUrl = url;
+    }
     this.disconnect(); // Ensure any existing connection is closed
-    this._connectWebSocket(url);
+    this._connectWebSocket(this._lastUrl);
   }
 
   disconnect() {
