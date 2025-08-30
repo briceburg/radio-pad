@@ -1,8 +1,16 @@
 @media (min-width: 1200px) {
   ion-app {
     max-width: 1024px;
-    margin: 0 auto;
+    margin: auto auto;
   }
+}
+
+ion-header {
+  padding-top: var(--safe-area-inset-top);
+}
+
+ion-tab-bar {
+  padding-bottom: var(--safe-area-inset-bottom);
 }
 
 ion-row.station-placeholder ion-skeleton-text {

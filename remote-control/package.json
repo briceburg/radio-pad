@@ -11,8 +11,8 @@
     "lint:fix": "prettier --write src/"
   },
   "dependencies": {
+    "@capacitor-community/safe-area": "^7.0.0-alpha.1",
     "@capacitor/android": "^7.4.1",
-    "@capacitor/camera": "latest",
     "@capacitor/core": "latest",
     "@capacitor/preferences": "^7.0.1",
     "@capacitor/splash-screen": "^7.0.1",

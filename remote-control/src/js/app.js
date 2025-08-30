@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { SafeArea } from '@capacitor-community/safe-area';
+SafeArea.enable({config: {}});
+
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
 import { RadioPadSwitchboard } from "./lib/switchboard.js";
@@ -48,10 +51,16 @@ class RadioPad {
         }
         case "playerId": {
           const player = await discoverPlayer(data.value, this.PREFS);
-          this.STATE.set("player", player);
+          if (player) {
+            this.STATE.set("player", player);
+          }
           break;
         }
       }
+      this.UI.updatePreference(data.key, data.value);
+    });
+    this.PREFS.registerEvent("options-changed", async (data) => {
+      this.UI.updatePreference(data.key, await this.PREFS.get(data.key), data.options);
     });
 
     // STATE CHANGES
@@ -96,12 +105,21 @@ class RadioPad {
     this.UI.registerEvent("click-stop", () => {
       this.SWITCHBOARD.sendStationRequest(null);
     });
+    this.UI.registerEvent("click-stream", () => {
+      const playing = this.STREAMER.togglePlayback();
+      this.UI.toggleStreamButton(playing);
+    });
+    this.UI.registerEvent("settings-save", (settingsMap) => {
+      for (const [key, value] of Object.entries(settingsMap)) {
+        this.PREFS.set(key, value);
+      }
+    });
   }
 
   async start() {
-    this.UI.init();
     await this.PREFS.init();
-    this.UI.renderPreferences(this.PREFS);
+    this.UI.init();
+    this.UI.renderPreferences(this.PREFS.preferences);
   }
 
   async loadStations(stations_url) {

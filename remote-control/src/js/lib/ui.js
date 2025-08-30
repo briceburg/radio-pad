@@ -29,10 +29,19 @@ export class RadioPadUI extends EventEmitter {
     this._nowPlaying = document.getElementById("now-playing");
     this._stationGrid = document.getElementById("station-grid");
     this._stopButton = document.getElementById("stop-button");
+    this._streamButton = document.getElementById("stream-button");
     this._settingsSaveButton = document.getElementById("settings-save-button");
-
     this._stopButton.addEventListener("click", () => {
       this.emitEvent("click-stop", null);
+    });
+
+    this._settingsSaveButton.addEventListener("click", async () => {
+      const settingsMap = {};
+      document.querySelectorAll("#settings-list ion-input, #settings-list ion-select").forEach(input => {
+        const key = input.id?.replace(/^pref-/, "");
+        if (key) settingsMap[key] = input.value;
+      });
+      this.emitEvent("settings-save", settingsMap);
     });
   }
 
@@ -40,11 +49,11 @@ export class RadioPadUI extends EventEmitter {
     this._radioInfo.innerText = msg;
   }
 
-  renderPreferences(prefs) {
+  renderPreferences(preferences) {
     const settingsList = document.getElementById("settings-list");
     settingsList.innerHTML = "";
 
-    for (const [key, pref] of Object.entries(prefs.preferences)) {
+    for (const [key, pref] of Object.entries(preferences)) {
       const item = document.createElement("ion-item");
       const label = document.createElement("ion-label");
       label.setAttribute("position", "stacked");
@@ -59,12 +68,7 @@ export class RadioPadUI extends EventEmitter {
         case "select":
           input = document.createElement("ion-select");
           if (pref.options && pref.options.length > 0) {
-            for (const option of pref.options) {
-              const optionElement = document.createElement("ion-select-option");
-              optionElement.value = option.value;
-              optionElement.innerText = option.label;
-              input.appendChild(optionElement);
-            }
+            this._populateSelectOptions(input, pref.options);
           }
           break;
       }
@@ -73,19 +77,6 @@ export class RadioPadUI extends EventEmitter {
       item.appendChild(label);
       item.appendChild(input);
       settingsList.appendChild(item);
-    }
-
-    // allow multiple calls to renderPreferences without adding multiple save listeners
-    if (!this._settingsSaveButton._listenerAdded) {
-      this._settingsSaveButton.addEventListener("click", async () => {
-        for (const [key, pref] of Object.entries(prefs.preferences)) {
-          const input = document.getElementById(`pref-${key}`);
-          if (input) {
-            await prefs.set(key, input.value);
-          }
-        }
-      });
-      this._settingsSaveButton._listenerAdded = true;
     }
   }
 
@@ -141,5 +132,26 @@ export class RadioPadUI extends EventEmitter {
     });
     this._stopButton.disabled = !currentStation;
     this._nowPlaying.innerText = currentStation || "...";
+  }
+
+  updatePreference(key, value, options = null) {
+    console.log("updatePreference: ", key, value, options);
+    const input = document.getElementById(`pref-${key}`);
+    if (input) {
+      input.value = value;
+      if (options !== null) {
+        this._populateSelectOptions(input, options);
+      }
+    }
+  }
+
+  _populateSelectOptions(input, options) {
+    input.innerHTML = "";
+    for (const option of options) {
+      const optionElement = document.createElement("ion-select-option");
+      optionElement.value = option.value;
+      optionElement.innerText = option.label;
+      input.appendChild(optionElement);
+    }
   }
 }

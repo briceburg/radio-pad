@@ -7,6 +7,9 @@
       "launchAutoHide": true,
       "launchShowDuration": 777,
       "androidSplashResourceName": "splash"
+    },
+    "SafeArea": {
+      "enabled": true
     }
   }
 }
