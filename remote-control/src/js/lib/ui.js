@@ -25,22 +25,35 @@ export class RadioPadUI extends EventEmitter {
   }
 
   init() {
-    this._radioInfo = document.getElementById("radio-info");
+    this._listenButton = document.getElementById("listen-button");
     this._nowPlaying = document.getElementById("now-playing");
+    this._radioInfo = document.getElementById("radio-info");
+    this._settingsSaveButton = document.getElementById("settings-save-button");
     this._stationGrid = document.getElementById("station-grid");
     this._stopButton = document.getElementById("stop-button");
-    this._streamButton = document.getElementById("stream-button");
-    this._settingsSaveButton = document.getElementById("settings-save-button");
+
+    this._listenButton.addEventListener("click", () => {
+      this._listenButton.setAttribute(
+        "fill",
+        this._listenButton.getAttribute("fill") === "solid"
+          ? "outline"
+          : "solid",
+      );
+      this.emitEvent("click-listen", null);
+    });
+
     this._stopButton.addEventListener("click", () => {
       this.emitEvent("click-stop", null);
     });
 
     this._settingsSaveButton.addEventListener("click", async () => {
       const settingsMap = {};
-      document.querySelectorAll("#settings-list ion-input, #settings-list ion-select").forEach(input => {
-        const key = input.id?.replace(/^pref-/, "");
-        if (key) settingsMap[key] = input.value;
-      });
+      document
+        .querySelectorAll("#settings-list ion-input, #settings-list ion-select")
+        .forEach((input) => {
+          const key = input.id?.replace(/^pref-/, "");
+          if (key) settingsMap[key] = input.value;
+        });
       this.emitEvent("settings-save", settingsMap);
     });
   }

@@ -57,6 +57,15 @@
                 <ion-button
                   shape="round"
                   size="small"
+                  id="listen-button"
+                  aria-label="Play stream"
+                  fill="outline"
+                >
+                  <ion-icon slot="icon-only" name="headset"></ion-icon>
+                </ion-button>
+                <ion-button
+                  shape="round"
+                  size="small"
                   color="danger"
                   disabled="true"
                   id="stop-button"
@@ -82,9 +91,7 @@
           </ion-header>
           <ion-content fullscreen="true" class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
-            <ion-list id="settings-list" />
-              <ion-item />
-            </ion-list>
+            <ion-list id="settings-list"></ion-list>
             <ion-button id="settings-save-button" expand="block"
               >Save</ion-button
             >

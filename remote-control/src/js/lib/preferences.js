@@ -93,10 +93,14 @@ export class RadioPadPreferences extends EventEmitter {
         (opt) =>
           !opt ||
           typeof opt !== "object" ||
-          Object.keys(opt).sort().join() !== "label,value"
+          !("label" in opt) ||
+          !("value" in opt) ||
+          Object.keys(opt).length !== 2,
       )
     ) {
-      throw new Error("options must be an array of objects with 'label' and 'value' fields.");
+      throw new Error(
+        "options must be an array of objects with 'label' and 'value' fields.",
+      );
     }
 
     const prevOptions = JSON.stringify(this.preferences[key].options || []);

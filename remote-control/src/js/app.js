@@ -16,11 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { SafeArea } from '@capacitor-community/safe-area';
-SafeArea.enable({config: {}});
+import { SafeArea } from "@capacitor-community/safe-area";
+SafeArea.enable({ config: {} });
 
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
+import { RadioPadStreamer } from "./lib/streaming.js";
 import { RadioPadSwitchboard } from "./lib/switchboard.js";
 import { RadioPadUI } from "./lib/ui.js";
 import {
@@ -33,8 +34,10 @@ class RadioPad {
   constructor() {
     this.STATE = new RadioPadState();
     this.PREFS = new RadioPadPreferences();
+    this.STREAMER = new RadioPadStreamer();
     this.SWITCHBOARD = new RadioPadSwitchboard();
     this.UI = new RadioPadUI();
+    this.stations = new Map();
 
     // PREFERENCE CHANGES
     this.PREFS.registerEvent("on-change", async (data) => {
@@ -60,14 +63,31 @@ class RadioPad {
       this.UI.updatePreference(data.key, data.value);
     });
     this.PREFS.registerEvent("options-changed", async (data) => {
-      this.UI.updatePreference(data.key, await this.PREFS.get(data.key), data.options);
+      this.UI.updatePreference(
+        data.key,
+        await this.PREFS.get(data.key),
+        data.options,
+      );
     });
 
     // STATE CHANGES
     this.STATE.registerEvent("on-change", async (data) => {
       switch (data.key) {
         case "currentStation":
+          if (this.STATE.get("localMode")) {
+            this.STREAMER.play(data.value);
+          }
           this.UI.highlightCurrentStation(data.value);
+          break;
+        case "localMode":
+          if (data.value) {
+            this.SWITCHBOARD.disconnect();
+            this.UI.info("🎧 Playing Locally");
+            this.STREAMER.play(this.STATE.get("currentStation"));
+          } else {
+            this.SWITCHBOARD.connect();
+            this.STREAMER.stop();
+          }
           break;
         case "player":
           await this.SWITCHBOARD.connect(data.value.switchboard_url);
@@ -99,15 +119,22 @@ class RadioPad {
     });
 
     // UI EVENTS
+    this.UI.registerEvent("click-listen", async () => {
+      this.STATE.set("localMode", !this.STATE.get("localMode"));
+    });
     this.UI.registerEvent("click-station", (stationName) => {
-      this.SWITCHBOARD.sendStationRequest(stationName);
+      if (this.STATE.get("localMode")) {
+        this.STATE.set("currentStation", stationName);
+      } else {
+        this.SWITCHBOARD.sendStationRequest(stationName);
+      }
     });
     this.UI.registerEvent("click-stop", () => {
-      this.SWITCHBOARD.sendStationRequest(null);
-    });
-    this.UI.registerEvent("click-stream", () => {
-      const playing = this.STREAMER.togglePlayback();
-      this.UI.toggleStreamButton(playing);
+      if (this.STATE.get("localMode")) {
+        this.STATE.set("currentStation", null);
+      } else {
+        this.SWITCHBOARD.sendStationRequest(null);
+      }
     });
     this.UI.registerEvent("settings-save", (settingsMap) => {
       for (const [key, value] of Object.entries(settingsMap)) {
@@ -127,6 +154,7 @@ class RadioPad {
     try {
       const response = await fetch(stations_url);
       const station_data = await response.json();
+      this.STREAMER.setStations(station_data);
       this.UI.renderStations(station_data);
       this.UI.highlightCurrentStation(this.STATE.get("currentStation"));
     } catch (error) {

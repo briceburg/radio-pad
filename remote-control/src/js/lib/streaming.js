@@ -8,7 +8,7 @@ This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
-This program is distributed in the hope that it will be useful,
+This program is distributed in the hope that it is useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
@@ -16,34 +16,32 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { EventEmitter } from "./interfaces.js";
-
-export class RadioPadState extends EventEmitter {
-  constructor(
-    initialState = {
-      player: {
-        id: null,
-        name: null,
-        stations_url: null,
-        switchboard_url: null,
-      },
-      stations_url: null,
-      currentStation: null,
-      localMode: false,
-    },
-  ) {
-    super();
-    this.state = initialState;
+export class RadioPadStreamer {
+  constructor() {
+    this.audio = null;
+    this.stations = new Map();
   }
 
-  get(key) {
-    return this.state[key] || null;
-  }
-
-  async set(key, value) {
-    if (value !== this.state[key]) {
-      this.state[key] = value;
-      await this.emitEvent("on-change", { key, value });
+  play(stationName) {
+    this.stop();
+    const url = this.stations.get(stationName);
+    // TODO: support .pls URLS
+    if (url) {
+      this.audio = new Audio(url);
+      this.audio.play();
     }
+  }
+
+  stop() {
+    if (this.audio) {
+      this.audio.pause();
+      this.audio = null;
+    }
+  }
+
+  setStations(station_data) {
+    this.stations = new Map(
+      station_data.stations.map((station) => [station.name, station.url]),
+    );
   }
 }
