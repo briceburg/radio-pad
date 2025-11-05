@@ -12,6 +12,8 @@ dependencies {
     implementation project(':capacitor-community-safe-area')
     implementation project(':capacitor-preferences')
     implementation project(':capacitor-splash-screen')
+    implementation project(':mediagrid-capacitor-native-audio')
+
 }
 
 
