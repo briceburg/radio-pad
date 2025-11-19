@@ -63,7 +63,7 @@ class RadioPad {
           break;
         }
         case "presetId": {
-          this.STATE.set("stations_url_local", data.value);
+          await this.loadStations(data.value, "listen");
           break;
         }
       }
@@ -80,65 +80,57 @@ class RadioPad {
     // STATE CHANGES
     this.STATE.registerEvent("on-change", async (data) => {
       switch (data.key) {
-        case "currentStation":
-          if (this.STATE.get("localMode")) {
-            this.STREAMER.play(data.value);
-          }
-          this.UI.highlightCurrentStation(data.value);
-          break;
-        case "localMode":
-          if (data.value) {
-            this.SWITCHBOARD.disconnect();
-            this.UI.info("🎧 Playing Locally");
-            this.STREAMER.play(this.STATE.get("currentStation"));
-          } else {
-            this.SWITCHBOARD.connect();
-            this.STREAMER.stop();
-          }
-          break;
         case "player":
           await this.SWITCHBOARD.connect(data.value.switchboard_url);
           break;
         case "stations_url":
-          await this.loadStations(data.value);
+          await this.loadStations(data.value, "control");
+          break;
+        case "controlStation":
+          this.UI.highlightCurrentStation(data.value, "control");
+          break;
+        case "listenStation":
+          this.UI.highlightCurrentStation(data.value, "listen");
           break;
       }
     });
 
     // SWITCHBOARD EVENTS
     this.SWITCHBOARD.registerEvent("connect", (url) => {
-      this.UI.info(`✅ Connected to ${this.STATE.get("player").name}`);
+      this.UI.info(
+        `✅ Connected to ${this.STATE.get("player").name}`,
+        "control",
+      );
     });
     this.SWITCHBOARD.registerEvent("connecting", (url) => {
-      this.UI.info(`🔄 Connecting...`);
+      this.UI.info(`🔄 Connecting...`, "control");
     });
     this.SWITCHBOARD.registerEvent("disconnect", () => {
-      this.UI.info("🔌 Disconnected. Reconnecting...");
+      this.UI.info("🔌 Disconnected. Reconnecting...", "control");
     });
     this.SWITCHBOARD.registerEvent("error", (msg) => {
-      this.UI.info(`⚠️ Error: ${msg}`);
+      this.UI.info(`⚠️ Error: ${msg}`, "control");
     });
     this.SWITCHBOARD.registerEvent("station-playing", (stationName) => {
-      this.STATE.set("currentStation", stationName);
+      this.STATE.set("controlStation", stationName);
     });
     this.SWITCHBOARD.registerEvent("stations-url", (url) => {
       this.STATE.set("stations_url", url);
     });
 
     // UI EVENTS
-    this.UI.registerEvent("click-listen", async () => {
-      this.STATE.set("localMode", !this.STATE.get("localMode"));
-    });
-    this.UI.registerEvent("click-station", (stationName) => {
-      if (this.STATE.get("localMode")) {
-        this.STATE.set("currentStation", stationName);
+    this.UI.registerEvent("click-station", (data) => {
+      if (data.tab === "listen") {
+        this.STREAMER.play(data.station);
+        this.STATE.set("listenStation", data.station);
       } else {
-        this.SWITCHBOARD.sendStationRequest(stationName);
+        this.SWITCHBOARD.sendStationRequest(data.station);
       }
     });
-    this.UI.registerEvent("click-stop", () => {
-      if (this.STATE.get("localMode")) {
-        this.STATE.set("currentStation", null);
+    this.UI.registerEvent("click-stop", (data) => {
+      if (data.tab === "listen") {
+        this.STREAMER.stop();
+        this.STATE.set("listenStation", null);
       } else {
         this.SWITCHBOARD.sendStationRequest(null);
       }
@@ -156,14 +148,20 @@ class RadioPad {
     this.UI.renderPreferences(this.PREFS.preferences);
   }
 
-  async loadStations(stations_url) {
-    this.UI.renderSkeletonStations();
+  async loadStations(stations_url, tabName = "control") {
+    this.UI.renderSkeletonStations(3, 3, tabName);
     try {
       const response = await fetch(stations_url);
       const station_data = await response.json();
-      this.STREAMER.setStations(station_data);
-      this.UI.renderStations(station_data);
-      this.UI.highlightCurrentStation(this.STATE.get("currentStation"));
+      if (tabName === "listen") {
+        this.STREAMER.setStations(station_data);
+      }
+      this.UI.renderStations(station_data, tabName);
+      const currentStation =
+        tabName === "listen"
+          ? this.STATE.get("listenStation")
+          : this.STATE.get("controlStation");
+      this.UI.highlightCurrentStation(currentStation, tabName);
     } catch (error) {
       // TODO: use toast / ui notification error?
       console.error("Error loading stations:", error);

@@ -68,14 +68,14 @@ export async function discoverPresets(accountId, prefs) {
       `/v1/presets/`,
     ];
 
-    if(registryUrl){
+    if (registryUrl) {
       for (const path of paths) {
         const items = await fetchAllPages(path, registryUrl);
         presets.push(
           ...items.map((i) => ({
             value: `${registryUrl}${path}${i.id}`,
             label: i.name || i.id,
-          }))
+          })),
         );
       }
     }
