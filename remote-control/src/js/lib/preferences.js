@@ -42,7 +42,7 @@ export class RadioPadPreferences extends EventEmitter {
         type: "select",
         label: "Account",
         options: [],
-        group: "radio-control"
+        group: "default"
       },
       playerId: {
         type: "select",
@@ -50,15 +50,9 @@ export class RadioPadPreferences extends EventEmitter {
         options: [],
         group: "radio-control"
       },
-      listenAccountId: {
+      presetId: {
         type: "select",
-        label: "Account",
-        options: [],
-        group: "radio-listen"
-      },
-      listenPlayerId: {
-        type: "select",
-        label: "Player",
+        label: "Station Preset",
         options: [],
         group: "radio-listen"
       }
