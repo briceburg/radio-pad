@@ -59,6 +59,33 @@ export async function discoverPlayers(accountId, prefs) {
   return [];
 }
 
+export async function discoverPresets(accountId, prefs) {
+  const presets = [];
+  try {
+    const registryUrl = await prefs.get("registryUrl");
+    const paths = [
+      ...(accountId ? [`/v1/accounts/${accountId}/presets/`] : []),
+      `/v1/presets/`,
+    ];
+
+    if(registryUrl){
+      for (const path of paths) {
+        const items = await fetchAllPages(path, registryUrl);
+        presets.push(
+          ...items.map((i) => ({
+            value: `${registryUrl}${path}${i.id}`,
+            label: i.name || i.id,
+          }))
+        );
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch presets from registry:", e);
+  }
+
+  return presets;
+}
+
 export async function discoverPlayer(playerId, prefs) {
   try {
     const accountId = await prefs.get("accountId");
