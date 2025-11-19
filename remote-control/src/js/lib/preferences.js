@@ -36,17 +36,32 @@ export class RadioPadPreferences extends EventEmitter {
             return false;
           }
         },
+        group: "default"
       },
       accountId: {
         type: "select",
         label: "Account",
         options: [],
+        group: "radio-control"
       },
       playerId: {
         type: "select",
         label: "Player",
         options: [],
+        group: "radio-control"
       },
+      listenAccountId: {
+        type: "select",
+        label: "Account",
+        options: [],
+        group: "radio-listen"
+      },
+      listenPlayerId: {
+        type: "select",
+        label: "Player",
+        options: [],
+        group: "radio-listen"
+      }
     },
   ) {
     super();
