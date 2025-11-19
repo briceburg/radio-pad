@@ -35,9 +35,13 @@
       <ion-tabs>
         <!-- navbar -->
         <ion-tab-bar slot="bottom">
-          <ion-tab-button tab="radio">
+          <ion-tab-button tab="control">
             <ion-icon name="radio-outline"></ion-icon>
-            Radio
+            Control
+          </ion-tab-button>
+          <ion-tab-button tab="listen">
+            <ion-icon name="headset-outline"></ion-icon>
+            Listen
           </ion-tab-button>
           <ion-tab-button tab="settings">
             <ion-icon name="settings-outline"></ion-icon>
@@ -45,42 +49,8 @@
           </ion-tab-button>
         </ion-tab-bar>
 
-        <!-- radio page -->
-        <ion-tab tab="radio">
-          <ion-header translucent="true">
-            <ion-toolbar>
-              <ion-title size="large">
-                <span id="stations-name"></span>:
-                <span id="now-playing">...</span>
-              </ion-title>
-              <ion-buttons slot="end">
-                <ion-button
-                  shape="round"
-                  size="small"
-                  id="listen-button"
-                  aria-label="Play stream"
-                  fill="outline"
-                >
-                  <ion-icon slot="icon-only" name="headset"></ion-icon>
-                </ion-button>
-                <ion-button
-                  shape="round"
-                  size="small"
-                  color="danger"
-                  disabled="true"
-                  id="stop-button"
-                  aria-label="Stop playback"
-                >
-                  <ion-icon slot="icon-only" name="stop"></ion-icon>
-                </ion-button>
-              </ion-buttons>
-            </ion-toolbar>
-          </ion-header>
-          <ion-content fullscreen="true" class="ion-padding">
-            <div id="radio-info" class="ion-text-center"></div>
-            <ion-grid id="station-grid"></ion-grid>
-          </ion-content>
-        </ion-tab>
+        <ion-tab tab="control"></ion-tab>
+        <ion-tab tab="listen"></ion-tab>
 
         <!-- settings page -->
         <ion-tab tab="settings">
@@ -99,5 +69,32 @@
         </ion-tab>
       </ion-tabs>
     </ion-app>
+
+    <template id="tab-player">
+      <ion-header translucent="true">
+        <ion-toolbar>
+          <ion-title size="large">
+            <span class="stations-name"></span>:
+            <span class="now-playing">...</span>
+          </ion-title>
+          <ion-buttons slot="end">
+            <ion-button
+              shape="round"
+              size="small"
+              color="danger"
+              disabled="true"
+              class="stop-button"
+              aria-label="Stop playback"
+            >
+              <ion-icon slot="icon-only" name="stop"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content fullscreen="true" class="ion-padding">
+        <div class="radio-info ion-text-center"></div>
+        <ion-grid class="station-grid"></ion-grid>
+      </ion-content>
+    </template>
   </body>
 </html>

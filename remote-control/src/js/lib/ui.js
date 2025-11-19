@@ -21,30 +21,14 @@ import { EventEmitter } from "./interfaces.js";
 export class RadioPadUI extends EventEmitter {
   constructor() {
     super();
-    this.stationButtons = {}; // map of station name to button element
+    this.tabs = {}; // map of tab name to { element, refs, stationButtons }
   }
 
   init() {
-    this._listenButton = document.getElementById("listen-button");
-    this._nowPlaying = document.getElementById("now-playing");
-    this._radioInfo = document.getElementById("radio-info");
     this._settingsSaveButton = document.getElementById("settings-save-button");
-    this._stationGrid = document.getElementById("station-grid");
-    this._stopButton = document.getElementById("stop-button");
 
-    this._listenButton.addEventListener("click", () => {
-      this._listenButton.setAttribute(
-        "fill",
-        this._listenButton.getAttribute("fill") === "solid"
-          ? "outline"
-          : "solid",
-      );
-      this.emitEvent("click-listen", null);
-    });
-
-    this._stopButton.addEventListener("click", () => {
-      this.emitEvent("click-stop", null);
-    });
+    // Initialize tabs
+    ["control", "listen"].forEach((tabName) => this._initPlayerTab(tabName));
 
     this._settingsSaveButton.addEventListener("click", async () => {
       const settingsMap = {};
@@ -58,17 +42,54 @@ export class RadioPadUI extends EventEmitter {
     });
   }
 
-  info(msg) {
-    this._radioInfo.innerText = msg;
+  _initPlayerTab(tabName) {
+    const tabEl = document.querySelector(`ion-tab[tab="${tabName}"]`);
+    const template = document.getElementById("tab-player");
+    if (!template || !tabEl) return;
+
+    const clone = template.content.cloneNode(true);
+    tabEl.appendChild(clone);
+
+    const refs = {
+      stationsName: tabEl.querySelector(".stations-name"),
+      nowPlaying: tabEl.querySelector(".now-playing"),
+      stopButton: tabEl.querySelector(".stop-button"),
+      radioInfo: tabEl.querySelector(".radio-info"),
+      stationGrid: tabEl.querySelector(".station-grid"),
+    };
+
+    this.tabs[tabName] = { element: tabEl, refs: refs, stationButtons: {} };
+
+    refs.stopButton.addEventListener("click", () => {
+      this.emitEvent("click-stop", { tab: tabName });
+    });
+  }
+
+  info(msg, tabName = "control") {
+    if (this.tabs[tabName]) {
+      this.tabs[tabName].refs.radioInfo.innerText = msg;
+    }
   }
 
   renderPreferences(preferences) {
     const settingsList = document.getElementById("settings-list");
     settingsList.innerHTML = "";
     const groups = {
-      "default": { label: "Primary Settings", icon: "settings", color: "tertiary"},
-      "radio-control": { label: "Control Settings", icon: "radio", color: "tertiary" },
-      "radio-listen": { label: "Listen Settings", icon: "headset", color: "tertiary" }
+      default: {
+        label: "Primary Settings",
+        icon: "settings",
+        color: "tertiary",
+      },
+      "radio-control": {
+        label: "Control Settings",
+        icon: "radio",
+        color: "tertiary",
+      },
+      "radio-listen": {
+        label: "Listen Settings",
+        icon: "headset",
+        color: "tertiary",
+      },
     };
 
     for (const [groupKey, { label, icon, color }] of Object.entries(groups)) {
@@ -105,15 +126,18 @@ export class RadioPadUI extends EventEmitter {
     }
   }
 
-  renderStations(station_data) {
-    this.stationButtons = {};
-    this._stationGrid.innerHTML = "";
+  renderStations(station_data, tabName = "control") {
+    const tab = this.tabs[tabName];
+    if (!tab) return;
+
+    tab.stationButtons = {};
+    tab.refs.stationGrid.innerHTML = "";
 
     let ionRow;
     station_data.stations.forEach((station, index) => {
       if (index % 3 === 0) {
         ionRow = document.createElement("ion-row");
-        this._stationGrid.appendChild(ionRow);
+        tab.refs.stationGrid.appendChild(ionRow);
       }
       const ionCol = document.createElement("ion-col");
       const ionButton = document.createElement("ion-button");
@@ -121,19 +145,24 @@ export class RadioPadUI extends EventEmitter {
       ionButton.expand = "block";
       ionButton.addEventListener("click", () => {
         ionButton.setAttribute("color", "light");
-        this.emitEvent("click-station", station.name);
+        this.emitEvent("click-station", {
+          station: station.name,
+          tab: tabName,
+        });
       });
-      this.stationButtons[station.name] = ionButton;
+      tab.stationButtons[station.name] = ionButton;
       ionCol.appendChild(ionButton);
       ionRow.appendChild(ionCol);
     });
 
-    let stationsName = document.getElementById("stations-name");
-    stationsName.innerText = station_data.name;
+    tab.refs.stationsName.innerText = station_data.name;
   }
 
-  renderSkeletonStations(rows = 3, cols = 3) {
-    this._stationGrid.innerHTML = "";
+  renderSkeletonStations(rows = 3, cols = 3, tabName = "control") {
+    const tab = this.tabs[tabName];
+    if (!tab) return;
+
+    tab.refs.stationGrid.innerHTML = "";
     for (let i = 0; i < rows; i++) {
       const ionRow = document.createElement("ion-row");
       ionRow.className = "station-placeholder";
@@ -144,19 +173,22 @@ export class RadioPadUI extends EventEmitter {
         ionCol.appendChild(skeleton);
         ionRow.appendChild(ionCol);
       }
-      this._stationGrid.appendChild(ionRow);
+      tab.refs.stationGrid.appendChild(ionRow);
     }
   }
 
-  highlightCurrentStation(currentStation) {
-    Object.entries(this.stationButtons).forEach(([name, btn]) => {
+  highlightCurrentStation(currentStation, tabName = "control") {
+    const tab = this.tabs[tabName];
+    if (!tab) return;
+
+    Object.entries(tab.stationButtons).forEach(([name, btn]) => {
       btn.setAttribute(
         "color",
         name === currentStation ? "success" : "primary",
       );
     });
-    this._stopButton.disabled = !currentStation;
-    this._nowPlaying.innerText = currentStation || "...";
+    tab.refs.stopButton.disabled = !currentStation;
+    tab.refs.nowPlaying.innerText = currentStation || "...";
   }
 
   updatePreference(key, value, options = null) {
