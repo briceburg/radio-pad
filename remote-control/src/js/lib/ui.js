@@ -65,6 +65,18 @@ export class RadioPadUI extends EventEmitter {
   renderPreferences(preferences) {
     const settingsList = document.getElementById("settings-list");
     settingsList.innerHTML = "";
+    const groups = {
+      "default": { label: "Primary Settings", icon: "settings", color: "tertiary"},
+      "radio-control": { label: "Control Settings", icon: "radio", color: "tertiary" },
+      "radio-listen": { label: "Listen Settings", icon: "headset", color: "tertiary" }
+    };
+
+    for (const [groupKey, { label, icon, color }] of Object.entries(groups)) {
+      const group = document.createElement("ion-item-group");
+      group.innerHTML = `<ion-item-divider color="${color}"><ion-icon name="${icon}" slot="start"></ion-icon><ion-label>${label}</ion-label></ion-item-divider>`;
+      settingsList.appendChild(group);
+      groups[groupKey].element = group;
+    }
 
     for (const [key, pref] of Object.entries(preferences)) {
       const item = document.createElement("ion-item");
@@ -89,7 +101,7 @@ export class RadioPadUI extends EventEmitter {
       input.value = pref.value;
       item.appendChild(label);
       item.appendChild(input);
-      settingsList.appendChild(item);
+      groups[pref.group || "default"].element.appendChild(item);
     }
   }
 

@@ -45,11 +45,13 @@ class RadioPad {
         case "registryUrl": {
           const accounts = await discoverAccounts(data.value);
           await this.PREFS.setOptions("accountId", accounts);
+          await this.PREFS.setOptions("listenAccountId", accounts);
           break;
         }
         case "accountId": {
           const players = await discoverPlayers(data.value, this.PREFS);
           await this.PREFS.setOptions("playerId", players);
+          await this.PREFS.setOptions("listenPlayerId", players);
           break;
         }
         case "playerId": {
