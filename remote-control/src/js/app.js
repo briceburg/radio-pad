@@ -87,15 +87,17 @@ class RadioPad {
           await this.PREFS.setOptions("presetId", data.value);
           break;
         case "player":
+          this.STATE.set("current_station", null);
+          this.UI.renderSkeletonStations(3, 3, "control");
           await this.CONTROL.connect(data.value.switchboard_url);
           break;
         case "stations_url":
           await this.loadStations(data.value, "control");
           break;
-        case "controlStation":
+        case "current_station":
           this.UI.highlightCurrentStation(data.value, "control");
           break;
-        case "listenStation":
+        case "listen_station":
           this.UI.highlightCurrentStation(data.value, "listen");
           break;
       }
@@ -118,7 +120,7 @@ class RadioPad {
       this.UI.info(`⚠️ Error: ${msg}`, "control");
     });
     this.CONTROL.registerEvent("station-playing", (stationName) => {
-      this.STATE.set("controlStation", stationName);
+      this.STATE.set("current_station", stationName);
     });
     this.CONTROL.registerEvent("stations-url", (url) => {
       this.STATE.set("stations_url", url);
@@ -128,7 +130,7 @@ class RadioPad {
     this.UI.registerEvent("click-station", (data) => {
       if (data.tab === "listen") {
         this.LISTEN.play(data.station);
-        this.STATE.set("listenStation", data.station);
+        this.STATE.set("listen_station", data.station);
       } else {
         this.CONTROL.sendStationRequest(data.station);
       }
@@ -136,7 +138,7 @@ class RadioPad {
     this.UI.registerEvent("click-stop", (data) => {
       if (data.tab === "listen") {
         this.LISTEN.stop();
-        this.STATE.set("listenStation", null);
+        this.STATE.set("listen_station", null);
       } else {
         this.CONTROL.sendStationRequest(null);
       }
@@ -165,8 +167,8 @@ class RadioPad {
       this.UI.renderStations(station_data, tabName);
       const currentStation =
         tabName === "listen"
-          ? this.STATE.get("listenStation")
-          : this.STATE.get("controlStation");
+          ? this.STATE.get("listen_station")
+          : this.STATE.get("current_station");
       this.UI.highlightCurrentStation(currentStation, tabName);
     } catch (error) {
       // TODO: use toast / ui notification error?

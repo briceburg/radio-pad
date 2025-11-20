@@ -195,10 +195,10 @@ export class RadioPadUI extends EventEmitter {
     console.log("updatePreference: ", key, value, options);
     const input = document.getElementById(`pref-${key}`);
     if (input) {
-      input.value = value;
       if (options !== null) {
         this._populateSelectOptions(input, options);
       }
+      input.value = value;
     }
   }
 

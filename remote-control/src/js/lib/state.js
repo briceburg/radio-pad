@@ -23,7 +23,8 @@ export class RadioPadState extends EventEmitter {
     initialState = {
       available_players: [],
       available_presets: [],
-      currentStation: null,
+      current_station: null,
+      listen_station: null,
       player: {
         id: null,
         name: null,
