@@ -18,7 +18,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { EventEmitter } from "./interfaces.js";
 
-export class RadioPadSwitchboard extends EventEmitter {
+export class RadioControl extends EventEmitter {
   constructor() {
     super();
     this.ws = null;
@@ -45,6 +45,20 @@ export class RadioPadSwitchboard extends EventEmitter {
       this.ws.close();
       this.ws = null;
     }
+    this.emitEvent("disconnect");
+  }
+
+  play(station) {
+    this.sendStationRequest(station);
+  }
+
+  stop() {
+    this.sendStationRequest(null);
+  }
+
+  setVolume(level) {
+    // TODO: Implement volume control in switchboard/protocol if not already present
+    // this.sendVolumeRequest(level);
   }
 
   sendStationRequest(stationName) {

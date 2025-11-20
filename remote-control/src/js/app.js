@@ -21,8 +21,8 @@ SafeArea.enable({ config: {} });
 
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
-import { RadioPadStreamer } from "./lib/streaming.js";
-import { RadioPadSwitchboard } from "./lib/switchboard.js";
+import { RadioListen } from "./lib/radio-listen.js";
+import { RadioControl } from "./lib/radio-control.js";
 import { RadioPadUI } from "./lib/ui.js";
 import {
   discoverAccounts,
@@ -35,8 +35,8 @@ class RadioPad {
   constructor() {
     this.STATE = new RadioPadState();
     this.PREFS = new RadioPadPreferences();
-    this.STREAMER = new RadioPadStreamer();
-    this.SWITCHBOARD = new RadioPadSwitchboard();
+    this.LISTEN = new RadioListen();
+    this.CONTROL = new RadioControl();
     this.UI = new RadioPadUI();
     this.stations = new Map();
 
@@ -51,8 +51,8 @@ class RadioPad {
         case "accountId": {
           const players = await discoverPlayers(data.value, this.PREFS);
           const presets = await discoverPresets(data.value, this.PREFS);
-          await this.PREFS.setOptions("playerId", players);
-          await this.PREFS.setOptions("presetId", presets);
+          this.STATE.set("available_players", players);
+          this.STATE.set("available_presets", presets);
           break;
         }
         case "playerId": {
@@ -80,8 +80,14 @@ class RadioPad {
     // STATE CHANGES
     this.STATE.registerEvent("on-change", async (data) => {
       switch (data.key) {
+        case "available_players":
+          await this.PREFS.setOptions("playerId", data.value);
+          break;
+        case "available_presets":
+          await this.PREFS.setOptions("presetId", data.value);
+          break;
         case "player":
-          await this.SWITCHBOARD.connect(data.value.switchboard_url);
+          await this.CONTROL.connect(data.value.switchboard_url);
           break;
         case "stations_url":
           await this.loadStations(data.value, "control");
@@ -95,44 +101,44 @@ class RadioPad {
       }
     });
 
-    // SWITCHBOARD EVENTS
-    this.SWITCHBOARD.registerEvent("connect", (url) => {
+    // REMOTE CONTROL EVENTS
+    this.CONTROL.registerEvent("connect", (url) => {
       this.UI.info(
         `✅ Connected to ${this.STATE.get("player").name}`,
         "control",
       );
     });
-    this.SWITCHBOARD.registerEvent("connecting", (url) => {
+    this.CONTROL.registerEvent("connecting", (url) => {
       this.UI.info(`🔄 Connecting...`, "control");
     });
-    this.SWITCHBOARD.registerEvent("disconnect", () => {
+    this.CONTROL.registerEvent("disconnect", () => {
       this.UI.info("🔌 Disconnected. Reconnecting...", "control");
     });
-    this.SWITCHBOARD.registerEvent("error", (msg) => {
+    this.CONTROL.registerEvent("error", (msg) => {
       this.UI.info(`⚠️ Error: ${msg}`, "control");
     });
-    this.SWITCHBOARD.registerEvent("station-playing", (stationName) => {
+    this.CONTROL.registerEvent("station-playing", (stationName) => {
       this.STATE.set("controlStation", stationName);
     });
-    this.SWITCHBOARD.registerEvent("stations-url", (url) => {
+    this.CONTROL.registerEvent("stations-url", (url) => {
       this.STATE.set("stations_url", url);
     });
 
     // UI EVENTS
     this.UI.registerEvent("click-station", (data) => {
       if (data.tab === "listen") {
-        this.STREAMER.play(data.station);
+        this.LISTEN.play(data.station);
         this.STATE.set("listenStation", data.station);
       } else {
-        this.SWITCHBOARD.sendStationRequest(data.station);
+        this.CONTROL.sendStationRequest(data.station);
       }
     });
     this.UI.registerEvent("click-stop", (data) => {
       if (data.tab === "listen") {
-        this.STREAMER.stop();
+        this.LISTEN.stop();
         this.STATE.set("listenStation", null);
       } else {
-        this.SWITCHBOARD.sendStationRequest(null);
+        this.CONTROL.sendStationRequest(null);
       }
     });
     this.UI.registerEvent("settings-save", (settingsMap) => {
@@ -154,7 +160,7 @@ class RadioPad {
       const response = await fetch(stations_url);
       const station_data = await response.json();
       if (tabName === "listen") {
-        this.STREAMER.setStations(station_data);
+        this.LISTEN.setStations(station_data);
       }
       this.UI.renderStations(station_data, tabName);
       const currentStation =
