@@ -18,6 +18,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { Capacitor } from "@capacitor/core";
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
+import { EventEmitter } from "./interfaces.js";
 
 /**
  * Web-based audio player using HTML5 Audio API
@@ -116,12 +117,19 @@ class NativeAudioPlayer {
   }
 }
 
-export class RadioPadStreamer {
+export class RadioListen extends EventEmitter {
   constructor() {
+    super();
     this.player = Capacitor.isNativePlatform()
       ? new NativeAudioPlayer()
       : new WebAudioPlayer();
     this.stations = new Map();
+  }
+
+  setStations(station_data) {
+    this.stations = new Map(
+      station_data.stations.map((station) => [station.name, station.url]),
+    );
   }
 
   async play(stationName) {
@@ -129,16 +137,16 @@ export class RadioPadStreamer {
     // TODO: support .pls URLS
     if (url) {
       await this.player.play(url, stationName);
+      this.emitEvent("station-playing", stationName);
     }
   }
 
   async stop() {
     await this.player.stop();
+    this.emitEvent("station-playing", null);
   }
 
-  setStations(station_data) {
-    this.stations = new Map(
-      station_data.stations.map((station) => [station.name, station.url]),
-    );
+  setVolume(level) {
+    // TODO: Implement volume control for local player if supported by drivers
   }
 }

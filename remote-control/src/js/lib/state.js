@@ -21,6 +21,9 @@ import { EventEmitter } from "./interfaces.js";
 export class RadioPadState extends EventEmitter {
   constructor(
     initialState = {
+      available_players: [],
+      available_presets: [],
+      currentStation: null,
       player: {
         id: null,
         name: null,
@@ -28,8 +31,6 @@ export class RadioPadState extends EventEmitter {
         switchboard_url: null,
       },
       stations_url: null,
-      currentStation: null,
-      localMode: false,
     },
   ) {
     super();
