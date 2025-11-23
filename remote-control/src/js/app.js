@@ -148,9 +148,12 @@ class RadioPad {
         this.CONTROL.sendStationRequest(null);
       }
     });
-    this.UI.registerEvent("settings-save", (settingsMap) => {
+    this.UI.registerEvent("settings-save", async (settingsMap) => {
       for (const [key, value] of Object.entries(settingsMap)) {
-        this.PREFS.set(key, value);
+        const storedValue = await this.PREFS.set(key, value);
+        if (storedValue !== value) {
+          this.UI.updatePreference(key, storedValue);
+        }
       }
     });
   }
