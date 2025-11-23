@@ -32,7 +32,7 @@ async function fetchAllPages(startPath, registryUrl) {
   return items;
 }
 
-export async function discoverAccounts(registryUrl) {
+export async function discoverAccounts(registryUrl, {throwOnError = false} = {}) {
   try {
     if (registryUrl) {
       const items = await fetchAllPages("/v1/accounts/", registryUrl);
@@ -40,6 +40,8 @@ export async function discoverAccounts(registryUrl) {
     }
   } catch (e) {
     console.error("Failed to fetch accounts from registry:", e);
+
+    if (throwOnError) throw e;
   }
   return [];
 }
