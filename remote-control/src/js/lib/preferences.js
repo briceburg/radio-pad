@@ -70,9 +70,9 @@ export class RadioPadPreferences extends EventEmitter {
       const value = await this.get(key);
       const defaultValue = this.preferences[key]?.default || null;
       if (value === null && defaultValue !== null) {
-        this.set(key, defaultValue);
+        await this.set(key, defaultValue);
       } else {
-        this.set(key, value);
+        await this.set(key, value);
       }
     }
   }
@@ -84,15 +84,42 @@ export class RadioPadPreferences extends EventEmitter {
 
   async set(key, value) {
     const pref = this.preferences[key];
-    if (value !== pref.value) {
-      if (pref.validate && !pref.validate(value)) {
-        console.warn(`Invalid value for preference ${key}: ${value}`);
-      } else {
-        pref.value = value;
-        await Preferences.set({ key, value });
-        await this.emitEvent("on-change", { key, value });
-      }
+    if (!pref) {
+      console.warn(`Unknown preference: ${key}`);
+      return null;
     }
+
+    const currentValue = pref.value ?? null;
+    if (pref.value !== undefined && value === pref.value) {
+      return currentValue;
+    }
+
+    const normalize = pref.normalize || ((v) => v);
+    let nextValue;
+    try {
+      nextValue = normalize(value);
+    } catch (error) {
+      console.warn(`Normalization failed for preference ${key}`, error);
+      return currentValue;
+    }
+
+    if (nextValue !== value) {
+      console.info(`Normalized preference ${key}: '${value}' -> '${nextValue}'`);
+    }
+
+    if (pref.validate && !pref.validate(nextValue)) {
+      console.warn(`Invalid value for preference ${key}: ${nextValue}`);
+      return currentValue;
+    }
+
+    if (nextValue === pref.value) {
+      return pref.value ?? null;
+    }
+
+    pref.value = nextValue;
+    await Preferences.set({ key, value: nextValue });
+    await this.emitEvent("on-change", { key, value: nextValue });
+    return nextValue;
   }
 
   async setOptions(key, options) {
