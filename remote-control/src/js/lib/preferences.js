@@ -28,6 +28,11 @@ export class RadioPadPreferences extends EventEmitter {
         placeholder: "Enter registry URL",
         default:
           import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
+        normalize: (value) => {
+          const trimmed = typeof value === "string" ? value.trim() : "";
+          if (!trimmed) return trimmed;
+          return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+        },
         validate: (value) => {
           try {
             new URL(value);
