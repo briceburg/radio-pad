@@ -32,7 +32,10 @@ async function fetchAllPages(startPath, registryUrl) {
   return items;
 }
 
-export async function discoverAccounts(registryUrl, {throwOnError = false} = {}) {
+export async function discoverAccounts(
+  registryUrl,
+  { throwOnError = false } = {},
+) {
   try {
     if (registryUrl) {
       const items = await fetchAllPages("/v1/accounts/", registryUrl);

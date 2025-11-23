@@ -49,7 +49,9 @@ class RadioPad {
     this.PREFS.registerEvent("on-change", async (data) => {
       switch (data.key) {
         case "registryUrl": {
-          const accounts = await discoverAccounts(data.value, {throwOnError: true});
+          const accounts = await discoverAccounts(data.value, {
+            throwOnError: true,
+          });
           await this.PREFS.setOptions("accountId", accounts);
           break;
         }
