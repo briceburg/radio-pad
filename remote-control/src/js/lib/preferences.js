@@ -109,7 +109,9 @@ export class RadioPadPreferences extends EventEmitter {
     }
 
     if (nextValue !== value) {
-      console.info(`Normalized preference ${key}: '${value}' -> '${nextValue}'`);
+      console.info(
+        `Normalized preference ${key}: '${value}' -> '${nextValue}'`,
+      );
     }
 
     if (pref.validate && !pref.validate(nextValue)) {
