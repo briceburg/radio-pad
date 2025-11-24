@@ -22,6 +22,11 @@ async function fetchAllPages(startPath, registryUrl) {
 
   while (url) {
     const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error(
+        `Registry request failed with status ${resp.status} for ${url}`,
+      );
+    }
     const data = await resp.json();
     if (Array.isArray(data.items)) items.push(...data.items);
 
@@ -33,15 +38,14 @@ async function fetchAllPages(startPath, registryUrl) {
 }
 
 export async function discoverAccounts(registryUrl) {
+  if (!registryUrl) return [];
   try {
-    if (registryUrl) {
-      const items = await fetchAllPages("/v1/accounts/", registryUrl);
-      return items.map((i) => ({ value: i.id, label: i.name || i.id }));
-    }
-  } catch (e) {
-    console.error("Failed to fetch accounts from registry:", e);
+    const items = await fetchAllPages("/v1/accounts/", registryUrl);
+    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  } catch (error) {
+    console.error("Failed to fetch accounts from registry:", error);
+    throw error;
   }
-  return [];
 }
 
 export async function discoverPlayers(accountId, prefs) {

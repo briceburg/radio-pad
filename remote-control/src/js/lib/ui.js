@@ -22,10 +22,12 @@ export class RadioPadUI extends EventEmitter {
   constructor() {
     super();
     this.tabs = {}; // map of tab name to { element, refs, stationButtons }
+    this._toast = null;
   }
 
   init() {
     this._settingsSaveButton = document.getElementById("settings-save-button");
+    this._toast = document.getElementById("global-toast");
 
     // Initialize tabs
     ["control", "listen"].forEach((tabName) => this._initPlayerTab(tabName));
@@ -58,17 +60,42 @@ export class RadioPadUI extends EventEmitter {
       stationGrid: tabEl.querySelector(".station-grid"),
     };
 
-    this.tabs[tabName] = { element: tabEl, refs: refs, stationButtons: {} };
+    this.tabs[tabName] = {
+      element: tabEl,
+      refs,
+      stationButtons: {},
+      setInfo: (msg) => {
+        if (refs.radioInfo) refs.radioInfo.innerText = msg;
+      },
+    };
 
     refs.stopButton.addEventListener("click", () => {
       this.emitEvent("click-stop", { tab: tabName });
     });
   }
 
-  info(msg, tabName = "control") {
-    if (this.tabs[tabName]) {
-      this.tabs[tabName].refs.radioInfo.innerText = msg;
-    }
+  getTab(tabName) {
+    return this.tabs[tabName] || null;
+  }
+
+  setTabInfo(message, tabName = "control") {
+    this.getTab(tabName)?.setInfo?.(message);
+  }
+
+  async toast(message, { color = "tertiary", duration = 3000 } = {}) {
+    if (!this._toast) return;
+    this._toast.message = message;
+    this._toast.duration = duration;
+    this._toast.color = color;
+    await this._toast.present();
+  }
+
+  async toastWarning(message) {
+    await this.toast(message, { color: "warning" });
+  }
+
+  async toastSuccess(message) {
+    await this.toast(message, { color: "success" });
   }
 
   renderPreferences(preferences) {

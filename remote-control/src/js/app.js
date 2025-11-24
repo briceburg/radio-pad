@@ -54,6 +54,10 @@ class RadioPad {
             await this.PREFS.setOptions("accountId", accounts);
           } catch (error) {
             console.error("Failed to update accounts:", error);
+            const message =
+              "⚠️ Unable to load accounts. Check the registry URL or network.";
+            this.UI.setTabInfo(message);
+            await this.UI.toastWarning(message);
           }
           break;
         }
@@ -114,19 +118,16 @@ class RadioPad {
 
     // REMOTE CONTROL EVENTS
     this.CONTROL.registerEvent("connect", (url) => {
-      this.UI.info(
-        `✅ Connected to ${this.STATE.get("player").name}`,
-        "control",
-      );
+      this.UI.setTabInfo(`✅ Connected to ${this.STATE.get("player").name}`);
     });
     this.CONTROL.registerEvent("connecting", (url) => {
-      this.UI.info(`🔄 Connecting...`, "control");
+      this.UI.setTabInfo(`🔄 Connecting...`);
     });
     this.CONTROL.registerEvent("disconnect", () => {
-      this.UI.info("🔌 Disconnected. Reconnecting...", "control");
+      this.UI.setTabInfo("🔌 Disconnected. Reconnecting...");
     });
     this.CONTROL.registerEvent("error", (msg) => {
-      this.UI.info(`⚠️ Error: ${msg}`, "control");
+      this.UI.setTabInfo(`⚠️ Error: ${msg}`);
     });
     this.CONTROL.registerEvent("station-playing", (stationName) => {
       this.STATE.set("current_station", stationName);
@@ -153,6 +154,7 @@ class RadioPad {
       }
     });
     this.UI.registerEvent("settings-save", async (settingsMap) => {
+      // Apply sequentially so downstream events fire in a predictable order.
       for (const [key, value] of Object.entries(settingsMap)) {
         await this.PREFS.set(key, value);
       }
@@ -160,8 +162,8 @@ class RadioPad {
   }
 
   async start() {
-    await this.PREFS.init();
     this.UI.init();
+    await this.PREFS.init();
     this.UI.renderPreferences(this.PREFS.preferences);
   }
 
