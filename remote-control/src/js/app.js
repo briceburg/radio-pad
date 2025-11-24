@@ -49,10 +49,12 @@ class RadioPad {
     this.PREFS.registerEvent("on-change", async (data) => {
       switch (data.key) {
         case "registryUrl": {
-          const accounts = await discoverAccounts(data.value, {
-            throwOnError: true,
-          });
-          await this.PREFS.setOptions("accountId", accounts);
+          try {
+            const accounts = await discoverAccounts(data.value);
+            await this.PREFS.setOptions("accountId", accounts);
+          } catch (error) {
+            console.error("Failed to update accounts:", error);
+          }
           break;
         }
         case "accountId": {
@@ -152,10 +154,7 @@ class RadioPad {
     });
     this.UI.registerEvent("settings-save", async (settingsMap) => {
       for (const [key, value] of Object.entries(settingsMap)) {
-        const storedValue = await this.PREFS.set(key, value);
-        if (storedValue !== value) {
-          this.UI.updatePreference(key, storedValue);
-        }
+        await this.PREFS.set(key, value);
       }
     });
   }
