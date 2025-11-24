@@ -73,12 +73,17 @@ export class RadioPadPreferences extends EventEmitter {
   async init() {
     for (const [key, pref] of Object.entries(this.preferences)) {
       const value = await this.get(key);
-      const defaultValue = this.preferences[key]?.default || null;
-      if (value === null && defaultValue !== null) {
-        await this.set(key, defaultValue);
-      } else {
-        await this.set(key, value);
+      const defaultValue = pref?.default ?? null;
+
+      if (value === null || value === undefined) {
+        if (defaultValue !== null && defaultValue !== undefined) {
+          await this.set(key, defaultValue);
+        }
+        continue;
       }
+
+      pref.value = value;
+      await this.emitEvent("on-change", { key, value });
     }
   }
 
@@ -87,14 +92,16 @@ export class RadioPadPreferences extends EventEmitter {
     return result.value;
   }
 
+  /**
+   * Sets a preference value, applying normalization/validation hooks when present.
+   * Always returns undefined to preserve legacy behavior.
+   */
   async set(key, value) {
     const pref = this.preferences[key];
     if (!pref) {
       console.warn(`Unknown preference: ${key}`);
-      return null;
+      return;
     }
-
-    const currentValue = pref.value ?? null;
 
     const normalize = pref.normalize || ((v) => v);
     let nextValue;
@@ -102,32 +109,29 @@ export class RadioPadPreferences extends EventEmitter {
       nextValue = normalize(value);
     } catch (error) {
       console.warn(`Normalization failed for preference ${key}`, error);
-      return currentValue;
+      return;
     }
 
-    if (nextValue == null) {
-      return currentValue;
+    if (nextValue === null || nextValue === undefined) {
+      return;
     }
 
     if (nextValue !== value) {
-      console.info(
-        `Normalized preference ${key}: '${value}' -> '${nextValue}'`,
-      );
+      console.info(`Normalized preference ${key}`);
     }
 
     if (pref.validate && !pref.validate(nextValue)) {
       console.warn(`Invalid value for preference ${key}: ${nextValue}`);
-      return currentValue;
+      return;
     }
 
     if (nextValue === pref.value) {
-      return pref.value ?? null;
+      return;
     }
 
     pref.value = nextValue;
     await Preferences.set({ key, value: nextValue });
     await this.emitEvent("on-change", { key, value: nextValue });
-    return nextValue;
   }
 
   async setOptions(key, options) {

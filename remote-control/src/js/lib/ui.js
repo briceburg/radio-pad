@@ -17,6 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { EventEmitter } from "./interfaces.js";
+import { RegistryRequestError } from "./error-utils.js";
 
 export class RadioPadUI extends EventEmitter {
   constructor() {
@@ -69,6 +70,8 @@ export class RadioPadUI extends EventEmitter {
       },
     };
 
+    this.renderSkeletonStations(tabName);
+
     refs.stopButton.addEventListener("click", () => {
       this.emitEvent("click-stop", { tab: tabName });
     });
@@ -80,6 +83,27 @@ export class RadioPadUI extends EventEmitter {
 
   setTabInfo(message, tabName = "control") {
     this.getTab(tabName)?.setInfo?.(message);
+  }
+
+  async showError({
+    summary,
+    error = null,
+    tab = "control",
+    toastColor = "warning",
+  }) {
+    const detailText = this._formatError(error);
+    const message = detailText ? `${summary} ${detailText}`.trim() : summary;
+    this.setTabInfo(message, tab);
+    await this.toast(message, { color: toastColor });
+  }
+
+  async showRegistryError(summary, error, options = {}) {
+    const registryDetail = RegistryRequestError.format(error);
+    await this.showError({
+      summary,
+      error: { message: registryDetail },
+      ...options,
+    });
   }
 
   async toast(message, { color = "tertiary", duration = 3000 } = {}) {
@@ -185,7 +209,8 @@ export class RadioPadUI extends EventEmitter {
     tab.refs.stationsName.innerText = station_data.name;
   }
 
-  renderSkeletonStations(rows = 3, cols = 3, tabName = "control") {
+  renderSkeletonStations(tabName = "control", options = {}) {
+    const { rows = 3, cols = 3 } = options;
     const tab = this.tabs[tabName];
     if (!tab) return;
 
@@ -237,5 +262,12 @@ export class RadioPadUI extends EventEmitter {
       optionElement.innerText = option.label;
       input.appendChild(optionElement);
     }
+  }
+
+  _formatError(error) {
+    if (error && typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+    return "";
   }
 }
