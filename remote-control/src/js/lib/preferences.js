@@ -30,7 +30,7 @@ export class RadioPadPreferences extends EventEmitter {
           import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
         normalize: (value) => {
           const trimmed = typeof value === "string" ? value.trim() : "";
-          if (!trimmed) return trimmed;
+          if (!trimmed) return null;
           return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
         },
         validate: (value) => {
@@ -95,9 +95,6 @@ export class RadioPadPreferences extends EventEmitter {
     }
 
     const currentValue = pref.value ?? null;
-    if (pref.value !== undefined && value === pref.value) {
-      return currentValue;
-    }
 
     const normalize = pref.normalize || ((v) => v);
     let nextValue;
@@ -105,6 +102,10 @@ export class RadioPadPreferences extends EventEmitter {
       nextValue = normalize(value);
     } catch (error) {
       console.warn(`Normalization failed for preference ${key}`, error);
+      return currentValue;
+    }
+
+    if (nextValue == null) {
       return currentValue;
     }
 
