@@ -43,8 +43,6 @@ class RadioPad {
     this.LISTEN = new RadioListen();
     this.CONTROL = new RadioControl();
     this.UI = new RadioPadUI();
-    this.stations = new Map();
-
     // PREFERENCE CHANGES
     this.PREFS.registerEvent("on-change", async (data) => {
       switch (data.key) {
@@ -116,7 +114,7 @@ class RadioPad {
           break;
         case "player":
           this.STATE.set("current_station", null);
-          this.UI.renderSkeletonStations("control");
+          this.UI.showStationsLoading("control");
           await this.CONTROL.connect(data.value.switchboard_url);
           break;
         case "stations_url":
@@ -183,7 +181,7 @@ class RadioPad {
   }
 
   async loadStations(stations_url, tabName = "control") {
-    this.UI.renderSkeletonStations(tabName);
+    this.UI.showStationsLoading(tabName);
     try {
       const response = await fetch(stations_url);
       const station_data = await response.json();
@@ -197,8 +195,12 @@ class RadioPad {
           : this.STATE.get("current_station");
       this.UI.highlightCurrentStation(currentStation, tabName);
     } catch (error) {
-      // TODO: use toast / ui notification error?
       console.error("Error loading stations:", error);
+      await this.UI.showError({
+        summary: "⚠️ Failed loading stations.",
+        error,
+        tab: tabName,
+      });
     }
   }
 }

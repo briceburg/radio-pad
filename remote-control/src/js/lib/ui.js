@@ -68,9 +68,13 @@ export class RadioPadUI extends EventEmitter {
       setInfo: (msg) => {
         if (refs.radioInfo) refs.radioInfo.innerText = msg;
       },
+      setNowPlaying: (stationName = null) => {
+        if (refs.nowPlaying) refs.nowPlaying.innerText = stationName || "...";
+        if (refs.stopButton) refs.stopButton.disabled = !stationName;
+      },
     };
 
-    this.renderSkeletonStations(tabName);
+    this.showStationsLoading(tabName);
 
     refs.stopButton.addEventListener("click", () => {
       this.emitEvent("click-stop", { tab: tabName });
@@ -209,11 +213,12 @@ export class RadioPadUI extends EventEmitter {
     tab.refs.stationsName.innerText = station_data.name;
   }
 
-  renderSkeletonStations(tabName = "control", options = {}) {
+  showStationsLoading(tabName = "control", options = {}) {
     const { rows = 3, cols = 3 } = options;
     const tab = this.tabs[tabName];
     if (!tab) return;
 
+    tab.stationButtons = {};
     tab.refs.stationGrid.innerHTML = "";
     for (let i = 0; i < rows; i++) {
       const ionRow = document.createElement("ion-row");
@@ -227,6 +232,8 @@ export class RadioPadUI extends EventEmitter {
       }
       tab.refs.stationGrid.appendChild(ionRow);
     }
+
+    tab.setNowPlaying?.(null);
   }
 
   highlightCurrentStation(currentStation, tabName = "control") {
@@ -239,8 +246,7 @@ export class RadioPadUI extends EventEmitter {
         name === currentStation ? "success" : "primary",
       );
     });
-    tab.refs.stopButton.disabled = !currentStation;
-    tab.refs.nowPlaying.innerText = currentStation || "...";
+    tab.setNowPlaying?.(currentStation);
   }
 
   updatePreference(key, value, options = null) {
