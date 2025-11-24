@@ -181,10 +181,19 @@ class RadioPad {
   }
 
   async loadStations(stations_url, tabName = "control") {
+    if (!this.stationRequests) {
+      // Track per-tab request ids so stale responses do not repaint the UI.
+      this.stationRequests = new Map();
+    }
     this.UI.showStationsLoading(tabName);
+    const nextRequestId = (this.stationRequests.get(tabName) || 0) + 1;
+    this.stationRequests.set(tabName, nextRequestId);
     try {
       const response = await fetch(stations_url);
       const station_data = await response.json();
+      if (nextRequestId !== this.stationRequests.get(tabName)) {
+        return;
+      }
       if (tabName === "listen") {
         this.LISTEN.setStations(station_data);
       }
@@ -195,6 +204,9 @@ class RadioPad {
           : this.STATE.get("current_station");
       this.UI.highlightCurrentStation(currentStation, tabName);
     } catch (error) {
+      if (nextRequestId !== this.stationRequests.get(tabName)) {
+        return;
+      }
       console.error("Error loading stations:", error);
       await this.UI.showError({
         summary: "⚠️ Failed loading stations.",
