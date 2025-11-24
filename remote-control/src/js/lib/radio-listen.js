@@ -147,6 +147,6 @@ export class RadioListen extends EventEmitter {
   }
 
   setVolume(level) {
-    // TODO: Implement volume control for local player if supported by drivers
+    // TODO: Implement volume control for local player
   }
 }

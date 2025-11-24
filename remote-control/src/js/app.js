@@ -53,25 +53,40 @@ class RadioPad {
             const accounts = await discoverAccounts(data.value);
             await this.PREFS.setOptions("accountId", accounts);
           } catch (error) {
-            console.error("Failed to update accounts:", error);
-            const message =
-              "⚠️ Unable to load accounts. Check the registry URL or network.";
-            this.UI.setTabInfo(message);
-            await this.UI.toastWarning(message);
+            await this.UI.showRegistryError(
+              "⚠️ Failed refreshing accounts.",
+              error,
+            );
           }
           break;
         }
         case "accountId": {
-          const players = await discoverPlayers(data.value, this.PREFS);
-          const presets = await discoverPresets(data.value, this.PREFS);
-          this.STATE.set("available_players", players);
-          this.STATE.set("available_presets", presets);
+          try {
+            const [players, presets] = await Promise.all([
+              discoverPlayers(data.value, this.PREFS),
+              discoverPresets(data.value, this.PREFS),
+            ]);
+            this.STATE.set("available_players", players);
+            this.STATE.set("available_presets", presets);
+          } catch (error) {
+            await this.UI.showRegistryError(
+              "⚠️ Failed refreshing account players/presets.",
+              error,
+            );
+          }
           break;
         }
         case "playerId": {
-          const player = await discoverPlayer(data.value, this.PREFS);
-          if (player) {
-            this.STATE.set("player", player);
+          try {
+            const player = await discoverPlayer(data.value, this.PREFS);
+            if (player) {
+              this.STATE.set("player", player);
+            }
+          } catch (error) {
+            await this.UI.showRegistryError(
+              "⚠️ Failed refreshing player info.",
+              error,
+            );
           }
           break;
         }
@@ -101,7 +116,7 @@ class RadioPad {
           break;
         case "player":
           this.STATE.set("current_station", null);
-          this.UI.renderSkeletonStations(3, 3, "control");
+          this.UI.renderSkeletonStations("control");
           await this.CONTROL.connect(data.value.switchboard_url);
           break;
         case "stations_url":
@@ -168,7 +183,7 @@ class RadioPad {
   }
 
   async loadStations(stations_url, tabName = "control") {
-    this.UI.renderSkeletonStations(3, 3, tabName);
+    this.UI.renderSkeletonStations(tabName);
     try {
       const response = await fetch(stations_url);
       const station_data = await response.json();

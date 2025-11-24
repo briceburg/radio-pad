@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { RegistryRequestError } from "./error-utils.js";
+
 async function fetchAllPages(startPath, registryUrl) {
   const items = [];
   let url = new URL(startPath, registryUrl).toString();
@@ -23,9 +25,7 @@ async function fetchAllPages(startPath, registryUrl) {
   while (url) {
     const resp = await fetch(url);
     if (!resp.ok) {
-      throw new Error(
-        `Registry request failed with status ${resp.status} for ${url}`,
-      );
+      throw new RegistryRequestError({ url, status: resp.status });
     }
     const data = await resp.json();
     if (Array.isArray(data.items)) items.push(...data.items);
@@ -49,61 +49,68 @@ export async function discoverAccounts(registryUrl) {
 }
 
 export async function discoverPlayers(accountId, prefs) {
-  try {
-    const registryUrl = await prefs.get("registryUrl");
+  if (!accountId) return [];
 
-    if (registryUrl && accountId) {
-      const path = `/v1/accounts/${accountId}/players/`;
-      const items = await fetchAllPages(path, registryUrl);
-      return items.map((i) => ({ value: i.id, label: i.name || i.id }));
-    }
-  } catch (e) {
-    console.error("Failed to fetch players from registry:", e);
+  const registryUrl = await prefs.get("registryUrl");
+  if (!registryUrl) return [];
+
+  try {
+    const path = `/v1/accounts/${accountId}/players/`;
+    const items = await fetchAllPages(path, registryUrl);
+    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  } catch (error) {
+    console.error("Failed to fetch players from registry:", error);
+    throw error;
   }
-  return [];
 }
 
 export async function discoverPresets(accountId, prefs) {
-  const presets = [];
-  try {
-    const registryUrl = await prefs.get("registryUrl");
-    const paths = [
-      ...(accountId ? [`/v1/accounts/${accountId}/presets/`] : []),
-      `/v1/presets/`,
-    ];
+  const registryUrl = await prefs.get("registryUrl");
+  if (!registryUrl) return [];
 
-    if (registryUrl) {
-      for (const path of paths) {
-        const items = await fetchAllPages(path, registryUrl);
-        presets.push(
-          ...items.map((i) => ({
-            value: `${registryUrl}${path}${i.id}`,
-            label: i.name || i.id,
-          })),
-        );
-      }
+  const presets = [];
+  const paths = [
+    ...(accountId ? [`/v1/accounts/${accountId}/presets/`] : []),
+    `/v1/presets/`,
+  ];
+
+  try {
+    for (const path of paths) {
+      const items = await fetchAllPages(path, registryUrl);
+      presets.push(
+        ...items.map((i) => ({
+          value: `${registryUrl}${path}${i.id}`,
+          label: i.name || i.id,
+        })),
+      );
     }
-  } catch (e) {
-    console.error("Failed to fetch presets from registry:", e);
+  } catch (error) {
+    console.error("Failed to fetch presets from registry:", error);
+    throw error;
   }
 
   return presets;
 }
 
 export async function discoverPlayer(playerId, prefs) {
-  try {
-    const accountId = await prefs.get("accountId");
-    const registryUrl = await prefs.get("registryUrl");
+  if (!playerId) return null;
 
-    if (registryUrl && accountId && playerId) {
-      const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
-      console.log("Discovering player from registry:", url);
-      const response = await fetch(url);
-      return await response.json();
+  const [accountId, registryUrl] = await Promise.all([
+    prefs.get("accountId"),
+    prefs.get("registryUrl"),
+  ]);
+
+  if (!(registryUrl && accountId)) return null;
+
+  const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new RegistryRequestError({ url, status: response.status });
     }
+    return await response.json();
   } catch (error) {
     console.error("Error discovering player info from registry:", error);
+    throw error;
   }
-
-  return null;
 }
