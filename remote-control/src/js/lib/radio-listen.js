@@ -20,75 +20,79 @@ import { Capacitor } from "@capacitor/core";
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
 import { EventEmitter } from "./interfaces.js";
 
-/**
- * Web-based audio player using HTML5 Audio API
- */
-class WebAudioPlayer {
-  constructor() {
-    this.audio = null;
-  }
+const AUDIO_ID = "radio-pad-stream";
 
-  async play(url, stationName) {
-    if (!url) return;
+const createWebAudioPlayer = () => {
+  let audio;
 
-    await this.stop();
+  const cleanup = () => {
+    if (!audio) return;
+    audio.pause();
+    audio = null;
+  };
 
-    const audio = new Audio(url);
-    this.audio = audio;
+  return {
+    async play(url) {
+      if (!url) return;
+      cleanup();
 
-    const handleError = () => {
-      if (this.audio === audio) {
-        this.stop();
-      }
-    };
+      const next = new Audio(url);
+      audio = next;
 
-    audio.addEventListener("error", handleError, { once: true });
-    audio.play().catch(handleError);
-  }
+      const bail = () => {
+        if (audio === next) {
+          cleanup();
+        }
+      };
 
-  async stop() {
-    if (this.audio) {
-      this.audio.pause();
-      this.audio = null;
-    }
-  }
-}
+      next.addEventListener("error", bail, { once: true });
+      next.play().catch(bail);
+    },
+    async stop() {
+      cleanup();
+    },
+  };
+};
 
-/**
- * Native audio player using Capacitor Native Audio plugin
- * Supports background playback with system notification
- */
-class NativeAudioPlayer {
-  constructor() {
-    this.audioId = "radio-pad-stream";
-    this.isInitialized = false;
-  }
+const createNativeAudioPlayer = () => {
+  let initialized = false;
+  let readyListener;
 
-  async play(url, stationName) {
-    try {
-      if (!this.isInitialized) {
-        await this._initialize(url, stationName);
-      } else {
-        await this._changeStation(url, stationName);
-      }
-    } catch (error) {
-      console.error("Native audio playback error:", error);
-    }
-  }
+  const audioRef = (extra = {}) => ({ audioId: AUDIO_ID, ...extra });
 
-  async stop() {
-    if (this.isInitialized) {
+  const teardown = async () => {
+    if (readyListener) {
       try {
-        await AudioPlayer.stop({ audioId: this.audioId });
+        await readyListener.remove();
       } catch (error) {
-        console.error("Native audio stop error:", error);
+        console.warn("Failed to remove audio ready listener", error);
+      }
+      readyListener = null;
+    }
+
+    try {
+      await AudioPlayer.destroy(audioRef());
+    } catch (error) {
+      if (initialized) {
+        console.error("Native audio destroy error:", error);
       }
     }
-  }
 
-  async _initialize(url, stationName) {
+    initialized = false;
+  };
+
+  const ensureInitialized = async (url, stationName) => {
+    if (initialized) {
+      await AudioPlayer.changeAudioSource(audioRef({ source: url }));
+      await AudioPlayer.changeMetadata(
+        audioRef({ friendlyTitle: stationName }),
+      );
+      await AudioPlayer.play(audioRef());
+      return;
+    }
+
     await AudioPlayer.create({
-      audioId: this.audioId,
+      audioId: AUDIO_ID,
       audioSource: url,
       friendlyTitle: stationName,
       useForNotification: true,
@@ -96,40 +100,54 @@ class NativeAudioPlayer {
       loop: false,
     });
 
-    await AudioPlayer.onAudioReady({ audioId: this.audioId }, async () => {
-      await AudioPlayer.play({ audioId: this.audioId });
-    });
+    try {
+      readyListener = await AudioPlayer.onAudioReady(audioRef(), async () => {
+        await AudioPlayer.play(audioRef());
+      });
 
-    await AudioPlayer.initialize({ audioId: this.audioId });
-    this.isInitialized = true;
-  }
+      await AudioPlayer.initialize(audioRef());
+      initialized = true;
+    } catch (error) {
+      await teardown();
+      throw error;
+    }
+  };
 
-  async _changeStation(url, stationName) {
-    await AudioPlayer.changeAudioSource({
-      audioId: this.audioId,
-      source: url,
-    });
-    await AudioPlayer.changeMetadata({
-      audioId: this.audioId,
-      friendlyTitle: stationName,
-    });
-    await AudioPlayer.play({ audioId: this.audioId });
-  }
-}
+  return {
+    async play(url, stationName) {
+      if (!url) return;
+      try {
+        await ensureInitialized(url, stationName);
+      } catch (error) {
+        console.error("Native audio playback error:", error);
+      }
+    },
+    async stop() {
+      if (!initialized) return;
+
+      try {
+        await AudioPlayer.stop(audioRef());
+      } catch (error) {
+        console.error("Native audio stop error:", error);
+      }
+
+      await teardown();
+    },
+  };
+};
 
 export class RadioListen extends EventEmitter {
   constructor() {
     super();
     this.player = Capacitor.isNativePlatform()
-      ? new NativeAudioPlayer()
-      : new WebAudioPlayer();
+      ? createNativeAudioPlayer()
+      : createWebAudioPlayer();
     this.stations = new Map();
   }
 
-  setStations(station_data) {
-    this.stations = new Map(
-      station_data.stations.map((station) => [station.name, station.url]),
-    );
+  setStations(stationsPayload = {}) {
+    const { stations = [] } = stationsPayload;
+    this.stations = new Map(stations.map(({ name, url }) => [name, url]));
   }
 
   async play(stationName) {
