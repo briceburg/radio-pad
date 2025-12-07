@@ -91,10 +91,20 @@ while True:
     last_encoder_switch = pressed
 
     # --- Key Events ---
-    key_event = macropad.keys.events.get()
-    if key_event and key_event.pressed:
+    last_pressed_station = None
+    while True:
+        # Drain keypad event queue so simultaneous presses resolve to the "last" press.
+        key_event = macropad.keys.events.get()
+        if not key_event:
+            break
+        if not key_event.pressed:
+            continue
+
         key_number = key_event.key_number
         station_name = keys.get_station_name(key_number)
         if station_name:
             keys.set_key_color(key_number, PRESSED_COLOR)
-            player.send_command("station_request", station_name)
+            last_pressed_station = station_name
+
+    if last_pressed_station:
+        player.send_command("station_request", last_pressed_station)
