@@ -1,2 +1,11 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "radio-pad-player"
+version = "2025.01.0"
+description = "Radio-Pad player client"
+
 [tool.isort]
 profile = "black"

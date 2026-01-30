@@ -1,7 +1,7 @@
-import json
+import asyncio
 import logging
-import time
-import urllib.request
+
+import httpx
 
 from lib.exceptions import ConfigError
 from lib.interfaces import RadioPadPlayerConfig, RadioPadStation
@@ -9,21 +9,38 @@ from lib.interfaces import RadioPadPlayerConfig, RadioPadStation
 logger = logging.getLogger("CONFIG")
 
 
-def fetch_json_url(url, timeout=12, retries=3):
-    for attempt in range(retries):
-        try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                if response.status == 200:
-                    return json.loads(response.read())
+def http_client_headers(custom_headers=None):
+    """Return HTTP client headers with RadioPad user agent, merged with any custom headers"""
+    defaults = {
+        "User-Agent": f"RadioPad/1.0 (Linux; Player) Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko)",
+    }
+    if custom_headers is None:
+        return defaults
+    return {**defaults, **custom_headers}
+
+
+async def fetch_json_url(url, timeout=12, retries=3):
+    """Fetch JSON from URL with retries"""
+    headers = http_client_headers({"Accept": "application/json"})
+    async with httpx.AsyncClient(
+        timeout=timeout, headers=headers, follow_redirects=True
+    ) as client:
+        for attempt in range(retries):
+            try:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    return response.json()
                 else:
                     logger.warning(
-                        "Failed to fetch JSON: %s from %s", response.status, url
+                        "Failed to fetch JSON: %s from %s",
+                        response.status_code,
+                        url,
                     )
-        except Exception as e:
-            logger.warning("Attempt %s failed for %s: %s", attempt + 1, url, e)
-        logger.info("Retrying in %s seconds...", 2**attempt)
-        time.sleep(2**attempt)
+            except Exception as e:
+                logger.warning("Attempt %s failed for %s: %s", attempt + 1, url, e)
+            if attempt < retries - 1:
+                logger.info("Retrying in %s seconds...", 2**attempt)
+                await asyncio.sleep(2**attempt)
     return None
 
 
@@ -51,7 +68,7 @@ def make(
     logger.info(f"Using stations_url: {stations_url}")
     logger.info(f"Using switchboard_url: {switchboard_url}")
 
-    station_data = fetch_json_url(stations_url)
+    station_data = asyncio.run(fetch_json_url(stations_url))
     if not station_data:
         raise ConfigError("Failed fetching stations")
     if (
@@ -88,7 +105,7 @@ def discover_config(player, registry_url, stations_url=None, switchboard_url=Non
     url = f"{registry_url.rstrip('/')}/v1/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)
     logger.info("  To skip, set RADIOPAD_ENABLE_DISCOVERY=false")
-    data = fetch_json_url(url)
+    data = asyncio.run(fetch_json_url(url))
     if data:
         stations_url = stations_url or data.get("stations_url")
         switchboard_url = switchboard_url or data.get("switchboard_url")
