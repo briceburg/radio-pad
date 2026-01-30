@@ -22,6 +22,7 @@ import logging
 
 import websockets
 
+from lib.config import http_client_headers
 from lib.interfaces import RadioPadClient, RadioPadPlayer
 
 logger = logging.getLogger("SWITCHBOARD")
@@ -35,10 +36,9 @@ class SwitchboardClient(RadioPadClient):
         self.url = player.config.switchboard_url
         self.ws = None
 
-        self.http_headers = {
-            "User-Agent": "RadioPad/1.0",
-            "RadioPad-Stations-Url": player.config.stations_url,
-        }
+        self.http_headers = http_client_headers(
+            {"RadioPad-Stations-Url": player.config.stations_url}
+        )
 
     async def run(self):
         if not self.url:

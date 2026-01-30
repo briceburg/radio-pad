@@ -1,3 +1,4 @@
+httpx==0.25.2
 pyserial==3.5
 pyserial-asyncio==0.6
 python-mpv-jsonipc==1.2.1
