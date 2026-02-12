@@ -9,9 +9,11 @@
         {"name": "kmrd", "url": "https://kmrd.broadcasttool.stream/listen"},
         {"name": "kkfi", "url": "https://stream.pacificaservice.org:9000/kkfi_128"},
         {"name": "wqxr", "url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="},
-        {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
-        {"name": "lofi", "url": "https://www.youtube.com/watch?v=jfKfPfyJRdk"},
         {"name": "kboo", "url": "https://live.kboo.fm:8443/high"},
-        {"name": "GD.net", "url": "http://108.163.245.230:8100/listen.pls"}
+        {"name": "wxna", "url": "http://listen.wxnafm.org:8000/stream"},
+        {"name": "kexp", "url": "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"},
+        {"name": "GD.net", "url": "http://108.163.245.230:8100/listen.pls"},
+        {"name": "wtju", "url": "https://streams.wtju.net/wtju-live.mp3"},
+        {"name": "lofi", "url": "https://www.youtube.com/watch?v=jfKfPfyJRdk"}
     ] 
 }
