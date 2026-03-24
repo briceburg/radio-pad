@@ -104,10 +104,11 @@ The intended authentication model is a write-enabled GitHub deploy key over SSH.
 
 The checked-in `fly.toml` uses `tmp/data` as the local checkout. The backend also uses a repo-scoped file lock so processes sharing the same checkout serialize Git operations safely.
 
-Deploy by creating a write-enabled GitHub deploy key for the data repo, storing its private key in the Fly secret `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY`, and then deploying:
+Deploy by generating an SSH keypair, adding the **public** key to the data repo as a write-enabled GitHub deploy key, storing the **private** key in the Fly secret `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY`, and then deploying:
 
 ```sh
 ssh-keygen -t ed25519 -f ~/.ssh/radio-pad-registry-data-fly -C "radio-pad-registry fly deploy"
+# add ~/.ssh/radio-pad-registry-data-fly.pub to GitHub as a deploy key with write access
 fly secrets set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY="$(cat ~/.ssh/radio-pad-registry-data-fly)"
 fly deploy
 curl -i https://radio-pad-registry.fly.dev/healthz
