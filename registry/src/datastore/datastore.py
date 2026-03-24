@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -54,43 +55,13 @@ class DataStore:
         Seeds the datastore with initial data from the data-seed directory.
         Only seeds data if it doesn't already exist in the backend.
         """
-        import json
-
         if not self.seed_path.is_dir():
             logger.error(f"Seed path does not exist: {self.seed_path}")
             return
 
-        # Heterogeneous list of stores; length and order not critical
-        stores: list[SeedableStore] = [
-            seedable(self.accounts),
-            seedable(self.players),
-            seedable(self.global_presets),
-            seedable(self.account_presets),
-        ]
-
-        for dirpath, _, filenames in os.walk(self.seed_path):
-            for filename in filenames:
-                if not filename.endswith(".json"):
-                    continue
-
-                seed_file = Path(dirpath) / filename
-                relative_path = str(seed_file.relative_to(self.seed_path))
-
-                for store in stores:
-                    if params := store.match(relative_path):
-                        object_id = params.pop("id")
-                        path_params = params if params else None
-
-                        if store.exists(object_id, path_params=path_params):
-                            logger.debug(f"Skipping existing object: {relative_path}")
-                            break
-
-                        with seed_file.open("r", encoding="utf-8") as f:
-                            data = json.load(f)
-                        model_data = {"id": object_id, **params, **data}
-                        store.seed(model_data, path_params=path_params)
-                        logger.info(f"Seeded {relative_path}")
-                        break
+        stores = self._seedable_stores()
+        for seed_file in self.seed_path.rglob("*.json"):
+            self._seed_file(seed_file, stores)
 
     def _build_git_backend(self, repo_path: str) -> GitBackend:
         remote_url = os.environ.get(
@@ -110,3 +81,30 @@ class DataStore:
             ),
             ssh_key_path=os.environ.get("REGISTRY_BACKEND_GIT_SSH_KEY_PATH"),
         )
+
+    def _seedable_stores(self) -> list[SeedableStore]:
+        return [
+            seedable(self.accounts),
+            seedable(self.players),
+            seedable(self.global_presets),
+            seedable(self.account_presets),
+        ]
+
+    def _seed_file(self, seed_file: Path, stores: list[SeedableStore]) -> None:
+        relative_path = seed_file.relative_to(self.seed_path).as_posix()
+
+        for store in stores:
+            if not (params := store.match(relative_path)):
+                continue
+
+            object_id = params.pop("id")
+            path_params = params or None
+            if store.exists(object_id, path_params=path_params):
+                logger.debug(f"Skipping existing object: {relative_path}")
+                return
+
+            with seed_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            store.seed({"id": object_id, **params, **data}, path_params=path_params)
+            logger.info(f"Seeded {relative_path}")
+            return
