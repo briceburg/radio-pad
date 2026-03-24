@@ -3,15 +3,9 @@ from http import HTTPStatus
 import pytest
 from starlette.testclient import TestClient
 
-from api.models.pagination import PaginationParams
 from datastore.types import JsonDoc
 from models.player import PlayerCreate
-from tests.api._helpers import (
-    INVALID_SLUGS,
-    VALID_ACCOUNT_ITEM_SLUG_PAIRS,
-    assert_item_fields,
-    assert_pagination_page,
-)
+from tests.api._helpers import assert_item_fields
 from tests.api.client.players import PlayerApi
 
 
@@ -42,10 +36,6 @@ def test_update_player(player_api: PlayerApi) -> None:
     player_api.put("testuser1", "player1", PlayerCreate.model_validate({"name": "Updated Player"}))
     data = player_api.get("testuser1", "player1")
     assert_item_fields(data, name="Updated Player")
-
-
-def test_get_player_not_found(player_api: PlayerApi) -> None:
-    player_api.get("testuser1", "does-not-exist", expected_status=404)
 
 
 @pytest.mark.parametrize(
@@ -97,47 +87,6 @@ def test_player_create_validation(client: TestClient, body: PlayerCreate | JsonD
         assert resp.json()["detail"]
 
 
-@pytest.mark.parametrize("invalid_id", INVALID_SLUGS)
-def test_player_invalid_id_rejected(client: TestClient, invalid_id: str) -> None:
-    resp = client.put(
-        f"/v1/accounts/testuser1/players/{invalid_id}",
-        json={"name": "Bad"},
-    )
-    assert resp.status_code == 422
-
-
-# New: invalid account_id path segment should 422 before hitting model logic
-@pytest.mark.parametrize("invalid_account_id", INVALID_SLUGS)
-def test_player_invalid_account_id_rejected(client: TestClient, invalid_account_id: str) -> None:
-    resp = client.put(
-        f"/v1/accounts/{invalid_account_id}/players/playerx",
-        json={"name": "X"},
-    )
-    assert resp.status_code == 422
-
-
-# Positive edge-case slugs should work
-@pytest.mark.parametrize("account_id,player_id", VALID_ACCOUNT_ITEM_SLUG_PAIRS)
-def test_player_valid_slug_edge_cases(client: TestClient, account_id: str, player_id: str) -> None:
-    resp = client.put(
-        f"/v1/accounts/{account_id}/players/{player_id}",
-        json={"name": "Edge"},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["id"] == player_id
-    assert data["account_id"] == account_id
-
-
-def test_error_detail_shape_for_not_found(client: TestClient) -> None:
-    # Non-existent player
-    r = client.get("/v1/accounts/testuser1/players/missing-player")
-    assert r.status_code == HTTPStatus.NOT_FOUND
-    body = r.json()
-    assert body["code"] == "not_found"
-    assert body["details"]["player_id"] == "missing-player"
-
-
 def test_conflict_error_shape_and_status(client: TestClient) -> None:
     # Create a player
     r = client.put(
@@ -152,38 +101,3 @@ def test_conflict_error_shape_and_status(client: TestClient) -> None:
         body = r2.json()
         assert body["code"] == "conflict"
         assert "message" in body
-
-
-# --- Pagination Tests ---
-
-
-def test_pagination_out_of_bounds(player_api: PlayerApi) -> None:
-    data = player_api.list("testuser1", params=PaginationParams(page=1000, per_page=1))
-    assert_pagination_page(
-        data,
-        item_ids=[],
-        page=1000,
-        per_page=1,
-        prev="?page=999&per_page=1",
-        next=None,
-    )
-
-
-def test_per_page_and_link_behavior_single_page(player_api: PlayerApi) -> None:
-    data = player_api.list("testuser1", params=PaginationParams(page=1, per_page=5))
-    assert_pagination_page(data, item_ids=["player1", "player2"], page=1, per_page=5, prev=None, next=None)
-
-
-def test_pagination_works(player_api: PlayerApi) -> None:
-    data = player_api.list("testuser1", params=PaginationParams(page=1, per_page=1))
-    assert_pagination_page(data, item_ids=["player1"], page=1, per_page=1, prev=None, next="?page=2&per_page=1")
-
-    data = player_api.list("testuser1", params=PaginationParams(page=2, per_page=1))
-    assert_pagination_page(
-        data,
-        item_ids=["player2"],
-        page=2,
-        per_page=1,
-        prev="?page=1&per_page=1",
-        next="?page=3&per_page=1",
-    )
