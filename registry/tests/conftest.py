@@ -3,7 +3,6 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 from starlette.testclient import TestClient
 
 from datastore import DataStore, LocalBackend
@@ -30,6 +29,30 @@ def _seed_store(ds: DataStore) -> None:
     )
 
 
+def _reset_dir(path: Path) -> Path:
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _build_store(data_dir: Path, *, seed: bool = False) -> DataStore:
+    store = DataStore(backend=LocalBackend(base_path=str(data_dir)))
+    if seed:
+        _seed_store(store)
+    return store
+
+
+def _build_client(store: DataStore) -> TestClient:
+    app = create_app()
+
+    from api.types import get_store
+
+    app.dependency_overrides[get_store] = lambda: store
+    app.state.store = store
+    return TestClient(app, raise_server_exceptions=False)
+
+
 @pytest.fixture(scope="session")
 def unit_tests_root() -> Path:
     """Root directory for unit test data under <project>/tmp/tests/unit."""
@@ -46,79 +69,45 @@ def mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     tmp/tests/unit/api/data directory. This ensures test isolation while allowing inspection
     of test data after a run.
     """
-    data_dir = unit_tests_root / "api" / "data"
-    # Clean up and recreate the test data directory for each test
-    if data_dir.exists():
-        shutil.rmtree(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    backend = LocalBackend(base_path=str(data_dir))
-    test_store = DataStore(backend=backend)
+    data_dir = _reset_dir(unit_tests_root / "api" / "data")
+    test_store = _build_store(data_dir)
     yield test_store
-    # Clean up the temporary directory after the test
     shutil.rmtree(data_dir)
 
 
 @pytest.fixture(autouse=True)
 def seeded_store(mock_store: DataStore) -> DataStore:
     """Cleans and re-seeds the mock_store for each test."""
-    # We know this is a LocalBackend because we set it up in mock_store
     assert isinstance(mock_store.backend, LocalBackend)
-    data_dir = mock_store.backend.base_path
-    if data_dir.exists():
-        shutil.rmtree(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
+    _reset_dir(mock_store.backend.base_path)
     _seed_store(mock_store)
     return mock_store
 
 
 @pytest.fixture(scope="session")
 def client(mock_store: DataStore) -> Generator[TestClient]:
-    app = create_app()
-
-    # Override shared dependency
-    from api.types import get_store
-
-    app.dependency_overrides[get_store] = lambda: mock_store
-    # Prevent lifespan from creating and seeding its own DataStore
-    app.state.store = mock_store
-
-    # Using a `with` statement for the TestClient ensures that the app's
-    # lifespan events (startup and shutdown) are correctly triggered.
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client
+    with _build_client(mock_store) as test_client:
+        yield test_client
 
 
 @pytest.fixture(scope="session")
 def ro_mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     """Session-scoped DataStore for read-only tests (seeded once)."""
-    data_dir = unit_tests_root / "api" / "ro_data"
-    if data_dir.exists():
-        shutil.rmtree(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    backend = LocalBackend(base_path=str(data_dir))
-    store = DataStore(backend=backend)
-    _seed_store(store)
+    data_dir = _reset_dir(unit_tests_root / "api" / "ro_data")
+    store = _build_store(data_dir, seed=True)
     yield store
-    # optional cleanup: keep for post-run inspection
 
 
 @pytest.fixture(scope="session")
 def ro_client(ro_mock_store: DataStore) -> Generator[TestClient]:
     """Session-scoped TestClient bound to the read-only store."""
-    app = create_app()
-    from api.types import get_store
-
-    app.dependency_overrides[get_store] = lambda: ro_mock_store
-    # Prevent lifespan seeding; use our seeded read-only store
-    app.state.store = ro_mock_store
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client
+    with _build_client(ro_mock_store) as test_client:
+        yield test_client
 
 
 @pytest.fixture(scope="session")
-def session_monkeypatch() -> Generator[MonkeyPatch]:
+def session_monkeypatch() -> Generator[pytest.MonkeyPatch]:
     """Session-scoped monkeypatch fixture to avoid pytest-mock dependency."""
-    mp = MonkeyPatch()
+    mp = pytest.MonkeyPatch()
     yield mp
     mp.undo()

@@ -6,6 +6,7 @@ from .helpers import (
     extract_object_id_from_path,
     normalize_etag,
     strip_id,
+    validate_if_match,
 )
 from .interfaces import ModelWithId, ObjectStore, SeedableStore
 from .model_store import ModelStore
@@ -24,4 +25,5 @@ __all__ = [
     "normalize_etag",
     "seedable",
     "strip_id",
+    "validate_if_match",
 ]

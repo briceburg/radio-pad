@@ -20,6 +20,7 @@ from datastore.core import (
     construct_storage_path,
     extract_object_id_from_path,
     strip_id,
+    validate_if_match,
 )
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
@@ -202,8 +203,7 @@ class GitBackend:
     ) -> None | object:
         file_path = self._get_fs_path(object_id, *path_parts)
         current, current_version = self._read_existing(file_path)
-        if if_match is not None and if_match != current_version:
-            raise ConcurrencyError("ETag mismatch")
+        validate_if_match(if_match, current_version)
 
         if current is not None and compute_etag(data) == current_version:
             return None

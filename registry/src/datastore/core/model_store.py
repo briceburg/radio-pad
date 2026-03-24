@@ -23,10 +23,10 @@ class ModelStore[Entity: ModelWithId, Create: BaseModel]:
 
     Examples:
     - Flat collection:
-      ModelStore(backend, model=Station, create_model=StationCreate, path_template="stations/{id}")
+      ModelStore(backend, model=Station, path_template="stations/{id}")
 
     - Account-scoped:
-      ModelStore(backend, model=Preset, create_model=PresetCreate, path_template="accounts/{account_id}/presets/{id}")
+      ModelStore(backend, model=Preset, path_template="accounts/{account_id}/presets/{id}")
       store.get("preset-1", path_params={"account_id": "acct-123"})
 
     Notes:
@@ -38,7 +38,6 @@ class ModelStore[Entity: ModelWithId, Create: BaseModel]:
         backend: ObjectStore,
         *,
         model: type[Entity],
-        create_model: type[Create],
         path_template: str,
     ):
         """Initialize a ModelStore.
@@ -46,12 +45,10 @@ class ModelStore[Entity: ModelWithId, Create: BaseModel]:
         Args:
             backend: Object storage backend used for persistence.
             model: Concrete model type
-            create_model: Input model type used for create/merge operations.
             path_template: Hierarchical JSON path template ending with "{id}".
         """
         self._backend = backend
         self._model = model
-        self._create_model = create_model
 
         # normalize and validate template
         normalized = path_template.strip().strip("/")

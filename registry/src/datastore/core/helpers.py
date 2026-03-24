@@ -4,6 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from ..exceptions import ConcurrencyError
 from ..types import JsonDoc
 
 
@@ -37,6 +38,12 @@ def normalize_etag(token: str | None) -> str | None:
     if token and token.startswith('"') and token.endswith('"'):
         return token[1:-1]
     return token
+
+
+def validate_if_match(if_match: str | None, current_version: str | None) -> None:
+    """Raise when a conditional-write token does not match the current version."""
+    if if_match is not None and if_match != current_version:
+        raise ConcurrencyError("ETag mismatch")
 
 
 def extract_object_id_from_path(path: str) -> str:

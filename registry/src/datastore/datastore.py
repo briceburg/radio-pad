@@ -4,9 +4,6 @@ from pathlib import Path
 
 from lib.constants import BASE_DIR
 from lib.logging import logger
-from models.account import AccountCreate
-from models.player import PlayerCreate
-from models.station_preset import AccountStationPresetCreate, GlobalStationPresetCreate
 
 from .backends import GitBackend, LocalBackend, S3Backend
 from .core import ObjectStore, SeedableStore, seedable
@@ -45,10 +42,10 @@ class DataStore:
             else:
                 self.backend = LocalBackend(base_path=data_path, prefix=self.prefix)
 
-        self.accounts = Accounts(self.backend, create_model=AccountCreate)
-        self.players = Players(self.backend, create_model=PlayerCreate)
-        self.global_presets = GlobalPresets(self.backend, create_model=GlobalStationPresetCreate)
-        self.account_presets = AccountPresets(self.backend, create_model=AccountStationPresetCreate)
+        self.accounts = Accounts(self.backend)
+        self.players = Players(self.backend)
+        self.global_presets = GlobalPresets(self.backend)
+        self.account_presets = AccountPresets(self.backend)
 
     def seed(self) -> None:
         """

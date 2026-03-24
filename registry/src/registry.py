@@ -7,8 +7,7 @@ from fastapi import FastAPI
 def create_app() -> FastAPI:
     from api import RegistryAPI
 
-    app = RegistryAPI()
-    return app
+    return RegistryAPI()
 
 
 app = create_app()

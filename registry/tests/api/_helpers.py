@@ -83,6 +83,37 @@ def assert_paginated(payload: JsonDoc) -> None:
         assert key in payload, f"Missing pagination key {key}"
 
 
+def assert_pagination_page(
+    payload: JsonDoc,
+    *,
+    item_ids: list[str],
+    page: int,
+    per_page: int,
+    prev: str | None,
+    next: str | None,
+) -> None:
+    assert_paginated(payload)
+    assert [str(item["id"]) for item in payload["items"]] == item_ids
+    assert payload["page"] == page
+    assert payload["per_page"] == per_page
+    links = payload["links"]
+    assert links.get("prev") == prev
+    assert links.get("next") == next
+
+
 def assert_item_fields(item: JsonDoc, **expected: object) -> None:
     for k, v in expected.items():
         assert item.get(k) == v, f"Field {k} expected {v} got {item.get(k)}"
+
+
+def assert_exact_fields(item: JsonDoc, *expected_fields: str) -> None:
+    expected = set(expected_fields)
+    actual = set(str(key) for key in item.keys())
+    assert actual == expected, f"Expected only {expected}, got {actual}"
+
+
+def find_item(items: list[JsonDoc], object_id: str) -> JsonDoc:
+    for item in items:
+        if item.get("id") == object_id:
+            return item
+    raise AssertionError(f"Expected to find item with id={object_id!r}")

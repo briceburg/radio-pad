@@ -6,7 +6,7 @@ from starlette.testclient import TestClient
 
 from api.models.pagination import PaginationParams
 from models.account import AccountCreate
-from tests.api._helpers import INVALID_SLUGS, assert_paginated
+from tests.api._helpers import INVALID_SLUGS, assert_paginated, assert_pagination_page
 from tests.api.client.accounts import AccountApi
 
 
@@ -65,43 +65,35 @@ def test_error_detail_shape_for_not_found(client: TestClient) -> None:
 
 def test_pagination_out_of_bounds(account_api: AccountApi) -> None:
     data = account_api.list(params=PaginationParams(page=1000, per_page=1))
-    assert len(data["items"]) == 0
-    assert data["page"] == 1000
-    assert data["per_page"] == 1
-    links = data["links"]
-    assert links["prev"] == "?page=999&per_page=1"
-    assert links.get("next") is None
+    assert_pagination_page(
+        data,
+        item_ids=[],
+        page=1000,
+        per_page=1,
+        prev="?page=999&per_page=1",
+        next=None,
+    )
 
 
 def test_per_page_and_link_behavior_single_page(account_api: AccountApi) -> None:
     # per_page >= item_count
     data = account_api.list(params=PaginationParams(page=1, per_page=5))
-    assert len(data["items"]) == 2
-    assert data["page"] == 1
-    assert data["per_page"] == 5
-    links = data["links"]
-    assert links.get("prev") is None
-    assert links.get("next") is None
+    assert_pagination_page(data, item_ids=["testuser1", "testuser2"], page=1, per_page=5, prev=None, next=None)
 
 
 def test_pagination_works(account_api: AccountApi) -> None:
     data = account_api.list(params=PaginationParams(page=1, per_page=1))
-    assert len(data["items"]) == 1
-    assert data["items"][0]["id"] == "testuser1"
-    assert data["page"] == 1
-    assert data["per_page"] == 1
-    links = data["links"]
-    assert links.get("prev") is None
-    assert links.get("next") == "?page=2&per_page=1"
+    assert_pagination_page(data, item_ids=["testuser1"], page=1, per_page=1, prev=None, next="?page=2&per_page=1")
 
     data = account_api.list(params=PaginationParams(page=2, per_page=1))
-    assert len(data["items"]) == 1
-    assert data["items"][0]["id"] == "testuser2"
-    assert data["page"] == 2
-    assert data["per_page"] == 1
-    links = data["links"]
-    assert links.get("prev") == "?page=1&per_page=1"
-    assert links.get("next") is not None
+    assert_pagination_page(
+        data,
+        item_ids=["testuser2"],
+        page=2,
+        per_page=1,
+        prev="?page=1&per_page=1",
+        next="?page=3&per_page=1",
+    )
 
 
 @pytest.mark.parametrize(

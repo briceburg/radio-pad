@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from lib.types import Descriptor, Slug, WsUrl
+from lib.validators import trim_name
 
 
 class PlayerBase(BaseModel):
@@ -21,10 +22,7 @@ class PlayerBase(BaseModel):
     @field_validator("name", mode="before")
     @classmethod
     def _trim_name(cls, v: str) -> str:
-        s = str(v).strip()
-        if not s:
-            raise ValueError("name cannot be empty")
-        return s
+        return trim_name(v)
 
 
 class PlayerCreate(PlayerBase):

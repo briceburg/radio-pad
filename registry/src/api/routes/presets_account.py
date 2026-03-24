@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from models import AccountStationPreset, AccountStationPresetCreate, AccountStationPresetSummary
 
 from ..exceptions import NotFoundError
+from ..helpers import paginated_summary
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, AccountId, PageParams, PresetId
@@ -49,11 +50,4 @@ async def list_account_presets(
     paging: PageParams,
 ) -> PaginatedList[AccountStationPresetSummary]:
     items = ds.account_presets.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    summary_items = [_to_summary(preset) for preset in items]
-    return PaginatedList.from_paged(summary_items, page=paging.page, per_page=paging.per_page)
-
-
-def _to_summary(preset: AccountStationPreset) -> AccountStationPresetSummary:
-    return AccountStationPresetSummary(
-        id=preset.id, account_id=preset.account_id, name=preset.name, category=preset.category
-    )
+    return paginated_summary(items, AccountStationPresetSummary, page=paging.page, per_page=paging.per_page)

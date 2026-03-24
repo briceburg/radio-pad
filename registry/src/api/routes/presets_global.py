@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from models import GlobalStationPreset, GlobalStationPresetCreate, GlobalStationPresetSummary
 
 from ..exceptions import NotFoundError
+from ..helpers import paginated_summary
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, PageParams, PresetId
@@ -46,9 +47,4 @@ async def list_global_presets(
     paging: PageParams,
 ) -> PaginatedList[GlobalStationPresetSummary]:
     items = ds.global_presets.list(page=paging.page, per_page=paging.per_page)
-    summary_items = [_to_summary(preset) for preset in items]
-    return PaginatedList.from_paged(summary_items, page=paging.page, per_page=paging.per_page)
-
-
-def _to_summary(preset: GlobalStationPreset) -> GlobalStationPresetSummary:
-    return GlobalStationPresetSummary(id=preset.id, name=preset.name, category=preset.category)
+    return paginated_summary(items, GlobalStationPresetSummary, page=paging.page, per_page=paging.per_page)

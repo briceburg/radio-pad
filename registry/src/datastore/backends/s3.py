@@ -11,8 +11,8 @@ from datastore.core import (
     deconstruct_storage_path,
     normalize_etag,
     strip_id,
+    validate_if_match,
 )
-from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
@@ -102,8 +102,7 @@ class S3Backend:
             current_hash = head.get("Metadata", {}).get("rpr-sha256")
             current_etag = normalize_etag(head.get("VersionId") or head.get("ETag"))
             # enforce optimistic concurrency
-            if if_match is not None and if_match != current_etag:
-                raise ConcurrencyError("ETag mismatch")
+            validate_if_match(if_match, current_etag)
             # no-op if identical content
             if current_hash == new_hash:
                 return

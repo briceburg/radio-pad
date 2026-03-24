@@ -9,8 +9,8 @@ from datastore.core import (
     construct_storage_path,
     extract_object_id_from_path,
     strip_id,
+    validate_if_match,
 )
-from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
@@ -87,8 +87,7 @@ class LocalBackend:
             with file_path.open("r", encoding="utf-8") as f:
                 current = json.load(f)
             current_etag = compute_etag(current)
-            if if_match is not None and if_match != current_etag:
-                raise ConcurrencyError("ETag mismatch")
+            validate_if_match(if_match, current_etag)
         # Never persist the 'id' field in the JSON content
         to_write = strip_id(data)
         # If content hash matches existing, no-op to avoid churn

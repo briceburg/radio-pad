@@ -5,7 +5,6 @@ from pathlib import Path
 import boto3
 import httpx
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 from starlette.testclient import TestClient
 
 from datastore.types import JsonDoc
@@ -18,7 +17,7 @@ from moto import mock_aws
 class FunctionalTestBed:
     """Helper for setting up functional tests with custom seed data."""
 
-    def __init__(self, tmp_path: Path, monkeypatch: MonkeyPatch):
+    def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         self.tmp_path = tmp_path
         self.monkeypatch = monkeypatch
         self.seed_dir = self.tmp_path / "seed"
@@ -28,19 +27,20 @@ class FunctionalTestBed:
         self.monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(self.data_dir))
         self.monkeypatch.setenv("REGISTRY_SEED_PATH", str(self.seed_dir))
 
+    def _write_seed_file(self, relative_path: str, payload: JsonDoc) -> None:
+        target = self.seed_dir / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload), encoding="utf-8")
+
     def create_seed_account(self, account_id: str, name: str) -> None:
-        accounts_dir = self.seed_dir / "accounts"
-        accounts_dir.mkdir(parents=True, exist_ok=True)
-        (accounts_dir / f"{account_id}.json").write_text(json.dumps({"name": name}))
+        self._write_seed_file(f"accounts/{account_id}.json", {"name": name})
 
     def create_seed_global_preset(self, preset_id: str, name: str, stations: list[JsonDoc] | None = None) -> None:
-        presets_dir = self.seed_dir / "presets"
-        presets_dir.mkdir(parents=True, exist_ok=True)
-        (presets_dir / f"{preset_id}.json").write_text(json.dumps({"name": name, "stations": stations or []}))
+        self._write_seed_file(f"presets/{preset_id}.json", {"name": name, "stations": stations or []})
 
 
 @pytest.fixture(scope="function")
-def functional_test_bed(tmp_path: Path, monkeypatch: MonkeyPatch) -> FunctionalTestBed:
+def functional_test_bed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FunctionalTestBed:
     """
     Function-scoped fixture that provides a test bed for creating custom seed data
     and configuring the environment.
@@ -50,7 +50,7 @@ def functional_test_bed(tmp_path: Path, monkeypatch: MonkeyPatch) -> FunctionalT
 
 @pytest.fixture(scope="session")
 def functional_client(
-    session_monkeypatch: MonkeyPatch,
+    session_monkeypatch: pytest.MonkeyPatch,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Generator[httpx.Client]:
     """

@@ -12,8 +12,19 @@ from tests.api._helpers import (
     VALID_SLUG_EDGE_CASES,
     assert_item_fields,
     assert_paginated,
+    assert_pagination_page,
 )
 from tests.api.client.presets import PresetApi
+
+
+def _assert_preset_partial_update(
+    *,
+    created: JsonDoc,
+    updated: JsonDoc,
+    expected_base_fields: dict[str, object],
+) -> None:
+    assert_item_fields(created, **expected_base_fields, name="Original", category="Music", description="Desc")
+    assert_item_fields(updated, **expected_base_fields, name="Renamed", category="Music", description="Desc")
 
 
 class TestGlobalPresets:
@@ -79,20 +90,25 @@ class TestGlobalPresets:
             }
         )
         created = preset_api.put_global(preset_id, initial)
-        assert_item_fields(created, id=preset_id, name="Original", category="Music", description="Desc")
-
         updated = preset_api.put_global(
             preset_id, GlobalStationPresetCreate.model_validate({"name": "Renamed", "stations": []})
         )
-        assert_item_fields(updated, id=preset_id, name="Renamed", category="Music", description="Desc")
+        _assert_preset_partial_update(created=created, updated=updated, expected_base_fields={"id": preset_id})
 
     def test_pagination_out_of_bounds(self, preset_api: PresetApi) -> None:
         data = preset_api.list_global(params=PaginationParams(page=1000, per_page=1))
-        assert len(data["items"]) == 0
+        assert_pagination_page(
+            data,
+            item_ids=[],
+            page=1000,
+            per_page=1,
+            prev="?page=999&per_page=1",
+            next=None,
+        )
 
     def test_per_page_and_link_behavior_single_page(self, preset_api: PresetApi) -> None:
         data = preset_api.list_global(params=PaginationParams(page=1, per_page=5))
-        assert len(data["items"]) == 1
+        assert_pagination_page(data, item_ids=["briceburg"], page=1, per_page=5, prev=None, next=None)
 
 
 class TestAccountPresets:
@@ -183,27 +199,15 @@ class TestAccountPresets:
             }
         )
         created = preset_api.put_account(self.ACCOUNT_ID, preset_id, initial)
-        assert_item_fields(
-            created,
-            id=preset_id,
-            account_id=self.ACCOUNT_ID,
-            name="Original",
-            category="Music",
-            description="Desc",
-        )
-
         updated = preset_api.put_account(
             self.ACCOUNT_ID,
             preset_id,
             AccountStationPresetCreate.model_validate({"name": "Renamed", "stations": initial.stations}),
         )
-        assert_item_fields(
-            updated,
-            id=preset_id,
-            account_id=self.ACCOUNT_ID,
-            name="Renamed",
-            category="Music",
-            description="Desc",
+        _assert_preset_partial_update(
+            created=created,
+            updated=updated,
+            expected_base_fields={"id": preset_id, "account_id": self.ACCOUNT_ID},
         )
 
 

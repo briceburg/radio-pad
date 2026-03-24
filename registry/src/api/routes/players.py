@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from models import Account, Player, PlayerCreate, PlayerSummary
 
 from ..exceptions import NotFoundError
+from ..helpers import paginated_summary
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, AccountId, PageParams, PlayerId
@@ -43,9 +44,4 @@ async def list_players(
     paging: PageParams,
 ) -> PaginatedList[PlayerSummary]:
     items = ds.players.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    summary_items = [_to_summary(player) for player in items]
-    return PaginatedList.from_paged(summary_items, page=paging.page, per_page=paging.per_page)
-
-
-def _to_summary(player: Player) -> PlayerSummary:
-    return PlayerSummary(id=player.id, account_id=player.account_id, name=player.name)
+    return paginated_summary(items, PlayerSummary, page=paging.page, per_page=paging.per_page)
