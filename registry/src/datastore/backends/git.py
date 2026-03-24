@@ -9,8 +9,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from typing import Any, TypeVar, cast
+from urllib.parse import urlsplit, urlunsplit
 
 from dulwich import porcelain
+from dulwich.client import SSHGitClient, get_transport_and_path
 from dulwich.errors import GitProtocolError, HangupException, SendPackError
 from dulwich.refs import Ref
 from dulwich.repo import Repo
@@ -120,7 +122,9 @@ class GitBackend:
             remote_url = self.remote_url
             self._run_remote_operation(
                 "clone",
-                lambda: porcelain.clone(
+                remote_label=self._display_remote(remote_url),
+                remote_url=remote_url,
+                operation=lambda: porcelain.clone(
                     remote_url,
                     str(self.repo_path),
                     checkout=True,
@@ -161,7 +165,9 @@ class GitBackend:
 
         self._run_remote_operation(
             "fetch",
-            lambda: porcelain.fetch(
+            remote_label=self._remote_label(repo),
+            remote_url=self._remote_url_for_location(repo, remote_location),
+            operation=lambda: porcelain.fetch(
                 str(self.repo_path),
                 remote_location,
                 outstream=io.StringIO(),
@@ -188,7 +194,9 @@ class GitBackend:
 
         result = self._run_remote_operation(
             "push",
-            lambda: porcelain.push(
+            remote_label=self._remote_label(repo),
+            remote_url=self._remote_url_for_location(repo, remote_location),
+            operation=lambda: porcelain.push(
                 str(self.repo_path),
                 remote_location,
                 refspecs=f"refs/heads/{self.branch}:refs/heads/{self.branch}",
@@ -309,23 +317,40 @@ class GitBackend:
         return self.remote_url
 
     def _remote_label(self, repo: Repo) -> str:
-        return self._remote_location(repo) or "disabled"
+        remote_location = self._remote_location(repo)
+        if remote_location is None:
+            return "disabled"
+        if remote_location == "origin":
+            return "origin"
+        return self._display_remote(remote_location)
 
     def _repo(self) -> Repo:
         return Repo(str(self.repo_path))
 
-    def _run_remote_operation(self, action: str, operation: Callable[[], _T]) -> _T:
+    def _run_remote_operation(
+        self,
+        action: str,
+        *,
+        remote_label: str,
+        remote_url: str | None,
+        operation: Callable[[], _T],
+    ) -> _T:
         try:
             return operation()
-        except (HangupException, GitProtocolError, SendPackError, OSError) as exc:
-            raise RuntimeError(self._remote_error_message(action)) from exc
+        except (HangupException, GitProtocolError, SendPackError) as exc:
+            raise RuntimeError(self._remote_error_message(action, remote_label, remote_url)) from exc
+        except OSError as exc:
+            message = (
+                f"{self._remote_error_message(action, remote_label, remote_url)} "
+                f"Underlying local error: {exc.__class__.__name__}: {exc}"
+            )
+            raise RuntimeError(message) from exc
 
-    def _remote_error_message(self, action: str) -> str:
-        remote = self.remote_url or "origin"
+    def _remote_error_message(self, action: str, remote_label: str, remote_url: str | None) -> str:
         message = [
-            f"Git backend failed to {action} remote {remote!r} for branch {self.branch!r}.",
+            f"Git backend failed to {action} remote {remote_label!r} for branch {self.branch!r}.",
         ]
-        if self.remote_url and self.remote_url.startswith("git@"):
+        if self._is_ssh_remote(remote_url):
             message.append("Check SSH auth: ensure REGISTRY_BACKEND_GIT_SSH_KEY_PATH points to a readable private key.")
             message.append(
                 "On Fly, set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY and add the matching public key "
@@ -334,6 +359,45 @@ class GitBackend:
         else:
             message.append("Check remote connectivity and credentials.")
         return " ".join(message)
+
+    def _remote_url_for_location(self, repo: Repo, remote_location: str | None) -> str | None:
+        if remote_location != "origin":
+            return remote_location
+        try:
+            remote_url = repo.get_config_stack().get((b"remote", b"origin"), b"url")
+        except KeyError:
+            return None
+        return remote_url.decode() if isinstance(remote_url, bytes) else str(remote_url)
+
+    def _display_remote(self, remote_url: str) -> str:
+        if "://" in remote_url:
+            return self._redacted_url(remote_url)
+        scp_target = self._scp_style_target(remote_url)
+        if scp_target is not None:
+            return scp_target
+        return remote_url
+
+    def _is_ssh_remote(self, remote_url: str | None) -> bool:
+        if remote_url is None:
+            return self.ssh_key_path is not None
+        try:
+            client, _ = get_transport_and_path(remote_url)
+        except Exception:
+            return False
+        return isinstance(client, SSHGitClient)
+
+    def _redacted_url(self, remote_url: str) -> str:
+        parsed = urlsplit(remote_url)
+        netloc = parsed.hostname or ""
+        if parsed.port is not None:
+            netloc = f"{netloc}:{parsed.port}"
+        return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+
+    def _scp_style_target(self, remote_url: str) -> str | None:
+        if "@" not in remote_url:
+            return None
+        _, target = remote_url.split("@", 1)
+        return target if ":" in target else None
 
     def _auth_kwargs(self) -> dict[str, Any]:
         kwargs: dict[str, Any] = {}

@@ -120,6 +120,23 @@ def test_git_backend_clone_error_explains_deploy_key_setup(tmp_path: Path, monke
     assert "deploy key with write access" in message
 
 
+def test_git_backend_clone_error_redacts_remote_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_clone(*args: object, **kwargs: object) -> None:
+        raise HangupException
+
+    monkeypatch.setattr(porcelain, "clone", failing_clone)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        _backend(
+            tmp_path / "clone",
+            remote_url="https://token@github.com/briceburg/radio-pad-registry-data.git",
+        )
+
+    message = str(excinfo.value)
+    assert "token@" not in message
+    assert "https://github.com/briceburg/radio-pad-registry-data.git" in message
+
+
 def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
     backend_path, writer_path = _clone_pair(tmp_path, remote, "backend", "writer")
@@ -131,6 +148,43 @@ def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
 
     data, _ = backend.get("fetched", "accounts")
     assert data == {"name": "Fetched"}
+
+
+def test_git_backend_origin_ssh_remote_uses_ssh_guidance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    remote = _create_remote_with_seed(tmp_path)
+    (backend_path,) = _clone_pair(tmp_path, remote, "backend")
+
+    repo = Repo(str(backend_path))
+    config = repo.get_config()
+    config.set((b"remote", b"origin"), b"url", b"ssh://git@github.com/briceburg/radio-pad-registry-data.git")
+    config.write_to_path()
+
+    def failing_fetch(*args: object, **kwargs: object) -> None:
+        raise HangupException
+
+    monkeypatch.setattr(porcelain, "fetch", failing_fetch)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        _backend(backend_path)
+
+    assert "REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" in str(excinfo.value)
+
+
+def test_git_backend_clone_oserror_reports_underlying_local_problem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing_clone(*args: object, **kwargs: object) -> None:
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(porcelain, "clone", failing_clone)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        _backend(
+            tmp_path / "clone",
+            remote_url="git@github.com:briceburg/radio-pad-registry-data.git",
+        )
+
+    assert "Underlying local error: OSError: permission denied" in str(excinfo.value)
 
 
 def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path) -> None:

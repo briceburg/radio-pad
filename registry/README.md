@@ -39,7 +39,7 @@ REGISTRY_BACKEND_GIT_REMOTE_URL | git remote URL used to bootstrap a clone when 
 REGISTRY_BACKEND_GIT_BRANCH | branch used for fetch/push operations. | `main`
 REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; writes always refresh first. | `30`
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
-REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want github.com to attribute commits to your account. | `briceburg@users.noreply.github.com`
+REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
 REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path for deploy-key authentication. | `None`
 REGISTRY_BIND_HOST | host to bind to | `localhost`
 REGISTRY_BIND_PORT | port to bind to | `8000`
