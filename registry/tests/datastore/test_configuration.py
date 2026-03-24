@@ -4,7 +4,7 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from datastore import DataStore
-from datastore.backends import LocalBackend, S3Backend
+from datastore.backends import GitBackend, LocalBackend, S3Backend
 
 
 def test_datastore_creates_local_backend_by_default(monkeypatch: MonkeyPatch) -> None:
@@ -35,6 +35,21 @@ def test_datastore_creates_s3_backend_from_env_var(monkeypatch: MonkeyPatch) -> 
     store = DataStore()
     assert isinstance(store.backend, S3Backend)
     assert store.backend.bucket == "test-bucket"
+
+
+def test_datastore_creates_git_backend_from_env_var(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """GitBackend is created when REGISTRY_BACKEND is 'git'."""
+    repo_path = tmp_path / "git-data"
+    monkeypatch.setenv("REGISTRY_BACKEND", "git")
+    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(repo_path))
+    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
+
+    store = DataStore()
+    assert isinstance(store.backend, GitBackend)
+    assert store.backend.repo_path == repo_path
+    assert store.backend.author_name == "briceburg"
+    assert store.backend.author_email == "briceburg@users.noreply.github.com"
+    assert store.prefix == ""
 
 
 def test_datastore_raises_error_if_s3_bucket_is_missing(monkeypatch: MonkeyPatch) -> None:

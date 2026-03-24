@@ -10,7 +10,7 @@ from _pytest.fixtures import SubRequest
 from datastore.core.interfaces import ObjectStore
 
 
-@pytest.fixture(params=["json", "s3"], ids=["json", "s3"])
+@pytest.fixture(params=["json", "s3", "git"], ids=["json", "s3", "git"])
 def object_store(request: SubRequest, tmp_path: Path) -> Generator[ObjectStore]:
     """Parameterized backend fixture providing a compatible ObjectStore.
 
@@ -22,7 +22,7 @@ def object_store(request: SubRequest, tmp_path: Path) -> Generator[ObjectStore]:
 
         backend: ObjectStore = LocalBackend(str(tmp_path))
         yield backend
-    else:
+    elif request.param == "s3":
         pytest.importorskip("moto")
         from moto import mock_aws
 
@@ -35,6 +35,18 @@ def object_store(request: SubRequest, tmp_path: Path) -> Generator[ObjectStore]:
             client.put_bucket_versioning(Bucket=bucket, VersioningConfiguration={"Status": "Enabled"})
             backend = S3Backend(bucket=bucket, prefix="contract", client=client)
             yield backend
+    else:
+        from datastore.backends.git import GitBackend
+
+        backend = GitBackend(
+            repo_path=str(tmp_path / "git-store"),
+            prefix="contract",
+            branch="main",
+            fetch_ttl_seconds=0,
+            author_name="Tests",
+            author_email="tests@example.invalid",
+        )
+        yield backend
 
 
 class TestObjectStoreContract:

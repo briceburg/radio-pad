@@ -7,7 +7,7 @@ from models.account import AccountCreate
 from models.player import PlayerCreate
 from models.station_preset import AccountStationPresetCreate, GlobalStationPresetCreate
 
-from .backends import LocalBackend, S3Backend
+from .backends import GitBackend, LocalBackend, S3Backend
 from .core import ObjectStore, SeedableStore, seedable
 from .stores import AccountPresets, Accounts, GlobalPresets, Players
 
@@ -31,12 +31,15 @@ class DataStore:
         else:
             backend_choice = os.environ.get("REGISTRY_BACKEND", "local").lower()
             logger.info(f"DataStore backend: {backend_choice}")
-            self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", "registry-v1")
+            default_prefix = "" if backend_choice == "git" else "registry-v1"
+            self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", default_prefix)
             if backend_choice == "s3":
                 bucket = os.environ.get("REGISTRY_BACKEND_S3_BUCKET", "").lower()
                 if not bucket:
                     raise ValueError("S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set")
                 self.backend = S3Backend(bucket=bucket, prefix=self.prefix)
+            elif backend_choice == "git":
+                self.backend = self._build_git_backend()
             else:
                 data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))
                 self.backend = LocalBackend(base_path=data_path, prefix=self.prefix)
@@ -88,3 +91,26 @@ class DataStore:
                         store.seed(model_data, path_params=path_params)
                         logger.info(f"Seeded {relative_path}")
                         break
+
+    def _build_git_backend(self) -> GitBackend:
+        repo_path = os.environ.get("REGISTRY_BACKEND_GIT_REPO_PATH", str(BASE_DIR / "tmp" / "git-data"))
+        remote_url = (
+            os.environ.get(
+                "REGISTRY_BACKEND_GIT_REMOTE_URL",
+                "git@github.com:briceburg/radio-pad-registry-data.git",
+            )
+            or None
+        )
+        return GitBackend(
+            repo_path=repo_path,
+            prefix=self.prefix,
+            branch=os.environ.get("REGISTRY_BACKEND_GIT_BRANCH", "main"),
+            remote_url=remote_url,
+            fetch_ttl_seconds=int(os.environ.get("REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS", "30")),
+            author_name=os.environ.get("REGISTRY_BACKEND_GIT_AUTHOR_NAME", "briceburg"),
+            author_email=os.environ.get(
+                "REGISTRY_BACKEND_GIT_AUTHOR_EMAIL",
+                "briceburg@users.noreply.github.com",
+            ),
+            ssh_key_path=os.environ.get("REGISTRY_BACKEND_GIT_SSH_KEY_PATH"),
+        )
