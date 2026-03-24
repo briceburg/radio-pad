@@ -16,7 +16,7 @@ if [ "${REGISTRY_BACKEND:-}" = "git" ] && [ -n "${REGISTRY_BACKEND_GIT_SSH_PRIVA
 fi
 
 CPU_COUNT=$(bin/docker/get_cpus.sh)
-UVICORN_WORKERS=${UVICORN_WORKERS:-${WORKERS:-$CPU_COUNT}}
+UVICORN_WORKERS=${UVICORN_WORKERS:-$CPU_COUNT}
 
 if [ "$#" -gt 0 ]; then
     exec "$@"

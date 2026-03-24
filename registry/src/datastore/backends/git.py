@@ -23,6 +23,7 @@ from datastore.core import (
 )
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
+from lib.logging import logger
 
 _T = TypeVar("_T")
 _RETRY = object()
@@ -60,6 +61,14 @@ class GitBackend:
             self._ensure_repo_exists()
             self._ensure_branch_symbolic_head()
             self._sync_from_remote(force=True)
+            logger.info(
+                "Git backend ready: repo=%s branch=%s remote=%s lock=%s fetch_ttl=%ss",
+                self.repo_path,
+                self.branch,
+                self.remote_url or "origin/local",
+                self._lock_path,
+                self.fetch_ttl_seconds,
+            )
 
     def get(self, object_id: str, *path_parts: str) -> ValueWithETag[JsonDoc]:
         with self._operation_lock():

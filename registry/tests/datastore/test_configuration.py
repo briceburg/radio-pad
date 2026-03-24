@@ -1,7 +1,9 @@
+import logging
 from pathlib import Path
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from pytest import LogCaptureFixture
 
 from datastore import DataStore
 from datastore.backends import GitBackend, LocalBackend, S3Backend
@@ -31,18 +33,27 @@ def test_datastore_creates_s3_backend_from_env_var(monkeypatch: MonkeyPatch) -> 
     """S3Backend is created when REGISTRY_BACKEND is 's3'."""
     monkeypatch.setenv("REGISTRY_BACKEND", "s3")
     monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", "test-bucket")
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
 
     store = DataStore()
     assert isinstance(store.backend, S3Backend)
     assert store.backend.bucket == "test-bucket"
 
 
-def test_datastore_creates_git_backend_from_env_var(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_datastore_creates_git_backend_from_env_var(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
     """GitBackend is created when REGISTRY_BACKEND is 'git'."""
     repo_path = tmp_path / "git-data"
     monkeypatch.setenv("REGISTRY_BACKEND", "git")
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
+    caplog.set_level(logging.INFO, logger="uvicorn")
 
     store = DataStore()
     assert isinstance(store.backend, GitBackend)
@@ -50,6 +61,7 @@ def test_datastore_creates_git_backend_from_env_var(monkeypatch: MonkeyPatch, tm
     assert store.backend.author_name == "briceburg"
     assert store.backend.author_email == "briceburg@users.noreply.github.com"
     assert store.prefix == ""
+    assert f"Git backend ready: repo={repo_path}" in caplog.text
 
 
 def test_datastore_raises_error_if_s3_bucket_is_missing(monkeypatch: MonkeyPatch) -> None:

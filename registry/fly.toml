@@ -19,7 +19,6 @@ primary_region = 'den'
   REGISTRY_BACKEND_GIT_REMOTE_URL = 'git@github.com:briceburg/radio-pad-registry-data.git'
   REGISTRY_BACKEND_GIT_AUTHOR_NAME = 'briceburg'
   REGISTRY_BACKEND_GIT_AUTHOR_EMAIL = 'briceburg@users.noreply.github.com'
-  UVICORN_WORKERS = '1'
 
 [http_service]
   internal_port = 8000
