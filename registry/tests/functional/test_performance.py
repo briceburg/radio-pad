@@ -16,11 +16,11 @@ NUM_PRESETS = 1000
 
 
 @pytest.mark.performance
-def test_pagination_performance(functional_tests_root: Path) -> None:
+def test_pagination_performance(tmp_path: Path) -> None:
     """
     Tests the pagination performance with a large number of records.
     """
-    data_path = functional_tests_root / "perf_data"
+    data_path = tmp_path / "perf_data"
     datastore = DataStore(backend=LocalBackend(base_path=str(data_path)))
 
     # Seed a large number of accounts
@@ -46,12 +46,19 @@ def test_pagination_performance(functional_tests_root: Path) -> None:
         )
         datastore.global_presets.save(preset)
 
-    # Test fetching the first page of accounts
+    start_time = time.perf_counter()
     paged_accounts = datastore.accounts.list(page=1, per_page=100)
-    assert len(paged_accounts) == 100
-
-    # Test fetching the first page of global presets
     paged_presets = datastore.global_presets.list(page=1, per_page=100)
+    duration = time.perf_counter() - start_time
+
+    logging.info(
+        "\nLocal pagination for 100-item first pages with %s accounts and %s presets took %.4f seconds.",
+        NUM_ACCOUNTS,
+        NUM_PRESETS,
+        duration,
+    )
+
+    assert len(paged_accounts) == 100
     assert len(paged_presets) == 100
 
 

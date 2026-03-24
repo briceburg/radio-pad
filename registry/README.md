@@ -131,16 +131,24 @@ Then, run the default test suite using pytest:
 pytest
 ```
 
+This runs the regular unit, API, datastore, and functional tests. Performance tests are excluded by default.
+
+To run the functional tests directly:
+
+```sh
+pytest tests/functional -m 'not performance'
+```
+
 ### Performance Tests
 
 The suite includes performance tests that are disabled by default. To run them, use the `performance` marker:
 
 ```sh
-pytest -m performance
+pytest tests/functional/test_performance.py -m performance
 ```
 
 To view the output from performance tests, set the log level:
 
 ```sh
-pytest -m performance --log-cli-level=INFO
+pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
 ```
