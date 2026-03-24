@@ -54,7 +54,7 @@ def test_datastore_creates_git_backend_from_env_var(
     repo_path.mkdir()
     Repo.init(str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND", "git")
-    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(repo_path))
+    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
     caplog.set_level(logging.INFO, logger="uvicorn")
 
@@ -73,7 +73,7 @@ def test_datastore_rejects_disabled_git_remote_without_existing_checkout(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("REGISTRY_BACKEND", "git")
-    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(tmp_path / "missing-git-data"))
+    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(tmp_path / "missing-git-data"))
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
 
     with pytest.raises(ValueError, match="remote disabled but checkout does not exist"):

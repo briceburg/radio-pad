@@ -33,15 +33,15 @@ class DataStore:
             logger.info(f"DataStore backend: {backend_choice}")
             default_prefix = "" if backend_choice == "git" else "registry-v1"
             self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", default_prefix)
+            data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))
             if backend_choice == "s3":
                 bucket = os.environ.get("REGISTRY_BACKEND_S3_BUCKET", "").lower()
                 if not bucket:
                     raise ValueError("S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set")
                 self.backend = S3Backend(bucket=bucket, prefix=self.prefix)
             elif backend_choice == "git":
-                self.backend = self._build_git_backend()
+                self.backend = self._build_git_backend(data_path)
             else:
-                data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))
                 self.backend = LocalBackend(base_path=data_path, prefix=self.prefix)
 
         self.accounts = Accounts(self.backend, create_model=AccountCreate)
@@ -92,8 +92,7 @@ class DataStore:
                         logger.info(f"Seeded {relative_path}")
                         break
 
-    def _build_git_backend(self) -> GitBackend:
-        repo_path = os.environ.get("REGISTRY_BACKEND_GIT_REPO_PATH", "/tmp/radio-pad-registry-data")
+    def _build_git_backend(self, repo_path: str) -> GitBackend:
         remote_url = os.environ.get(
             "REGISTRY_BACKEND_GIT_REMOTE_URL",
             "git@github.com:briceburg/radio-pad-registry-data.git",

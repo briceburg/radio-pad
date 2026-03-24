@@ -84,6 +84,13 @@ def _create_remote_with_seed(tmp_path: Path) -> Path:
     return remote
 
 
+def _clone_pair(tmp_path: Path, remote: Path, *names: str) -> tuple[Path, ...]:
+    paths = tuple(tmp_path / name for name in names)
+    for path in paths:
+        porcelain.clone(str(remote), str(path), checkout=True, branch="main")
+    return paths
+
+
 def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
 
@@ -96,11 +103,7 @@ def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
 
 def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
-    backend_path = tmp_path / "backend"
-    writer_path = tmp_path / "writer"
-
-    porcelain.clone(str(remote), str(backend_path), checkout=True, branch="main")
-    porcelain.clone(str(remote), str(writer_path), checkout=True, branch="main")
+    backend_path, writer_path = _clone_pair(tmp_path, remote, "backend", "writer")
 
     backend = _backend(backend_path)
 
@@ -113,11 +116,7 @@ def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
 
 def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
-    backend1_path = tmp_path / "backend1"
-    backend2_path = tmp_path / "backend2"
-
-    porcelain.clone(str(remote), str(backend1_path), checkout=True, branch="main")
-    porcelain.clone(str(remote), str(backend2_path), checkout=True, branch="main")
+    backend1_path, backend2_path = _clone_pair(tmp_path, remote, "backend1", "backend2")
 
     backend1 = _backend(backend1_path)
     backend2 = _backend(backend2_path, fetch_ttl_seconds=3600)
@@ -133,11 +132,7 @@ def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) 
 
 def test_git_backend_can_disable_remote_sync_for_existing_clone(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
-    backend_path = tmp_path / "backend"
-    writer_path = tmp_path / "writer"
-
-    porcelain.clone(str(remote), str(backend_path), checkout=True, branch="main")
-    porcelain.clone(str(remote), str(writer_path), checkout=True, branch="main")
+    backend_path, writer_path = _clone_pair(tmp_path, remote, "backend", "writer")
 
     backend = _backend(backend_path, remote_url="")
 
