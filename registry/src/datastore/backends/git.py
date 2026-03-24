@@ -53,6 +53,9 @@ class GitBackend:
         self.author_email = author_email
         self.ssh_key_path = ssh_key_path
 
+        self._head_ref = cast(Ref, b"HEAD")
+        self._branch_ref = cast(Ref, f"refs/heads/{self.branch}".encode())
+        self._remote_branch_ref = cast(Ref, f"refs/remotes/origin/{self.branch}".encode())
         self._lock = RLock()
         self._lock_path = self.repo_path.parent / f".{self.repo_path.name}.lock"
         self._last_fetch_at = 0.0
@@ -127,18 +130,17 @@ class GitBackend:
 
     def _ensure_branch_symbolic_head(self) -> None:
         repo = self._repo()
-        branch_ref = self._branch_ref()
-        expected = b"ref: " + branch_ref
-        if repo.refs.read_ref(self._head_ref()) == expected:
+        expected = b"ref: " + self._branch_ref
+        if repo.refs.read_ref(self._head_ref) == expected:
             return
 
-        if branch_ref not in repo.refs.keys():
+        if self._branch_ref not in repo.refs.keys():
             try:
-                repo.refs[branch_ref] = repo.head()
+                repo.refs[self._branch_ref] = repo.head()
             except KeyError:
                 pass
 
-        repo.refs.set_symbolic_ref(self._head_ref(), branch_ref)
+        repo.refs.set_symbolic_ref(self._head_ref, self._branch_ref)
 
     def _sync_from_remote(self, *, force: bool) -> None:
         repo = self._repo()
@@ -161,11 +163,10 @@ class GitBackend:
         )
 
         repo = self._repo()
-        remote_ref = self._remote_branch_ref()
-        if remote_ref in repo.refs.keys():
-            target = repo.refs[remote_ref]
-            repo.refs[self._branch_ref()] = target
-            repo.refs.set_symbolic_ref(self._head_ref(), self._branch_ref())
+        if self._remote_branch_ref in repo.refs.keys():
+            target = repo.refs[self._remote_branch_ref]
+            repo.refs[self._branch_ref] = target
+            repo.refs.set_symbolic_ref(self._head_ref, self._branch_ref)
             porcelain.reset(str(self.repo_path), mode="hard", treeish=target)
 
         self._last_fetch_at = now
@@ -289,21 +290,12 @@ class GitBackend:
     def _commit_message(self, action: str, rel_path: str) -> bytes:
         return f"{action.title()} {rel_path}".encode()
 
-    def _head_ref(self) -> Ref:
-        return cast(Ref, b"HEAD")
-
-    def _branch_ref(self) -> Ref:
-        return cast(Ref, f"refs/heads/{self.branch}".encode())
-
-    def _remote_branch_ref(self) -> Ref:
-        return cast(Ref, f"refs/remotes/origin/{self.branch}".encode())
-
     def _remote_location(self, repo: Repo) -> str | None:
         if self.remote_url == "":
             return None
         if any(ref.startswith(b"refs/remotes/origin/") for ref in repo.refs.keys()):
             return "origin"
-        return self.remote_url or None
+        return self.remote_url
 
     def _remote_label(self, repo: Repo) -> str:
         return self._remote_location(repo) or "disabled"
