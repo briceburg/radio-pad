@@ -94,12 +94,9 @@ class DataStore:
 
     def _build_git_backend(self) -> GitBackend:
         repo_path = os.environ.get("REGISTRY_BACKEND_GIT_REPO_PATH", "/tmp/radio-pad-registry-data")
-        remote_url = (
-            os.environ.get(
-                "REGISTRY_BACKEND_GIT_REMOTE_URL",
-                "git@github.com:briceburg/radio-pad-registry-data.git",
-            )
-            or None
+        remote_url = os.environ.get(
+            "REGISTRY_BACKEND_GIT_REMOTE_URL",
+            "git@github.com:briceburg/radio-pad-registry-data.git",
         )
         return GitBackend(
             repo_path=repo_path,

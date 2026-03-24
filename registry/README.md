@@ -36,7 +36,7 @@ REGISTRY_BACKEND_PATH | datastore location. required when backend is `local`. | 
 REGISTRY_BACKEND_PREFIX | prefix to apply to objects/files. For `git`, the default is empty so data can live at repo root. | `registry-v1` for `local`/`s3`, empty for `git`
 REGISTRY_BACKEND_S3_BUCKET | name of S3 bucket. required when backend is `s3` | `None`
 REGISTRY_BACKEND_GIT_REPO_PATH | local git checkout path. used for an existing clone or as the clone target when the backend bootstraps the repo. | `/tmp/radio-pad-registry-data`
-REGISTRY_BACKEND_GIT_REMOTE_URL | git remote URL used to bootstrap a clone when `REGISTRY_BACKEND_GIT_REPO_PATH` does not already exist. | `git@github.com:briceburg/radio-pad-registry-data.git`
+REGISTRY_BACKEND_GIT_REMOTE_URL | git remote URL used to bootstrap a clone when `REGISTRY_BACKEND_GIT_REPO_PATH` does not already exist. Set to an empty string to disable remote fetch/push for an existing checkout; this requires the checkout to already exist. | `git@github.com:briceburg/radio-pad-registry-data.git`
 REGISTRY_BACKEND_GIT_BRANCH | branch used for fetch/push operations. | `main`
 REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; writes always refresh first. | `30`
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`

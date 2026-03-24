@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from dulwich.repo import Repo
 from pytest import LogCaptureFixture
 
 from datastore import DataStore
@@ -50,6 +51,8 @@ def test_datastore_creates_git_backend_from_env_var(
 ) -> None:
     """GitBackend is created when REGISTRY_BACKEND is 'git'."""
     repo_path = tmp_path / "git-data"
+    repo_path.mkdir()
+    Repo.init(str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND", "git")
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
@@ -58,10 +61,23 @@ def test_datastore_creates_git_backend_from_env_var(
     store = DataStore()
     assert isinstance(store.backend, GitBackend)
     assert store.backend.repo_path == repo_path
+    assert store.backend.remote_url == ""
     assert store.backend.author_name == "briceburg"
     assert store.backend.author_email == "briceburg@users.noreply.github.com"
     assert store.prefix == ""
     assert f"Git backend ready: repo={repo_path}" in caplog.text
+
+
+def test_datastore_rejects_disabled_git_remote_without_existing_checkout(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("REGISTRY_BACKEND", "git")
+    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REPO_PATH", str(tmp_path / "missing-git-data"))
+    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
+
+    with pytest.raises(ValueError, match="remote disabled but checkout does not exist"):
+        DataStore()
 
 
 def test_datastore_raises_error_if_s3_bucket_is_missing(monkeypatch: MonkeyPatch) -> None:

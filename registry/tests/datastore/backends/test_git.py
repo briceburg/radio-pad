@@ -131,6 +131,23 @@ def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) 
         backend2.save("seed", {"name": "Local stale write"}, "accounts", if_match=stale_version)
 
 
+def test_git_backend_can_disable_remote_sync_for_existing_clone(tmp_path: Path) -> None:
+    remote = _create_remote_with_seed(tmp_path)
+    backend_path = tmp_path / "backend"
+    writer_path = tmp_path / "writer"
+
+    porcelain.clone(str(remote), str(backend_path), checkout=True, branch="main")
+    porcelain.clone(str(remote), str(writer_path), checkout=True, branch="main")
+
+    backend = _backend(backend_path, remote_url="")
+
+    _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message=b"writer update")
+    _push_main(writer_path, "origin")
+
+    data, _ = backend.get("fetched", "accounts")
+    assert data is None
+
+
 def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     _init_repo(repo_path)

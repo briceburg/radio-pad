@@ -61,11 +61,12 @@ class GitBackend:
             self._ensure_repo_exists()
             self._ensure_branch_symbolic_head()
             self._sync_from_remote(force=True)
+            repo = self._repo()
             logger.info(
                 "Git backend ready: repo=%s branch=%s remote=%s lock=%s fetch_ttl=%ss",
                 self.repo_path,
                 self.branch,
-                self.remote_url or "origin/local",
+                self._remote_label(repo),
                 self._lock_path,
                 self.fetch_ttl_seconds,
             )
@@ -105,6 +106,9 @@ class GitBackend:
 
         if self.repo_path.exists() and any(self.repo_path.iterdir()):
             raise ValueError(f"Git backend path exists but is not a git checkout: {self.repo_path}")
+
+        if self.remote_url == "":
+            raise ValueError(f"Git backend remote disabled but checkout does not exist: {self.repo_path}")
 
         self.repo_path.parent.mkdir(parents=True, exist_ok=True)
         if self.remote_url:
@@ -295,9 +299,14 @@ class GitBackend:
         return cast(Ref, f"refs/remotes/origin/{self.branch}".encode())
 
     def _remote_location(self, repo: Repo) -> str | None:
+        if self.remote_url == "":
+            return None
         if any(ref.startswith(b"refs/remotes/origin/") for ref in repo.refs.keys()):
             return "origin"
         return self.remote_url or None
+
+    def _remote_label(self, repo: Repo) -> str:
+        return self._remote_location(repo) or "disabled"
 
     def _repo(self) -> Repo:
         return Repo(str(self.repo_path))
