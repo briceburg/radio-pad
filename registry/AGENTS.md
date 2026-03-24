@@ -7,6 +7,7 @@ Guidance for coding agents working in `radio-pad-registry`.
 - FastAPI + Pydantic service for storing and serving radio-pad registry data.
 - Data is stored as JSON documents through typed datastore layers built on backend `ObjectStore` implementations.
 - The project is in active development. Prefer clean replacements over compatibility shims for older clients or older internal code.
+- The companion system repo is `radio-pad` (`https://github.com/briceburg/radio-pad`), which holds the player, switchboard, remote-control work and the higher-level architecture/auth diagrams.
 
 ## Runtime and tooling
 
@@ -32,6 +33,19 @@ Guidance for coding agents working in `radio-pad-registry`.
   - `presets/<preset>.json`
 - For Git-backed storage, prefer leaving `REGISTRY_BACKEND_PREFIX` unset so data lives at the repository root.
 - `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY` is a deployment secret used by Fly deploy setup; the runtime env var table documents `REGISTRY_BACKEND_GIT_SSH_KEY_PATH` for file-based key usage.
+
+## Auth and seeding conventions
+
+- Write-route auth uses OIDC bearer-token verification through `fastapi-oidc`; reads remain public.
+- Private authz data is stored separately from public content data and currently uses a local backend configured by `REGISTRY_AUTHZ_PATH`.
+- Checked-in seed data lives under `seed-data/`, with:
+  - `store/...` for public datastore seeds
+  - `auth/...` for private authz seeds
+- Checked-in authz seed documents live under `seed-data/auth/`, with:
+  - `global-admins.json`
+  - `accounts/<account>.json`
+- Reuse the shared `seed_from_path(...)` helper for both public content and authz seed loading so seeding behavior stays consistent across local, S3, and Git backends.
+- When changing auth or control semantics here, check whether the corresponding architecture/docs in the `radio-pad` repo should be updated too.
 
 ## Testing conventions
 

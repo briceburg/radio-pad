@@ -2,6 +2,8 @@
 
 registry.radiopad.dev - uniting players, remote-controls, and switchboards
 
+System architecture and the player-access/auth diagrams live in the main [`radio-pad`](https://github.com/briceburg/radio-pad) repo README.
+
 ## Usage
 
 ```bash
@@ -41,10 +43,17 @@ REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; write
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
 REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
 REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path for deploy-key authentication. | `None`
+REGISTRY_AUTH_OIDC_CLIENT_ID | OIDC client id used to verify bearer tokens for write access. When unset, write auth is disabled. | `None`
+REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for write access. | `None`
+REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc`; defaults to `REGISTRY_AUTH_OIDC_ISSUER`. | same as issuer
+REGISTRY_AUTH_OIDC_AUDIENCE | optional bearer token audience override; defaults to the client id when unset. | client id
+REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL | JWKS/discovery cache TTL in seconds for bearer token verification. | `3600`
+REGISTRY_AUTHZ_PATH | local private authz data path for owner/admin rules. This can share a Fly volume with the public datastore as long as it uses a separate directory. | `tmp/authz`
+REGISTRY_AUTHZ_PREFIX | prefix to apply to local private authz files. | `registry-authz-v1`
+REGISTRY_SEED_DATA_PATH | root location of checked-in seed documents. Store seeds load from `store/` and authz seeds load from `auth/` beneath this root. | `seed-data`
 REGISTRY_BIND_HOST | host to bind to | `localhost`
 REGISTRY_BIND_PORT | port to bind to | `8000`
 REGISTRY_LOG_LEVEL | uvicorn log level, e.g. `debug`, `error` | `info`
-REGISTRY_SEED_PATH | location of data to seed the datastore with. | `data`
 
 > relative paths are relative to the project root.
 
@@ -115,6 +124,33 @@ curl -i https://radio-pad-registry.fly.dev/healthz
 ```
 
 Use a volume for `REGISTRY_BACKEND_PATH` if startup clone latency becomes a problem.
+
+### Write authentication and authz seeding
+
+Read endpoints remain public. Write endpoints become protected when both `REGISTRY_AUTH_OIDC_CLIENT_ID` and `REGISTRY_AUTH_OIDC_ISSUER` are configured.
+
+The registry verifies OIDC bearer tokens with `fastapi-oidc` and then applies owner/admin ACL checks from a separate private local authz store.
+
+The checked-in seed documents live under a dedicated `seed-data/` root:
+
+- `seed-data/store/...` for public datastore seed content
+- `seed-data/auth/...` for private authz seed content
+
+The initial authz documents follow the same seed-file pattern as the public datastore, but live under `seed-data/auth/`:
+
+- `seed-data/auth/global-admins.json`
+- `seed-data/auth/accounts/<account>.json`
+
+These files are intended to stay human-friendly and easy to review. The checked-in defaults bootstrap:
+
+- `briceburg@gmail.com` as the first global admin
+- `briceburg` as an owned account for that verified email
+
+If you later want less public identity exposure, you can replace email entries with OIDC `subject` entries after first login.
+
+For the broader system view, including the switchboard/player control boundary, see the diagrams in the [`radio-pad` README](https://github.com/briceburg/radio-pad#architecture).
+
+In production, the private authz store should use a separate local path such as `REGISTRY_AUTHZ_PATH=/data/authz`, even if the public datastore also uses local storage on the same Fly volume.
 
 ## Testing
 

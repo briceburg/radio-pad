@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from models import Account, AccountCreate, AccountSummary
 
+from ..auth import require_account_manager
 from ..exceptions import NotFoundError
 from ..helpers import paginated_summary
 from ..models import PaginatedList
@@ -16,6 +17,7 @@ async def register_account(
     account_id: AccountId,
     ds: DS,
     account_data: AccountCreate,
+    _identity: object = Depends(require_account_manager),
 ) -> Account:
     account = ds.accounts.merge_upsert(account_id, account_data)
     return account

@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 
@@ -6,7 +5,7 @@ from lib.constants import BASE_DIR
 from lib.logging import logger
 
 from .backends import GitBackend, LocalBackend, S3Backend
-from .core import ObjectStore, SeedableStore, seedable
+from .core import ObjectStore, SeedableStore, seed_from_path, seedable
 from .stores import AccountPresets, Accounts, GlobalPresets, Players
 
 
@@ -19,9 +18,8 @@ class DataStore:
         seed_path: str | None = None,
     ) -> None:
         # Provide sensible defaults so tests can construct without args
-        self.seed_path = (
-            Path(seed_path) if seed_path else Path(os.environ.get("REGISTRY_SEED_PATH", str(BASE_DIR / "data")))
-        )
+        seed_root = Path(os.environ.get("REGISTRY_SEED_DATA_PATH", str(BASE_DIR / "seed-data")))
+        self.seed_path = Path(seed_path) if seed_path else seed_root / "store"
 
         if backend:
             self.backend = backend
@@ -52,13 +50,7 @@ class DataStore:
         Seeds the datastore with initial data from the data-seed directory.
         Only seeds data if it doesn't already exist in the backend.
         """
-        if not self.seed_path.is_dir():
-            logger.error(f"Seed path does not exist: {self.seed_path}")
-            return
-
-        stores = self._seedable_stores()
-        for seed_file in self.seed_path.rglob("*.json"):
-            self._seed_file(seed_file, stores)
+        seed_from_path(self.seed_path, self._seedable_stores(), label="content")
 
     def _build_git_backend(self, repo_path: str) -> GitBackend:
         remote_url = os.environ.get(
@@ -86,22 +78,3 @@ class DataStore:
             seedable(self.global_presets),
             seedable(self.account_presets),
         ]
-
-    def _seed_file(self, seed_file: Path, stores: list[SeedableStore]) -> None:
-        relative_path = seed_file.relative_to(self.seed_path).as_posix()
-
-        for store in stores:
-            if not (params := store.match(relative_path)):
-                continue
-
-            object_id = params.pop("id")
-            path_params = params or None
-            if store.exists(object_id, path_params=path_params):
-                logger.debug(f"Skipping existing object: {relative_path}")
-                return
-
-            with seed_file.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            store.seed({"id": object_id, **params, **data}, path_params=path_params)
-            logger.info(f"Seeded {relative_path}")
-            return

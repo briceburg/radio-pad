@@ -7,7 +7,9 @@ import boto3
 import pytest
 from _pytest.fixtures import SubRequest
 
+from datastore.core import ModelStore, seed_from_path, seedable
 from datastore.core.interfaces import ObjectStore
+from models.account import Account, AccountCreate
 
 
 @pytest.fixture(params=["json", "s3", "git"], ids=["json", "s3", "git"])
@@ -91,3 +93,20 @@ class TestObjectStoreContract:
         object_store.save("same", {"x": 2}, *path)
         _, v3 = object_store.get("same", *path)
         assert v3 != v2
+
+    def test_seed_from_path_works_across_backends(self, object_store: ObjectStore, tmp_path: Path) -> None:
+        seed_root = tmp_path / "seed"
+        (seed_root / "accounts").mkdir(parents=True)
+        (seed_root / "accounts" / "seeded.json").write_text('{\n  "name": "Seeded"\n}\n', encoding="utf-8")
+
+        accounts: ModelStore[Account, AccountCreate] = ModelStore(
+            object_store,
+            model=Account,
+            path_template="accounts/{id}",
+        )
+        seed_from_path(seed_root, [seedable(accounts)], label="content")
+
+        model = accounts.get("seeded")
+        assert model is not None
+        assert model.id == "seeded"
+        assert model.name == "Seeded"

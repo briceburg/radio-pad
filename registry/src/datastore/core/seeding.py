@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping
+from pathlib import Path
 
 from pydantic import BaseModel
+
+from lib.logging import logger
 
 from ..types import JsonDoc, PathParams
 from .interfaces import ModelWithId, SeedableStore
@@ -39,6 +43,31 @@ def seedable[Entity: ModelWithId, Create: BaseModel](
 ) -> SeedableStore:
     """Return a SeedableStore view for the given ModelStore."""
     return _SeedingView(store)
+
+
+def seed_from_path(seed_path: Path, stores: list[SeedableStore], *, label: str) -> None:
+    if not seed_path.is_dir():
+        logger.error(f"{label} seed path does not exist: {seed_path}")
+        return
+
+    for seed_file in seed_path.rglob("*.json"):
+        relative_path = seed_file.relative_to(seed_path).as_posix()
+
+        for store in stores:
+            if not (params := store.match(relative_path)):
+                continue
+
+            object_id = params.pop("id")
+            path_params = params or None
+            if store.exists(object_id, path_params=path_params):
+                logger.debug(f"Skipping existing {label} object: {relative_path}")
+                break
+
+            with seed_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            store.seed({"id": object_id, **params, **data}, path_params=path_params)
+            logger.info(f"Seeded {label} {relative_path}")
+            break
 
 
 def match_path_template(path: str, template: str) -> dict[str, str] | None:

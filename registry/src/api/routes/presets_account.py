@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from models import AccountStationPreset, AccountStationPresetCreate, AccountStationPresetSummary
 
+from ..auth import require_account_manager
 from ..exceptions import NotFoundError
 from ..helpers import paginated_summary
 from ..models import PaginatedList
@@ -22,6 +23,7 @@ async def register_account_preset(
     preset_id: PresetId,
     ds: DS,
     preset_data: AccountStationPresetCreate,
+    _identity: object = Depends(require_account_manager),
 ) -> AccountStationPreset:
     preset = ds.account_presets.merge_upsert(preset_id, preset_data, path_params={"account_id": account_id})
     return preset

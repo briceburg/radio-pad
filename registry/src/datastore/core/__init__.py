@@ -11,7 +11,7 @@ from .helpers import (
 )
 from .interfaces import ModelWithId, ObjectStore, SeedableStore
 from .model_store import ModelStore
-from .seeding import seedable
+from .seeding import seed_from_path, seedable
 
 __all__ = [
     "ModelStore",
@@ -24,6 +24,7 @@ __all__ = [
     "deconstruct_storage_path",
     "extract_object_id_from_path",
     "normalize_etag",
+    "seed_from_path",
     "seedable",
     "storage_json",
     "strip_id",

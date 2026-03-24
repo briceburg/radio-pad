@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from models import Account, Player, PlayerCreate, PlayerSummary
 
+from ..auth import require_account_manager
 from ..exceptions import NotFoundError
 from ..helpers import paginated_summary
 from ..models import PaginatedList
@@ -17,6 +18,7 @@ async def register_player(
     player_id: PlayerId,
     ds: DS,
     player_data: PlayerCreate,
+    _identity: object = Depends(require_account_manager),
 ) -> Player:
     if not ds.accounts.exists(account_id):
         new_account = Account(id=account_id, name=account_id)

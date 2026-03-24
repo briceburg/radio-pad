@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from datastore import DataStore
 from lib.logging import silence_access_logs
 
+from .auth import AuthServices
 from .models import ErrorDetail
 from .routes import presets_account, presets_global
 
@@ -19,6 +20,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ds = DataStore()
         ds.seed()
         app.state.store = ds  # expose for dependencies
+    if not hasattr(app.state, "auth"):
+        app.state.auth = AuthServices.from_env()
     yield
     # add cleanup logic here
 

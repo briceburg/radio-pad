@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from models import GlobalStationPreset, GlobalStationPresetCreate, GlobalStationPresetSummary
 
+from ..auth import require_admin
 from ..exceptions import NotFoundError
 from ..helpers import paginated_summary
 from ..models import PaginatedList
@@ -21,6 +22,7 @@ async def register_global_preset(
     preset_id: PresetId,
     ds: DS,
     preset_data: GlobalStationPresetCreate,
+    _identity: object = Depends(require_admin),
 ) -> GlobalStationPreset:
     preset = ds.global_presets.merge_upsert(preset_id, preset_data)
     return preset

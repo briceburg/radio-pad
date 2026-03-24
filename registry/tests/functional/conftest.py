@@ -20,12 +20,13 @@ class FunctionalTestBed:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         self.tmp_path = tmp_path
         self.monkeypatch = monkeypatch
-        self.seed_dir = self.tmp_path / "seed"
+        self.seed_root = self.tmp_path / "seed-data"
+        self.seed_dir = self.seed_root / "store"
         self.data_dir = self.tmp_path / "data"
 
     def configure_env(self) -> None:
         self.monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(self.data_dir))
-        self.monkeypatch.setenv("REGISTRY_SEED_PATH", str(self.seed_dir))
+        self.monkeypatch.setenv("REGISTRY_SEED_DATA_PATH", str(self.seed_root))
 
     def _write_seed_file(self, relative_path: str, payload: JsonDoc) -> None:
         target = self.seed_dir / relative_path
@@ -54,10 +55,10 @@ def functional_client(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Generator[httpx.Client]:
     """
-    Session-scoped client that uses the default seed data from `data/`.
+    Session-scoped client that uses the default seed data from `seed-data/store/`.
     """
     session_monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(tmp_path_factory.mktemp("data-session")))
-    # REGISTRY_SEED_PATH is NOT set, so the default `data/` is used.
+    # REGISTRY_SEED_DATA_PATH is NOT set, so the default `seed-data/store/` is used.
 
     app = create_app()
     with TestClient(app) as client:
