@@ -11,6 +11,7 @@ from threading import RLock
 from typing import Any, TypeVar, cast
 
 from dulwich import porcelain
+from dulwich.errors import GitProtocolError, HangupException, SendPackError
 from dulwich.refs import Ref
 from dulwich.repo import Repo
 
@@ -116,14 +117,18 @@ class GitBackend:
 
         self.repo_path.parent.mkdir(parents=True, exist_ok=True)
         if self.remote_url:
-            porcelain.clone(
-                self.remote_url,
-                str(self.repo_path),
-                checkout=True,
-                branch=self.branch,
-                origin="origin",
-                errstream=io.BytesIO(),
-                **self._auth_kwargs(),
+            remote_url = self.remote_url
+            self._run_remote_operation(
+                "clone",
+                lambda: porcelain.clone(
+                    remote_url,
+                    str(self.repo_path),
+                    checkout=True,
+                    branch=self.branch,
+                    origin="origin",
+                    errstream=io.BytesIO(),
+                    **self._auth_kwargs(),
+                ),
             )
         else:
             self.repo_path.mkdir(parents=True, exist_ok=True)
@@ -154,13 +159,16 @@ class GitBackend:
         if not force and self.fetch_ttl_seconds > 0 and now - self._last_fetch_at < self.fetch_ttl_seconds:
             return
 
-        porcelain.fetch(
-            str(self.repo_path),
-            remote_location,
-            outstream=io.StringIO(),
-            errstream=io.BytesIO(),
-            quiet=True,
-            **self._auth_kwargs(),
+        self._run_remote_operation(
+            "fetch",
+            lambda: porcelain.fetch(
+                str(self.repo_path),
+                remote_location,
+                outstream=io.StringIO(),
+                errstream=io.BytesIO(),
+                quiet=True,
+                **self._auth_kwargs(),
+            ),
         )
 
         repo = self._repo()
@@ -178,13 +186,16 @@ class GitBackend:
         if remote_location is None:
             return True
 
-        result = porcelain.push(
-            str(self.repo_path),
-            remote_location,
-            refspecs=f"refs/heads/{self.branch}:refs/heads/{self.branch}",
-            outstream=io.BytesIO(),
-            errstream=io.BytesIO(),
-            **self._auth_kwargs(),
+        result = self._run_remote_operation(
+            "push",
+            lambda: porcelain.push(
+                str(self.repo_path),
+                remote_location,
+                refspecs=f"refs/heads/{self.branch}:refs/heads/{self.branch}",
+                outstream=io.BytesIO(),
+                errstream=io.BytesIO(),
+                **self._auth_kwargs(),
+            ),
         )
         statuses = result.ref_status or {}
         if any(status is not None for status in statuses.values()):
@@ -302,6 +313,27 @@ class GitBackend:
 
     def _repo(self) -> Repo:
         return Repo(str(self.repo_path))
+
+    def _run_remote_operation(self, action: str, operation: Callable[[], _T]) -> _T:
+        try:
+            return operation()
+        except (HangupException, GitProtocolError, SendPackError, OSError) as exc:
+            raise RuntimeError(self._remote_error_message(action)) from exc
+
+    def _remote_error_message(self, action: str) -> str:
+        remote = self.remote_url or "origin"
+        message = [
+            f"Git backend failed to {action} remote {remote!r} for branch {self.branch!r}.",
+        ]
+        if self.remote_url and self.remote_url.startswith("git@"):
+            message.append("Check SSH auth: ensure REGISTRY_BACKEND_GIT_SSH_KEY_PATH points to a readable private key.")
+            message.append(
+                "On Fly, set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY and add the matching public key "
+                "to the data repository as a deploy key with write access."
+            )
+        else:
+            message.append("Check remote connectivity and credentials.")
+        return " ".join(message)
 
     def _auth_kwargs(self) -> dict[str, Any]:
         kwargs: dict[str, Any] = {}

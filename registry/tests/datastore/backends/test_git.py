@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import pytest
 from dulwich import porcelain
+from dulwich.errors import HangupException
 from dulwich.refs import Ref
 from dulwich.repo import Repo
 
@@ -99,6 +100,23 @@ def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
     data, version = backend.get("seed", "accounts")
     assert data == {"name": "Seed"}
     assert isinstance(version, str) and version
+
+
+def test_git_backend_clone_error_explains_deploy_key_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_clone(*args: object, **kwargs: object) -> None:
+        raise HangupException
+
+    monkeypatch.setattr(porcelain, "clone", failing_clone)
+
+    with pytest.raises(RuntimeError, match="failed to clone remote") as excinfo:
+        _backend(
+            tmp_path / "clone",
+            remote_url="git@github.com:briceburg/radio-pad-registry-data.git",
+        )
+
+    message = str(excinfo.value)
+    assert "REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" in message
+    assert "deploy key with write access" in message
 
 
 def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
