@@ -65,8 +65,10 @@ def unit_tests_root() -> Path:
 @pytest.fixture(scope="session")
 def mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     """
-    Fixture to create a clean DataStore for each test, using a dedicated
-    tmp/tests/unit/api/data directory. This ensures test isolation while allowing inspection
+    Session-scoped DataStore rooted in tmp/tests/unit/api/data.
+
+    Per-test isolation is provided by the autouse `seeded_store` fixture, which resets and
+    re-seeds this shared backend directory before each test while still allowing inspection
     of test data after a run.
     """
     data_dir = _reset_dir(unit_tests_root / "api" / "data")
