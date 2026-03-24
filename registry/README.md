@@ -104,53 +104,18 @@ The intended authentication model is a write-enabled GitHub deploy key over SSH.
 
 #### Fly.io deployment
 
-The checked-in `fly.toml` is now configured for the Git backend:
+The checked-in `fly.toml` is configured for the Git backend using `/tmp/radio-pad-registry-data` as the local checkout and `UVICORN_WORKERS=1`. That worker setting is a temporary safety choice while Git writes only use a process-local lock; one worker still handles multiple concurrent async requests, but once cross-process coordination exists, letting worker count default to CPU count should be reasonable again.
 
-- `REGISTRY_BACKEND=git`
-- `REGISTRY_BACKEND_GIT_REPO_PATH=/tmp/radio-pad-registry-data`
-- `REGISTRY_BACKEND_GIT_REMOTE_URL=git@github.com:briceburg/radio-pad-registry-data.git`
-- `REGISTRY_BACKEND_GIT_AUTHOR_NAME=briceburg`
-- `REGISTRY_BACKEND_GIT_AUTHOR_EMAIL=briceburg@users.noreply.github.com`
-- `UVICORN_WORKERS=1`
-
-`UVICORN_WORKERS=1` is intentional for now because the Git backend currently only coordinates writes with a process-local lock. This is a temporary safety setting, and we should revisit it after adding a cross-process lock or another coordination mechanism that makes multi-worker Git writes safe.
-
-A setting of `1` does **not** mean the service can only handle one request at a time. A single uvicorn worker still runs an async event loop and can serve multiple requests concurrently, especially for normal I/O-bound API traffic.
-
-In this container setup, if `UVICORN_WORKERS` is left unset, `bin/docker/entrypoint.sh` defaults it to the detected CPU count. That is often a reasonable target for backends that are safe to run across multiple worker processes. For the current Git backend, though, `1` is the safest setting until the locking story is improved.
-
-The local checkout is stored under `/tmp`, so no Fly volume is required for the current setup. If startup latency or clone churn becomes worth optimizing later, switching that checkout to a Fly volume-backed path would still be a reasonable follow-up.
-
-Recommended deploy procedure:
-
-1. Create a dedicated deploy key for the app:
+Deploy by creating a write-enabled GitHub deploy key for `briceburg/radio-pad-registry-data`, adding its private key to Fly as `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY`, and then deploying:
 
 ```sh
 ssh-keygen -t ed25519 -f ~/.ssh/radio-pad-registry-data-fly -C "radio-pad-registry fly deploy"
-```
-
-2. Add the public key to `briceburg/radio-pad-registry-data` as a GitHub deploy key with write access.
-
-3. Upload the private key to Fly as a secret:
-
-```sh
 fly secrets set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY="$(cat ~/.ssh/radio-pad-registry-data-fly)"
-```
-
-4. Deploy the application:
-
-```sh
 fly deploy
-```
-
-5. Verify the release:
-
-```sh
-fly status
 curl -i https://radio-pad-registry.fly.dev/healthz
 ```
 
-At container startup, `bin/docker/entrypoint.sh` writes `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY` to a private key file, exports `REGISTRY_BACKEND_GIT_SSH_KEY_PATH`, and populates `known_hosts` for `github.com`. No extra SSH setup is required inside the image beyond supplying the Fly secret.
+At container startup, `bin/docker/entrypoint.sh` materializes the private key, exports `REGISTRY_BACKEND_GIT_SSH_KEY_PATH`, and populates `known_hosts` for `github.com`. A Fly volume is not required for the current setup, though a volume-backed checkout is a reasonable follow-up if startup clone latency becomes worth optimizing.
 
 ## Testing
 

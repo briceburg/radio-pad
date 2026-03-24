@@ -3,9 +3,10 @@ from __future__ import annotations
 import io
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from dulwich import porcelain
 from dulwich.refs import Ref
@@ -20,6 +21,9 @@ from datastore.core import (
 )
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
+
+_T = TypeVar("_T")
+_RETRY = object()
 
 
 class GitBackend:
@@ -57,12 +61,7 @@ class GitBackend:
     def get(self, object_id: str, *path_parts: str) -> ValueWithETag[JsonDoc]:
         with self._lock:
             self._sync_from_remote(force=False)
-            file_path = self._get_fs_path(object_id, *path_parts)
-            if not file_path.exists():
-                return None, None
-            with file_path.open("r", encoding="utf-8") as f:
-                raw = json.load(f)
-            return raw, compute_etag(raw)
+            return self._read_existing(self._get_fs_path(object_id, *path_parts))
 
     def list(self, *path_parts: str, page: int = 1, per_page: int = 10) -> PagedResult[JsonDoc]:
         with self._lock:
@@ -75,69 +74,18 @@ class GitBackend:
             start = max(0, (page - 1) * per_page)
             page_files = files[start : start + per_page]
 
-            items: list[dict[str, Any]] = []
-            for file_path in page_files:
-                with file_path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data["id"] = extract_object_id_from_path(file_path.name)
-                items.append(data)
+            items = [self._read_json_file(file_path) for file_path in page_files]
+            for item, file_path in zip(items, page_files, strict=False):
+                item["id"] = extract_object_id_from_path(file_path.name)
             return items
 
     def save(self, object_id: str, data: JsonDoc, *path_parts: str, if_match: str | None = None) -> None:
         with self._lock:
-            for attempt in range(2):
-                self._sync_from_remote(force=True)
-                file_path = self._get_fs_path(object_id, *path_parts)
-                current, current_version = self._read_existing(file_path)
-                if if_match is not None and if_match != current_version:
-                    raise ConcurrencyError("ETag mismatch")
-
-                to_write = strip_id(data)
-                if current is not None and compute_etag(to_write) == current_version:
-                    return
-
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write_json_file(file_path, to_write)
-                rel_path = self._relative_repo_path(file_path)
-                porcelain.add(str(self.repo_path), paths=[rel_path])
-                porcelain.commit(
-                    str(self.repo_path),
-                    message=self._commit_message("update", rel_path),
-                    author=self._author_identity(),
-                    committer=self._author_identity(),
-                )
-
-                if self._push_branch():
-                    return
-                if attempt == 1:
-                    raise ConcurrencyError("Push rejected")
-
-            raise ConcurrencyError("Push rejected")
+            self._with_write_retry(lambda: self._save_once(object_id, strip_id(data), path_parts, if_match))
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
         with self._lock:
-            for attempt in range(2):
-                self._sync_from_remote(force=True)
-                file_path = self._get_fs_path(object_id, *path_parts)
-                if not file_path.exists():
-                    return False
-
-                rel_path = self._relative_repo_path(file_path)
-                porcelain.remove(str(self.repo_path), paths=[rel_path])
-                self._prune_empty_dirs(file_path.parent)
-                porcelain.commit(
-                    str(self.repo_path),
-                    message=self._commit_message("delete", rel_path),
-                    author=self._author_identity(),
-                    committer=self._author_identity(),
-                )
-
-                if self._push_branch():
-                    return True
-                if attempt == 1:
-                    raise ConcurrencyError("Push rejected")
-
-            raise ConcurrencyError("Push rejected")
+            return self._with_write_retry(lambda: self._delete_once(object_id, path_parts))
 
     def _ensure_repo_exists(self) -> None:
         if (self.repo_path / ".git").exists():
@@ -228,12 +176,56 @@ class GitBackend:
         self._last_fetch_at = time.monotonic()
         return True
 
+    def _save_once(
+        self,
+        object_id: str,
+        data: JsonDoc,
+        path_parts: tuple[str, ...],
+        if_match: str | None,
+    ) -> None | object:
+        file_path = self._get_fs_path(object_id, *path_parts)
+        current, current_version = self._read_existing(file_path)
+        if if_match is not None and if_match != current_version:
+            raise ConcurrencyError("ETag mismatch")
+
+        if current is not None and compute_etag(data) == current_version:
+            return None
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json_file(file_path, data)
+        rel_path = self._relative_repo_path(file_path)
+        porcelain.add(str(self.repo_path), paths=[rel_path])
+        self._commit_change("update", rel_path)
+        return None if self._push_branch() else _RETRY
+
+    def _delete_once(self, object_id: str, path_parts: tuple[str, ...]) -> bool | object:
+        file_path = self._get_fs_path(object_id, *path_parts)
+        if not file_path.exists():
+            return False
+
+        rel_path = self._relative_repo_path(file_path)
+        porcelain.remove(str(self.repo_path), paths=[rel_path])
+        self._prune_empty_dirs(file_path.parent)
+        self._commit_change("delete", rel_path)
+        return True if self._push_branch() else _RETRY
+
+    def _with_write_retry(self, operation: Callable[[], _T | object]) -> _T:
+        for _ in range(2):
+            self._sync_from_remote(force=True)
+            result = operation()
+            if result is not _RETRY:
+                return cast(_T, result)
+        raise ConcurrencyError("Push rejected")
+
     def _read_existing(self, file_path: Path) -> ValueWithETag[JsonDoc]:
         if not file_path.exists():
             return None, None
-        with file_path.open("r", encoding="utf-8") as f:
-            raw = json.load(f)
+        raw = self._read_json_file(file_path)
         return raw, compute_etag(raw)
+
+    def _read_json_file(self, file_path: Path) -> dict[str, Any]:
+        with file_path.open("r", encoding="utf-8") as f:
+            return cast(dict[str, Any], json.load(f))
 
     def _get_fs_path(self, object_id: str, *path_parts: str) -> Path:
         storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
@@ -258,6 +250,15 @@ class GitBackend:
 
     def _author_identity(self) -> bytes:
         return f"{self.author_name} <{self.author_email}>".encode()
+
+    def _commit_change(self, action: str, rel_path: str) -> None:
+        author = self._author_identity()
+        porcelain.commit(
+            str(self.repo_path),
+            message=self._commit_message(action, rel_path),
+            author=author,
+            committer=author,
+        )
 
     def _commit_message(self, action: str, rel_path: str) -> bytes:
         return f"{action.title()} {rel_path}".encode()

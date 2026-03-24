@@ -15,6 +15,8 @@ from datastore.backends.git import GitBackend
 from datastore.exceptions import ConcurrencyError
 
 AUTHOR = b"Tests <tests@example.invalid>"
+AUTHOR_NAME = "Tests"
+AUTHOR_EMAIL = "tests@example.invalid"
 
 
 def _init_repo(path: Path, *, branch: str = "main") -> None:
@@ -31,6 +33,33 @@ def _commit_json(repo_path: Path, relative_path: str, data: dict[str, object], *
     porcelain.commit(str(repo_path), message=message, author=AUTHOR, committer=AUTHOR)
 
 
+def _push_main(repo_path: Path, remote_location: str | Path) -> None:
+    porcelain.push(
+        str(repo_path),
+        str(remote_location),
+        refspecs="refs/heads/main:refs/heads/main",
+        outstream=io.BytesIO(),
+        errstream=io.BytesIO(),
+    )
+
+
+def _backend(
+    repo_path: Path,
+    *,
+    branch: str = "main",
+    remote_url: str | Path | None = None,
+    fetch_ttl_seconds: int = 0,
+) -> GitBackend:
+    return GitBackend(
+        repo_path=str(repo_path),
+        remote_url=str(remote_url) if remote_url is not None else None,
+        branch=branch,
+        fetch_ttl_seconds=fetch_ttl_seconds,
+        author_name=AUTHOR_NAME,
+        author_email=AUTHOR_EMAIL,
+    )
+
+
 def _create_remote_with_seed(tmp_path: Path) -> Path:
     remote = tmp_path / "remote.git"
     remote.mkdir(parents=True, exist_ok=True)
@@ -39,27 +68,14 @@ def _create_remote_with_seed(tmp_path: Path) -> Path:
     seed = tmp_path / "seed"
     _init_repo(seed)
     _commit_json(seed, "accounts/seed.json", {"name": "Seed"}, message=b"seed")
-    porcelain.push(
-        str(seed),
-        str(remote),
-        refspecs="refs/heads/main:refs/heads/main",
-        outstream=io.BytesIO(),
-        errstream=io.BytesIO(),
-    )
+    _push_main(seed, remote)
     return remote
 
 
 def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
     remote = _create_remote_with_seed(tmp_path)
 
-    backend = GitBackend(
-        repo_path=str(tmp_path / "clone"),
-        remote_url=str(remote),
-        branch="main",
-        fetch_ttl_seconds=0,
-        author_name="Tests",
-        author_email="tests@example.invalid",
-    )
+    backend = _backend(tmp_path / "clone", remote_url=remote)
 
     data, version = backend.get("seed", "accounts")
     assert data == {"name": "Seed"}
@@ -74,22 +90,10 @@ def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
     porcelain.clone(str(remote), str(backend_path), checkout=True, branch="main")
     porcelain.clone(str(remote), str(writer_path), checkout=True, branch="main")
 
-    backend = GitBackend(
-        repo_path=str(backend_path),
-        branch="main",
-        fetch_ttl_seconds=0,
-        author_name="Tests",
-        author_email="tests@example.invalid",
-    )
+    backend = _backend(backend_path)
 
     _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message=b"writer update")
-    porcelain.push(
-        str(writer_path),
-        "origin",
-        refspecs="refs/heads/main:refs/heads/main",
-        outstream=io.BytesIO(),
-        errstream=io.BytesIO(),
-    )
+    _push_main(writer_path, "origin")
 
     data, _ = backend.get("fetched", "accounts")
     assert data == {"name": "Fetched"}
@@ -103,20 +107,8 @@ def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) 
     porcelain.clone(str(remote), str(backend1_path), checkout=True, branch="main")
     porcelain.clone(str(remote), str(backend2_path), checkout=True, branch="main")
 
-    backend1 = GitBackend(
-        repo_path=str(backend1_path),
-        branch="main",
-        fetch_ttl_seconds=0,
-        author_name="Tests",
-        author_email="tests@example.invalid",
-    )
-    backend2 = GitBackend(
-        repo_path=str(backend2_path),
-        branch="main",
-        fetch_ttl_seconds=3600,
-        author_name="Tests",
-        author_email="tests@example.invalid",
-    )
+    backend1 = _backend(backend1_path)
+    backend2 = _backend(backend2_path, fetch_ttl_seconds=3600)
 
     _, stale_version = backend2.get("seed", "accounts")
     assert stale_version is not None
@@ -144,13 +136,7 @@ def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     )
 
     ds = DataStore(
-        backend=GitBackend(
-            repo_path=str(repo_path),
-            branch="main",
-            fetch_ttl_seconds=0,
-            author_name="Tests",
-            author_email="tests@example.invalid",
-        ),
+        backend=_backend(repo_path),
         seed_path=str(seed_dir),
     )
     ds.seed()
@@ -173,13 +159,7 @@ def test_git_backend_repoints_head_to_configured_branch(tmp_path: Path) -> None:
     repo.refs[other_ref] = repo.refs[main_ref]
     repo.refs.set_symbolic_ref(cast(Ref, b"HEAD"), other_ref)
 
-    backend = GitBackend(
-        repo_path=str(repo_path),
-        branch="main",
-        fetch_ttl_seconds=0,
-        author_name="Tests",
-        author_email="tests@example.invalid",
-    )
+    backend = _backend(repo_path)
 
     backend.save("fresh", {"name": "Fresh"}, "accounts")
 
