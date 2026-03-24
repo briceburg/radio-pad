@@ -115,5 +115,5 @@ def test_pagination_works(account_api: AccountApi) -> None:
 )
 def test_pagination_invalid_values_rejected(client: TestClient, raw_page: int, raw_per: int) -> None:
     resp = client.get(f"/v1/accounts?page={raw_page}&per_page={raw_per}")
-    assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert resp.json()["detail"]

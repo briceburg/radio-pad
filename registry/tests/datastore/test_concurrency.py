@@ -1,10 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from datastore.backends import LocalBackend
-from datastore.core import ModelStore
+from datastore.core import ModelStore, atomic_write_json_file
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, ValueWithETag
 from models import Account, AccountCreate
@@ -42,3 +43,20 @@ def test_merge_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypa
 
     # Restore real get to keep backend consistent for any subsequent tests
     monkeypatch.setattr(repo._backend, "get", real_get)
+
+
+def test_atomic_write_json_file_uses_unique_temp_files_under_concurrency(tmp_path: Path) -> None:
+    target = tmp_path / "shared.json"
+    errors: list[Exception] = []
+
+    def write_payload(i: int) -> None:
+        try:
+            atomic_write_json_file(target, {"value": i})
+        except Exception as exc:  # pragma: no cover - regression capture
+            errors.append(exc)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(write_payload, range(32)))
+
+    assert errors == []
+    assert target.exists()

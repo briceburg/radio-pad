@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from ..types import JsonDoc
@@ -45,10 +46,15 @@ def extract_object_id_from_path(path: str) -> str:
 
 def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
     """Writes a JSON file atomically by writing to a temp file and then renaming."""
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
-    os.replace(tmp_path, path)
+    fd, tmp_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
 
 def construct_storage_path(*, prefix: str, path_parts: tuple[str, ...], object_id: str | None = None) -> str:
