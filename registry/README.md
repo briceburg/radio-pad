@@ -104,7 +104,7 @@ The intended authentication model is a write-enabled GitHub deploy key over SSH.
 
 #### Fly.io deployment
 
-The checked-in `fly.toml` is configured for the Git backend using `/tmp/radio-pad-registry-data` as the local checkout and `UVICORN_WORKERS=1`. That worker setting is a temporary safety choice while Git writes only use a process-local lock; one worker still handles multiple concurrent async requests, but once cross-process coordination exists, letting worker count default to CPU count should be reasonable again.
+The checked-in `fly.toml` is configured for the Git backend using `/tmp/radio-pad-registry-data` as the local checkout and `UVICORN_WORKERS=1`. The backend now also uses a repo-scoped file lock so processes sharing the same checkout serialize Git operations safely. We are still keeping `UVICORN_WORKERS=1` as the conservative deployment default until multi-worker behavior gets more real-world exercise; one worker still handles multiple concurrent async requests.
 
 Deploy by creating a write-enabled GitHub deploy key for `briceburg/radio-pad-registry-data`, adding its private key to Fly as `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY`, and then deploying:
 

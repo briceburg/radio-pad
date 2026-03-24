@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+import multiprocessing as mp
+import time
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from dulwich import porcelain
@@ -58,6 +60,16 @@ def _backend(
         author_name=AUTHOR_NAME,
         author_email=AUTHOR_EMAIL,
     )
+
+
+def _contend_for_backend_lock(repo_path: str, ready_conn: Any, result_conn: Any) -> None:
+    ready_conn.send("ready")
+    ready_conn.recv()
+
+    started = time.monotonic()
+    backend = _backend(Path(repo_path))
+    with backend._operation_lock():
+        result_conn.send(time.monotonic() - started)
 
 
 def _create_remote_with_seed(tmp_path: Path) -> Path:
@@ -166,3 +178,26 @@ def test_git_backend_repoints_head_to_configured_branch(tmp_path: Path) -> None:
     repo = Repo(str(repo_path))
     assert repo.refs.read_ref(cast(Ref, b"HEAD")) == b"ref: refs/heads/main"
     assert repo.refs[main_ref] != repo.refs[other_ref]
+
+
+def test_git_backend_uses_cross_process_lock_for_shared_repo(tmp_path: Path) -> None:
+    repo_path = tmp_path / "repo"
+    _init_repo(repo_path)
+
+    backend = _backend(repo_path)
+    ctx = mp.get_context("spawn")
+    ready_parent, ready_child = ctx.Pipe()
+    result_parent, result_child = ctx.Pipe()
+    process = ctx.Process(target=_contend_for_backend_lock, args=(str(repo_path), ready_child, result_child))
+
+    with backend._operation_lock():
+        process.start()
+        assert ready_parent.recv() == "ready"
+        ready_parent.send("go")
+        time.sleep(0.3)
+        assert process.is_alive()
+        assert not result_parent.poll()
+
+    assert result_parent.recv() >= 0.3
+    process.join(timeout=5)
+    assert process.exitcode == 0

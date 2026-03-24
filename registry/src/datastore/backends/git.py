@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import fcntl
 import io
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from typing import Any, TypeVar, cast
@@ -51,20 +53,21 @@ class GitBackend:
         self.ssh_key_path = ssh_key_path
 
         self._lock = RLock()
+        self._lock_path = self.repo_path.parent / f".{self.repo_path.name}.lock"
         self._last_fetch_at = 0.0
 
-        with self._lock:
+        with self._operation_lock():
             self._ensure_repo_exists()
             self._ensure_branch_symbolic_head()
             self._sync_from_remote(force=True)
 
     def get(self, object_id: str, *path_parts: str) -> ValueWithETag[JsonDoc]:
-        with self._lock:
+        with self._operation_lock():
             self._sync_from_remote(force=False)
             return self._read_existing(self._get_fs_path(object_id, *path_parts))
 
     def list(self, *path_parts: str, page: int = 1, per_page: int = 10) -> PagedResult[JsonDoc]:
-        with self._lock:
+        with self._operation_lock():
             self._sync_from_remote(force=False)
             directory = self._get_dir_path(*path_parts)
             if not directory.exists():
@@ -80,11 +83,11 @@ class GitBackend:
             return items
 
     def save(self, object_id: str, data: JsonDoc, *path_parts: str, if_match: str | None = None) -> None:
-        with self._lock:
+        with self._operation_lock():
             self._with_write_retry(lambda: self._save_once(object_id, strip_id(data), path_parts, if_match))
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
-        with self._lock:
+        with self._operation_lock():
             return self._with_write_retry(lambda: self._delete_once(object_id, path_parts))
 
     def _ensure_repo_exists(self) -> None:
@@ -216,6 +219,16 @@ class GitBackend:
             if result is not _RETRY:
                 return cast(_T, result)
         raise ConcurrencyError("Push rejected")
+
+    @contextmanager
+    def _operation_lock(self) -> Iterator[None]:
+        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock, self._lock_path.open("a+b") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _read_existing(self, file_path: Path) -> ValueWithETag[JsonDoc]:
         if not file_path.exists():
