@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 from dulwich import porcelain
 from dulwich.errors import HangupException
+from dulwich.objects import Commit
 from dulwich.refs import Ref
 from dulwich.repo import Repo
 
@@ -130,6 +131,30 @@ def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
 
     data, _ = backend.get("fetched", "accounts")
     assert data == {"name": "Fetched"}
+
+
+def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path) -> None:
+    repo_path = tmp_path / "repo"
+    _init_repo(repo_path)
+
+    backend = _backend(repo_path)
+    backend.save("fresh", {"name": "Fresh", "stations": [{"url": "https://example.com", "name": "Example"}]}, "presets")
+
+    assert (repo_path / "presets" / "fresh.json").read_text(encoding="utf-8") == (
+        "{\n"
+        '  "name": "Fresh",\n'
+        '  "stations": [\n'
+        "    {\n"
+        '      "name": "Example",\n'
+        '      "url": "https://example.com"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+    )
+
+    repo = Repo(str(repo_path))
+    commit = cast(Commit, repo[repo.head()])
+    assert commit.message == b"radio-pad-registry: update presets/fresh.json"
 
 
 def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) -> None:

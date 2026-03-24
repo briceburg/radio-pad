@@ -299,7 +299,7 @@ class GitBackend:
         )
 
     def _commit_message(self, action: str, rel_path: str) -> bytes:
-        return f"{action.title()} {rel_path}".encode()
+        return f"radio-pad-registry: {action} {rel_path}".encode()
 
     def _remote_location(self, repo: Repo) -> str | None:
         if self.remote_url == "":

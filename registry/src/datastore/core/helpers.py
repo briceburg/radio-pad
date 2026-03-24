@@ -64,7 +64,8 @@ def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
             delete=False,
         ) as f:
             tmp_path = Path(f.name)
-            json.dump(data, f, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+            json.dump(data, f, indent=2, sort_keys=True, ensure_ascii=False)
+            f.write("\n")
         os.replace(tmp_path, path)
     finally:
         if tmp_path is not None and tmp_path.exists():
