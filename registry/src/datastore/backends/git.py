@@ -165,8 +165,16 @@ class GitBackend:
         repo = self._repo()
         branch_ref = self._branch_ref()
         expected = b"ref: " + branch_ref
-        if repo.refs.read_ref(self._head_ref()) != expected and branch_ref not in repo.refs.keys():
-            repo.refs.set_symbolic_ref(self._head_ref(), branch_ref)
+        if repo.refs.read_ref(self._head_ref()) == expected:
+            return
+
+        if branch_ref not in repo.refs.keys():
+            try:
+                repo.refs[branch_ref] = repo.head()
+            except KeyError:
+                pass
+
+        repo.refs.set_symbolic_ref(self._head_ref(), branch_ref)
 
     def _sync_from_remote(self, *, force: bool) -> None:
         repo = self._repo()

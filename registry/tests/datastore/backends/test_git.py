@@ -160,3 +160,29 @@ def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     assert account.name == "Account One"
     assert (repo_path / "accounts" / "acct1.json").exists()
     assert (repo_path / "presets" / "rock.json").exists()
+
+
+def test_git_backend_repoints_head_to_configured_branch(tmp_path: Path) -> None:
+    repo_path = tmp_path / "repo"
+    _init_repo(repo_path)
+    _commit_json(repo_path, "accounts/seed.json", {"name": "Seed"}, message=b"seed")
+
+    repo = Repo(str(repo_path))
+    main_ref = cast(Ref, b"refs/heads/main")
+    other_ref = cast(Ref, b"refs/heads/other")
+    repo.refs[other_ref] = repo.refs[main_ref]
+    repo.refs.set_symbolic_ref(cast(Ref, b"HEAD"), other_ref)
+
+    backend = GitBackend(
+        repo_path=str(repo_path),
+        branch="main",
+        fetch_ttl_seconds=0,
+        author_name="Tests",
+        author_email="tests@example.invalid",
+    )
+
+    backend.save("fresh", {"name": "Fresh"}, "accounts")
+
+    repo = Repo(str(repo_path))
+    assert repo.refs.read_ref(cast(Ref, b"HEAD")) == b"ref: refs/heads/main"
+    assert repo.refs[main_ref] != repo.refs[other_ref]
