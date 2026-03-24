@@ -31,6 +31,7 @@ from lib.logging import logger
 
 _T = TypeVar("_T")
 _RETRY = object()
+_UNSET = object()
 
 
 class GitBackend:
@@ -63,17 +64,19 @@ class GitBackend:
         self._lock = RLock()
         self._lock_path = self.repo_path.parent / f".{self.repo_path.name}.lock"
         self._last_fetch_at = 0.0
+        self._origin_remote_url_cache: str | None | object = _UNSET
 
         with self._operation_lock():
             self._ensure_repo_exists()
             self._ensure_branch_symbolic_head()
             self._sync_from_remote(force=True)
             repo = self._repo()
+            _, remote_label, _ = self._resolved_remote(repo)
             logger.info(
                 "Git backend ready: repo=%s branch=%s remote=%s lock=%s fetch_ttl=%ss",
                 self.repo_path,
                 self.branch,
-                self._remote_label(repo),
+                remote_label,
                 self._lock_path,
                 self.fetch_ttl_seconds,
             )
@@ -154,19 +157,21 @@ class GitBackend:
 
     def _sync_from_remote(self, *, force: bool) -> None:
         repo = self._repo()
-        remote_location = self._remote_location(repo)
+        remote_location, remote_label, remote_url = self._resolved_remote(repo)
         if remote_location is None:
             self._last_fetch_at = time.monotonic()
             return
 
         now = time.monotonic()
         if not force and self.fetch_ttl_seconds > 0 and now - self._last_fetch_at < self.fetch_ttl_seconds:
+            logger.debug("Skipping git fetch for %s; within fetch TTL (%ss)", remote_label, self.fetch_ttl_seconds)
             return
 
+        logger.debug("Fetching git remote %s for branch %s", remote_label, self.branch)
         self._run_remote_operation(
             "fetch",
-            remote_label=self._remote_label(repo),
-            remote_url=self._remote_url_for_location(repo, remote_location),
+            remote_label=remote_label,
+            remote_url=remote_url,
             operation=lambda: porcelain.fetch(
                 str(self.repo_path),
                 remote_location,
@@ -183,19 +188,21 @@ class GitBackend:
             repo.refs[self._branch_ref] = target
             repo.refs.set_symbolic_ref(self._head_ref, self._branch_ref)
             porcelain.reset(str(self.repo_path), mode="hard", treeish=target)
+            logger.debug("Updated local branch %s to remote target %s", self.branch, target.hex())
 
         self._last_fetch_at = now
 
     def _push_branch(self) -> bool:
         repo = self._repo()
-        remote_location = self._remote_location(repo)
+        remote_location, remote_label, remote_url = self._resolved_remote(repo)
         if remote_location is None:
             return True
 
+        logger.debug("Pushing git branch %s to %s", self.branch, remote_label)
         result = self._run_remote_operation(
             "push",
-            remote_label=self._remote_label(repo),
-            remote_url=self._remote_url_for_location(repo, remote_location),
+            remote_label=remote_label,
+            remote_url=remote_url,
             operation=lambda: porcelain.push(
                 str(self.repo_path),
                 remote_location,
@@ -207,10 +214,12 @@ class GitBackend:
         )
         statuses = result.ref_status or {}
         if any(status is not None for status in statuses.values()):
+            logger.debug("Git push to %s was rejected; refreshing from remote before retry", remote_label)
             self._sync_from_remote(force=True)
             return False
 
         self._last_fetch_at = time.monotonic()
+        logger.debug("Git push to %s succeeded", remote_label)
         return True
 
     def _save_once(
@@ -307,7 +316,20 @@ class GitBackend:
         )
 
     def _commit_message(self, action: str, rel_path: str) -> bytes:
-        return f"radio-pad-registry: {action} {rel_path}".encode()
+        summary = f"radio-pad-registry: {action} {self._commit_target(rel_path)}"
+        return f"{summary}\n\nGenerated-by: radio-pad-registry".encode()
+
+    def _commit_target(self, rel_path: str) -> str:
+        parts = Path(rel_path).parts
+        if len(parts) == 2 and parts[0] == "accounts":
+            return f"account {Path(parts[1]).stem}"
+        if len(parts) == 4 and parts[0] == "accounts" and parts[2] == "players":
+            return f"player {parts[1]}/{Path(parts[3]).stem}"
+        if len(parts) == 4 and parts[0] == "accounts" and parts[2] == "presets":
+            return f"account preset {parts[1]}/{Path(parts[3]).stem}"
+        if len(parts) == 2 and parts[0] == "presets":
+            return f"global preset {Path(parts[1]).stem}"
+        return rel_path
 
     def _remote_location(self, repo: Repo) -> str | None:
         if self.remote_url == "":
@@ -316,13 +338,13 @@ class GitBackend:
             return "origin"
         return self.remote_url
 
-    def _remote_label(self, repo: Repo) -> str:
+    def _resolved_remote(self, repo: Repo) -> tuple[str | None, str, str | None]:
         remote_location = self._remote_location(repo)
         if remote_location is None:
-            return "disabled"
+            return None, "disabled", None
         if remote_location == "origin":
-            return "origin"
-        return self._display_remote(remote_location)
+            return "origin", "origin", self._origin_remote_url(repo)
+        return remote_location, self._display_remote(remote_location), remote_location
 
     def _repo(self) -> Repo:
         return Repo(str(self.repo_path))
@@ -360,14 +382,17 @@ class GitBackend:
             message.append("Check remote connectivity and credentials.")
         return " ".join(message)
 
-    def _remote_url_for_location(self, repo: Repo, remote_location: str | None) -> str | None:
-        if remote_location != "origin":
-            return remote_location
+    def _origin_remote_url(self, repo: Repo) -> str | None:
+        if self._origin_remote_url_cache is not _UNSET:
+            return cast(str | None, self._origin_remote_url_cache)
         try:
             remote_url = repo.get_config_stack().get((b"remote", b"origin"), b"url")
         except KeyError:
+            self._origin_remote_url_cache = None
             return None
-        return remote_url.decode() if isinstance(remote_url, bytes) else str(remote_url)
+        resolved = remote_url.decode() if isinstance(remote_url, bytes) else str(remote_url)
+        self._origin_remote_url_cache = resolved
+        return resolved
 
     def _display_remote(self, remote_url: str) -> str:
         if "://" in remote_url:

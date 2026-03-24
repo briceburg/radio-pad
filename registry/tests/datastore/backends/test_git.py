@@ -208,7 +208,7 @@ def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path)
 
     repo = Repo(str(repo_path))
     commit = cast(Commit, repo[repo.head()])
-    assert commit.message == b"radio-pad-registry: update presets/fresh.json"
+    assert commit.message == (b"radio-pad-registry: update global preset fresh\n\nGenerated-by: radio-pad-registry")
 
 
 def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) -> None:
