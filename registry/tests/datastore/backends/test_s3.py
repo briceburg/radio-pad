@@ -9,6 +9,7 @@ import pytest
 from moto import mock_aws
 
 from datastore.backends.s3 import S3Backend
+from datastore.core import storage_json
 
 
 @pytest.fixture
@@ -63,3 +64,12 @@ class TestS3BackendListFiltering:
         # Path with only nested objects (no direct children)
         s3_backend.save("nested", {"name": "Nested"}, "path", "deep", "nested")
         assert s3_backend.list("path") == []
+
+    def test_save_uses_shared_storage_json_format(self, s3_backend: S3Backend) -> None:
+        payload = {"z": 1, "nested": {"b": 2, "a": 1}, "name": "Briceburg"}
+        s3_backend.save("briceburg", payload, "accounts")
+
+        obj = s3_backend.client.get_object(Bucket=s3_backend.bucket, Key="test/accounts/briceburg.json")
+        body = obj["Body"].read().decode("utf-8")
+
+        assert body == storage_json(payload)

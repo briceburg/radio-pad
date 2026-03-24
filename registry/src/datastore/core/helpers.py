@@ -18,6 +18,11 @@ def canonical_json(data: JsonDoc) -> str:
     return json.dumps(data, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
 
 
+def storage_json(data: JsonDoc) -> str:
+    """Return a stable, human-editable JSON string for persisted documents."""
+    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
 def compute_etag(data: JsonDoc) -> str:
     """Compute a SHA-256 hex digest over the canonical JSON representation."""
     payload = canonical_json(data).encode("utf-8")
@@ -64,8 +69,7 @@ def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
             delete=False,
         ) as f:
             tmp_path = Path(f.name)
-            json.dump(data, f, indent=2, sort_keys=True, ensure_ascii=False)
-            f.write("\n")
+            f.write(storage_json(data))
         os.replace(tmp_path, path)
     finally:
         if tmp_path is not None and tmp_path.exists():

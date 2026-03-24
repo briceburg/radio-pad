@@ -5,6 +5,7 @@ from .helpers import (
     deconstruct_storage_path,
     extract_object_id_from_path,
     normalize_etag,
+    storage_json,
     strip_id,
     validate_if_match,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "extract_object_id_from_path",
     "normalize_etag",
     "seedable",
+    "storage_json",
     "strip_id",
     "validate_if_match",
 ]

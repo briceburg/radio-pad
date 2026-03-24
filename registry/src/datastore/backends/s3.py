@@ -10,6 +10,7 @@ from datastore.core import (
     construct_storage_path,
     deconstruct_storage_path,
     normalize_etag,
+    storage_json,
     strip_id,
     validate_if_match,
 )
@@ -107,7 +108,7 @@ class S3Backend:
             if current_hash == new_hash:
                 return
         # Never persist the 'id' field in the JSON content
-        body = json.dumps(to_write, separators=(",", ":"), sort_keys=True, ensure_ascii=False).encode("utf-8")
+        body = storage_json(to_write).encode("utf-8")
         self.client.put_object(Bucket=self.bucket, Key=storage_path, Body=body, Metadata={"rpr-sha256": new_hash})
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
