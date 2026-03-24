@@ -16,6 +16,17 @@ bin/registry
 
 see the swagger API docs by visiting: http://localhost:8000/
 
+### Python version notes
+
+- The repository targets Python `3.13` language semantics in tooling and type checking.
+- The locked runtime dependencies in `requirements.txt` support installing and running the service on Python `3.14` as well.
+
+### Dependency workflow
+
+- `requirements-latest.txt` is the editable runtime dependency source.
+- `requirements.txt` is the frozen runtime lockfile used by Docker and CI.
+- `requirements-dev.txt` contains development-only tools used for `bin/ci` and `pytest`.
+
 ### Environment Variables
 
 name | description | default
@@ -74,6 +85,8 @@ To run the tests, first install the development dependencies:
 ```sh
 pip install -r requirements-dev.txt
 ```
+
+If you update runtime dependencies, edit `requirements-latest.txt` first and then re-freeze `requirements.txt`.
 
 Then, run the default test suite using pytest:
 

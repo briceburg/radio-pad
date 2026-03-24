@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from datastore import DataStore
@@ -58,3 +59,25 @@ def test_seed_copies_json_and_is_idempotent(tmp_path: Path) -> None:
     final_acct = ds.accounts.get("acct1")
     assert final_acct is not None
     assert final_acct.name == "Modified"
+
+
+def test_seed_is_safe_under_concurrent_startup(tmp_path: Path) -> None:
+    seed_dir = tmp_path / "seed"
+    data_dir = tmp_path / "data"
+
+    seeder = SeedCreator(seed_dir)
+    seeder.create_account("acct1", "Account One")
+    seeder.create_global_preset("rock", "Rock")
+
+    backend = LocalBackend(base_path=str(data_dir))
+
+    def run_seed(_: int) -> None:
+        ds = DataStore(backend=backend, seed_path=str(seed_dir))
+        ds.seed()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(run_seed, range(16)))
+
+    seeded_acct = DataStore(backend=backend, seed_path=str(seed_dir)).accounts.get("acct1")
+    assert seeded_acct is not None
+    assert seeded_acct.name == "Account One"

@@ -46,14 +46,21 @@ def extract_object_id_from_path(path: str) -> str:
 
 def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
     """Writes a JSON file atomically by writing to a temp file and then renaming."""
-    fd, tmp_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
-    tmp_path = Path(tmp_name)
+    tmp_path: Path | None = None
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f"{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as f:
+            tmp_path = Path(f.name)
             json.dump(data, f, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
         os.replace(tmp_path, path)
     finally:
-        if tmp_path.exists():
+        if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()
 
 
