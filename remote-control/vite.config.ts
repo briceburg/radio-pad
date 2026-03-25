@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  root: './src',
+  root: "./src",
+  envDir: "..",
   build: {
-    outDir: '../dist',
+    outDir: "../dist",
     minify: false,
     emptyOutDir: true,
   },

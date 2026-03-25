@@ -9,3 +9,23 @@ ion-row.station-placeholder ion-skeleton-text {
   height: 2em;
   width: 100%;
 }
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.auth-actions-item {
+  --inner-padding-end: 0;
+}
+
+.auth-actions ion-button {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.auth-identity {
+  word-break: break-word;
+}

@@ -61,6 +61,31 @@
           </ion-header>
           <ion-content class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
+            <ion-list>
+              <ion-item-group>
+                <ion-item-divider color="tertiary">
+                  <ion-icon name="person-circle" slot="start"></ion-icon>
+                  <ion-label>Account Sign-In</ion-label>
+                </ion-item-divider>
+                <ion-item lines="none">
+                  <ion-label>
+                    <h3 id="auth-status">Sign-in unavailable</h3>
+                    <p id="auth-hint">
+                      Sign in to load the accounts and players you can manage.
+                    </p>
+                    <p id="auth-identity" class="auth-identity"></p>
+                  </ion-label>
+                </ion-item>
+                <ion-item
+                  lines="none"
+                  class="auth-actions-item"
+                  id="auth-actions-item"
+                  hidden
+                >
+                  <div id="auth-actions" class="auth-actions"></div>
+                </ion-item>
+              </ion-item-group>
+            </ion-list>
             <ion-list id="settings-list"></ion-list>
             <ion-button id="settings-save-button" expand="block"
               >Save</ion-button

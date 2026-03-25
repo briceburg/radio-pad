@@ -1,44 +1,105 @@
 # radio-pad remote-control
 
-Remotely control [radio-pad](https://github.com/briceburg/radio-pad) through a simple web and/or mobile application.
+A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 
 ## Overview
 
-* remote controls connect via websockets to an instance of [switchboard](../switchboard/) -- which is used as a event-driven communication bus.
-  * remote controls publish requested stations and listen for channel changes.
-  * the player listens for requested stations and publishes channel changes.  
-* [capacitor](https://capacitorjs.com) and [ionic framework](https://ionicframework.com/) v8 are used to build native mobile and static web controls.
-  * VanillaJS is used instead of react/angular. this is a KISS project.
+* connects to [switchboard](../switchboard/) for real-time syncing with [players](https://github.com/briceburg/radio-pad/tree/main/player)
+  * remote controls publish station requests and listen for channel changes
+  * players listen for station requests and publish channel changes and other state
+* loads available players and station data from [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry)
+  * sign in when you need to control managed players
 
 ## Usage
 
-### Configure the Application
+### Local configuration
 
 ```bash
 npm install
-npx cap add android
+cp .env.example .env
 ```
 
-### Running the Application
+The registry URL defaults to `https://registry.radiopad.dev`. Override it only if you are targeting a different registry or local registry instance.
 
-**Web/Local Development:**
+Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 
-To run the app in a local web browser for development and testing:
+Set `VITE_GOOGLE_REDIRECT_URL` only if the browser should return to a specific URL instead of the current page URL.
+
+For local switchboard testing, set `VITE_SWITCHBOARD_URL=ws://localhost:1980/`. See [switchboard](../switchboard/).
+
+### Web development
+
+Create a Google `Web application` OAuth client:
+
+- `Authorized JavaScript origins`: `http://localhost:5173`
+- `Authorized redirect URIs`: `http://localhost:5173/`
+
+Then run:
 
 ```bash
 npm start
 ```
 
-**Android:**
+Open `http://localhost:5173`. Sign in from `Settings` when you want to load managed players or test registry writes.
 
-> requires an Android SDK
+For registry write testing on web, copy the API test token from `Settings` and use it with the [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry) API.
 
-To build and run the application on an Android device or emulator:
+When you deploy the web app, add the deployed origin and redirect URI to the same Google web client, or create a separate production client.
+
+To smoke-check the Settings UI:
 
 ```bash
+npm run smoke:settings -- --url http://127.0.0.1:5173/
+```
+
+For a simple assertion-based check:
+
+```bash
+npm run smoke:settings -- \
+  --url http://127.0.0.1:5173/ \
+  --expect-status "Signed out" \
+  --expect-sign-in-button-visible true
+```
+
+Add `--screenshot /tmp/settings.png` to save a capture.
+
+### Android development
+
+Create a Google `Android` OAuth client:
+
+- package: `net.iceburg.radio`
+- signing certificate fingerprint: use your local debug or release fingerprint
+
+Then run:
+
+```bash
+npx cap add android
 npm run build
+npx cap sync
 npx cap run android
 ```
+
+### iOS development
+
+Create a Google `iOS` OAuth client:
+
+- bundle identifier: `net.iceburg.radio`
+- save the iOS client ID
+- save the reversed URL scheme
+
+Then update the checked-in iOS placeholders in `ios/App/App.xcodeproj/project.pbxproj`:
+
+- `GOOGLE_IOS_CLIENT_ID`
+- `GOOGLE_IOS_REVERSED_CLIENT_ID`
+
+Then run:
+
+```bash
+npx cap add ios
+npx cap sync ios
+```
+
+Open the iOS project in Xcode and run it there.
 
 ## Development
 

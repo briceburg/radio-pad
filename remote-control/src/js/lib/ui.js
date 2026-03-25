@@ -24,11 +24,18 @@ export class RadioPadUI extends EventEmitter {
     super();
     this.tabs = {}; // map of tab name to { element, refs, stationButtons }
     this._toast = null;
+    this._copyTokenAvailable = false;
+    this._authState = null;
   }
 
   init() {
     this._settingsSaveButton = document.getElementById("settings-save-button");
     this._toast = document.getElementById("global-toast");
+    this._authStatus = document.getElementById("auth-status");
+    this._authHint = document.getElementById("auth-hint");
+    this._authIdentity = document.getElementById("auth-identity");
+    this._authActionsItem = document.getElementById("auth-actions-item");
+    this._authActions = document.getElementById("auth-actions");
 
     // Initialize tabs
     ["control", "listen"].forEach((tabName) => this._initPlayerTab(tabName));
@@ -181,6 +188,127 @@ export class RadioPadUI extends EventEmitter {
     }
   }
 
+  updateAuthState(state) {
+    if (!this._authStatus) {
+      return;
+    }
+
+    if (!state.enabled) {
+      this._authState = state;
+      this._authStatus.innerText = "Sign-in unavailable";
+      if (this._authHint) {
+        let hintText;
+        switch (state.reason) {
+          case "init_failed":
+            hintText =
+              "Sign-in could not be initialized. Check the Google client configuration and try reloading.";
+            break;
+          case "not_configured":
+          case null:
+          case undefined:
+            hintText = "This build does not have account sign-in configured.";
+            break;
+          default:
+            hintText = "Sign-in is currently unavailable.";
+            break;
+        }
+        this._authHint.innerText = hintText;
+      }
+      if (this._authIdentity) {
+        this._authIdentity.innerText = "";
+      }
+      this._renderAuthControls();
+      return;
+    }
+
+    const signedInLabel = state.signedIn ? "Signed in" : "Signed out";
+    this._authState = state;
+    this._authStatus.innerText = signedInLabel;
+
+    if (this._authHint) {
+      this._authHint.innerText = state.signedIn
+        ? "Your sign-in updates the Account and Player choices below."
+        : "Sign in to load the accounts and players you can manage.";
+    }
+
+    if (this._authIdentity) {
+      this._authIdentity.innerText = state.signedIn
+        ? [state.name, state.email, state.subject].filter(Boolean).join(" · ")
+        : "";
+    }
+
+    this._renderAuthControls();
+  }
+
+  setCopyTokenAvailable(available) {
+    this._copyTokenAvailable = available;
+    this._renderAuthControls();
+  }
+
+  _renderAuthControls() {
+    if (!(this._authActions && this._authActionsItem)) {
+      return;
+    }
+
+    const state = this._authState;
+    const controls = [];
+
+    if (!(state && state.enabled)) {
+      this._authActions.replaceChildren();
+      this._authActionsItem.hidden = true;
+      return;
+    }
+
+    if (!state.signedIn) {
+      controls.push(
+        this._createAuthButton("Sign in with Google", async () => {
+          await this.emitEvent("auth-sign-in");
+        }),
+      );
+      this._authActionsItem.hidden = false;
+      this._authActions.replaceChildren(...controls);
+      return;
+    }
+
+    controls.push(
+      this._createAuthButton(
+        "Sign out",
+        async () => {
+          await this.emitEvent("auth-sign-out");
+        },
+        { fill: "outline" },
+      ),
+    );
+
+    if (this._copyTokenAvailable) {
+      controls.push(
+        this._createAuthButton(
+          "Copy API test token",
+          async () => {
+            await this.emitEvent("auth-copy-token");
+          },
+          { fill: "outline" },
+        ),
+      );
+    }
+
+    this._authActionsItem.hidden = false;
+    this._authActions.replaceChildren(...controls);
+  }
+
+  _createAuthButton(label, onClick, { fill = null } = {}) {
+    const button = document.createElement("ion-button");
+    button.expand = "block";
+    if (fill) {
+      button.fill = fill;
+    }
+    button.innerText = label;
+    button.addEventListener("click", async () => {
+      await onClick();
+    });
+    return button;
+  }
+
   renderStations(station_data, tabName = "control") {
     const tab = this.tabs[tabName];
     if (!tab) return;
@@ -250,7 +378,6 @@ export class RadioPadUI extends EventEmitter {
   }
 
   updatePreference(key, value, options = null) {
-    console.log("updatePreference: ", key, value, options);
     const input = document.getElementById(`pref-${key}`);
     if (input) {
       if (options !== null) {

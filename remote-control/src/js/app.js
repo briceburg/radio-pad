@@ -16,10 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { Capacitor } from "@capacitor/core";
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
 import { RadioListen } from "./lib/radio-listen.js";
 import { RadioControl } from "./lib/radio-control.js";
+import { RadioPadAuth } from "./lib/auth.js";
 import { RadioPadUI } from "./lib/ui.js";
 import {
   discoverAccounts,
@@ -28,33 +30,53 @@ import {
   discoverPresets,
 } from "./lib/discovery.js";
 
+function resolveSwitchboardUrl(url) {
+  const override = import.meta.env.VITE_SWITCHBOARD_URL?.trim();
+  if (!(override && url) || Capacitor.isNativePlatform()) {
+    return url;
+  }
+
+  try {
+    const target = new URL(url);
+    const local = new URL(override);
+    local.pathname = `${local.pathname.replace(/\/$/, "")}${target.pathname}`;
+    local.search = target.search;
+    local.hash = target.hash;
+    return local.toString();
+  } catch (error) {
+    console.warn("Invalid VITE_SWITCHBOARD_URL override; using player URL.", {
+      override,
+      url,
+      error,
+    });
+    return url;
+  }
+}
+
 class RadioPad {
   constructor() {
     this.STATE = new RadioPadState();
     this.PREFS = new RadioPadPreferences();
     this.LISTEN = new RadioListen();
     this.CONTROL = new RadioControl();
+    this.AUTH = new RadioPadAuth();
     this.UI = new RadioPadUI();
+    this.copyTokenAvailable = !Capacitor.isNativePlatform();
     // PREFERENCE CHANGES
     this.PREFS.registerEvent("on-change", async (data) => {
       switch (data.key) {
         case "registryUrl": {
-          try {
-            const accounts = await discoverAccounts(data.value);
-            await this.PREFS.setOptions("accountId", accounts);
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing accounts.",
-              error,
-            );
-          }
+          await this.refreshAccounts(
+            data.value,
+            "⚠️ Failed refreshing accounts.",
+          );
           break;
         }
         case "accountId": {
           try {
             const [players, presets] = await Promise.all([
-              discoverPlayers(data.value, this.PREFS),
-              discoverPresets(data.value, this.PREFS),
+              discoverPlayers(data.value, this.PREFS, this.AUTH),
+              discoverPresets(data.value, this.PREFS, this.AUTH),
             ]);
             this.STATE.set("available_players", players);
             this.STATE.set("available_presets", presets);
@@ -68,7 +90,11 @@ class RadioPad {
         }
         case "playerId": {
           try {
-            const player = await discoverPlayer(data.value, this.PREFS);
+            const player = await discoverPlayer(
+              data.value,
+              this.PREFS,
+              this.AUTH,
+            );
             if (player) {
               this.STATE.set("player", player);
             }
@@ -107,7 +133,9 @@ class RadioPad {
         case "player":
           this.STATE.set("current_station", null);
           this.UI.showStationsLoading("control");
-          await this.CONTROL.connect(data.value.switchboard_url);
+          await this.CONTROL.connect(
+            resolveSwitchboardUrl(data.value.switchboard_url),
+          );
           break;
         case "stations_url":
           await this.loadStations(data.value, "control");
@@ -164,12 +192,84 @@ class RadioPad {
         await this.PREFS.set(key, value);
       }
     });
+    this.UI.registerEvent("auth-sign-in", async () => {
+      try {
+        await this.AUTH.signIn();
+      } catch (error) {
+        await this.UI.showError({
+          summary: "⚠️ Failed starting sign-in.",
+          error,
+          toastColor: "danger",
+        });
+      }
+    });
+    this.UI.registerEvent("auth-sign-out", async () => {
+      try {
+        await this.AUTH.signOut();
+        await this.UI.toastSuccess("Signed out.");
+      } catch (error) {
+        await this.UI.showError({
+          summary: "⚠️ Failed signing out.",
+          error,
+          toastColor: "danger",
+        });
+      }
+    });
+    this.UI.registerEvent("auth-copy-token", async () => {
+      const token = this.AUTH.getRegistryBearerToken();
+      if (!token) {
+        await this.UI.toastWarning("No API test token is available.");
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(token);
+        await this.UI.toastSuccess("Copied API test token.");
+      } catch (error) {
+        await this.UI.showError({
+          summary: "⚠️ Failed copying API test token.",
+          error,
+          toastColor: "danger",
+        });
+      }
+    });
+    this.AUTH.registerEvent("state-changed", async (state) => {
+      this.UI.updateAuthState(state);
+      const registryUrl = await this.PREFS.get("registryUrl");
+      await this.refreshAccounts(
+        registryUrl,
+        "⚠️ Failed refreshing accounts after auth change.",
+      );
+    });
+    this.AUTH.registerEvent("error", async ({ summary, error }) => {
+      await this.UI.showError({
+        summary,
+        error,
+        toastColor: "danger",
+      });
+    });
   }
 
   async start() {
     this.UI.init();
+    this.UI.setCopyTokenAvailable(this.copyTokenAvailable);
+    await this.AUTH.init();
     await this.PREFS.init();
     this.UI.renderPreferences(this.PREFS.preferences);
+    this.UI.updateAuthState(this.AUTH.getState());
+  }
+
+  async refreshAccounts(registryUrl, failureSummary) {
+    if (!registryUrl) {
+      return;
+    }
+
+    try {
+      const accounts = await discoverAccounts(registryUrl, this.AUTH);
+      await this.PREFS.setOptions("accountId", accounts);
+    } catch (error) {
+      await this.UI.showRegistryError(failureSummary, error);
+    }
   }
 
   async loadStations(stations_url, tabName = "control") {

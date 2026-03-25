@@ -7,3 +7,5 @@ node_modules/
 .vite
 dist/
 .vite/
+
+.env
