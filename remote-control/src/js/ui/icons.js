@@ -16,26 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-export class EventEmitter {
-  constructor() {
-    this._eventHandlers = {};
-  }
-
-  async registerEvent(event_name, handler) {
-    if (!this._eventHandlers[event_name]) {
-      this._eventHandlers[event_name] = [];
-    }
-    this._eventHandlers[event_name].push(handler);
-  }
-
-  async emitEvent(event_name, data) {
-    const handlers = this._eventHandlers[event_name] || [];
-    for (const handler of handlers) {
-      const result = await handler(data);
-      if (result === false) {
-        console.warn(`Event "${event_name}" propagation stopped by a handler.`);
-        break;
-      }
-    }
-  }
-}
+export {
+  headset,
+  headsetOutline,
+  personCircle,
+  radio,
+  radioOutline,
+  settings,
+  settingsOutline,
+  stop,
+} from "ionicons/icons";

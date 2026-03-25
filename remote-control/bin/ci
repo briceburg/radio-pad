@@ -13,4 +13,7 @@ die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 npm run lint || \
   die "Prettier check failed. Use 'npm run lint:fix' to fix."
 
+npm test || \
+  die "Unit tests failed."
+
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"
