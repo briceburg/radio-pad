@@ -27,6 +27,21 @@ export function sanitizeUrl(targetUrl) {
   }
 }
 
+export function formatErrorMessage(error, fallback = "") {
+  if (typeof error?.message === "string") {
+    const msg = error.message.trim();
+    if (msg.includes("NetworkError") || msg.includes("Failed to fetch")) {
+      return "Network connection failed.";
+    }
+    return msg;
+  }
+  return fallback;
+}
+
+export function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
 export class RegistryRequestError extends Error {
   constructor({ url, status = "unknown", cause } = {}) {
     const sanitized = sanitizeUrl(url);
@@ -46,9 +61,10 @@ export class RegistryRequestError extends Error {
     if (error instanceof RegistryRequestError) {
       return error.toMessage();
     }
-    if (error && typeof error.message === "string" && error.message.trim()) {
-      return error.message;
+    const msg = formatErrorMessage(error, "Unknown registry error");
+    if (msg === "Network connection failed.") {
+      return "Unable to connect. Please verify your Registry URL in Settings.";
     }
-    return "Unknown registry error";
+    return msg;
   }
 }

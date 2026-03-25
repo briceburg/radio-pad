@@ -16,14 +16,30 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { RegistryRequestError } from "./error-utils.js";
+import { RegistryRequestError } from "../utils/errors.js";
 
-async function fetchAllPages(startPath, registryUrl) {
+function buildRequestOptions(auth, signal) {
+  const token = auth?.getRegistryBearerToken?.();
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  return {
+    ...(headers ? { headers } : {}),
+    ...(signal ? { signal } : {}),
+  };
+}
+
+async function fetchAllPages(
+  startPath,
+  registryUrl,
+  auth = null,
+  signal = null,
+) {
   const items = [];
   let url = new URL(startPath, registryUrl).toString();
+  const options = buildRequestOptions(auth, signal);
 
   while (url) {
-    const resp = await fetch(url);
+    const resp = await fetch(url, options);
     if (!resp.ok) {
       throw new RegistryRequestError({ url, status: resp.status });
     }
@@ -37,34 +53,39 @@ async function fetchAllPages(startPath, registryUrl) {
   return items;
 }
 
-export async function discoverAccounts(registryUrl) {
+export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   if (!registryUrl) return [];
-  try {
-    const items = await fetchAllPages("/v1/accounts/", registryUrl);
-    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
-  } catch (error) {
-    console.error("Failed to fetch accounts from registry:", error);
-    throw error;
-  }
+  const items = await fetchAllPages(
+    "/v1/accounts/",
+    registryUrl,
+    auth,
+    options.signal,
+  );
+  return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
-export async function discoverPlayers(accountId, prefs) {
+export async function discoverPlayers(
+  accountId,
+  prefs,
+  auth = null,
+  options = {},
+) {
   if (!accountId) return [];
 
   const registryUrl = await prefs.get("registryUrl");
   if (!registryUrl) return [];
 
-  try {
-    const path = `/v1/accounts/${accountId}/players/`;
-    const items = await fetchAllPages(path, registryUrl);
-    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
-  } catch (error) {
-    console.error("Failed to fetch players from registry:", error);
-    throw error;
-  }
+  const path = `/v1/accounts/${accountId}/players/`;
+  const items = await fetchAllPages(path, registryUrl, auth, options.signal);
+  return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
-export async function discoverPresets(accountId, prefs) {
+export async function discoverPresets(
+  accountId,
+  prefs,
+  auth = null,
+  options = {},
+) {
   const registryUrl = await prefs.get("registryUrl");
   if (!registryUrl) return [];
 
@@ -74,25 +95,25 @@ export async function discoverPresets(accountId, prefs) {
     `/v1/presets/`,
   ];
 
-  try {
-    for (const path of paths) {
-      const items = await fetchAllPages(path, registryUrl);
-      presets.push(
-        ...items.map((i) => ({
-          value: `${registryUrl}${path}${i.id}`,
-          label: i.name || i.id,
-        })),
-      );
-    }
-  } catch (error) {
-    console.error("Failed to fetch presets from registry:", error);
-    throw error;
+  for (const path of paths) {
+    const items = await fetchAllPages(path, registryUrl, auth, options.signal);
+    presets.push(
+      ...items.map((i) => ({
+        value: `${registryUrl}${path}${i.id}`,
+        label: i.name || i.id,
+      })),
+    );
   }
 
   return presets;
 }
 
-export async function discoverPlayer(playerId, prefs) {
+export async function discoverPlayer(
+  playerId,
+  prefs,
+  auth = null,
+  options = {},
+) {
   if (!playerId) return null;
 
   const [accountId, registryUrl] = await Promise.all([
@@ -103,14 +124,9 @@ export async function discoverPlayer(playerId, prefs) {
   if (!(registryUrl && accountId)) return null;
 
   const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new RegistryRequestError({ url, status: response.status });
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("Error discovering player info from registry:", error);
-    throw error;
+  const response = await fetch(url, buildRequestOptions(auth, options.signal));
+  if (!response.ok) {
+    throw new RegistryRequestError({ url, status: response.status });
   }
+  return response.json();
 }

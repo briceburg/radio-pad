@@ -16,200 +16,87 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { RadioPadPreferences } from "./lib/preferences.js";
-import { RadioPadState } from "./lib/state.js";
-import { RadioListen } from "./lib/radio-listen.js";
-import { RadioControl } from "./lib/radio-control.js";
-import { RadioPadUI } from "./lib/ui.js";
+import "@ionic/core/css/ionic.bundle.css";
+import { Capacitor } from "@capacitor/core";
+import { defineCustomElements } from "@ionic/core/loader/index.js";
+import { addIcons } from "ionicons";
+import * as appIcons from "./ui/icons.js";
+import { createAuthActions } from "./actions/auth-actions.js";
+import { createControlActions } from "./actions/control-actions.js";
+import { createSettingsActions } from "./actions/settings-actions.js";
+import { toastDanger } from "./notifications.js";
+import { RadioPadAuth } from "./services/auth.js";
+import { RadioListen } from "./services/radio-listen.js";
+import { RadioControl } from "./services/radio-control.js";
+import { RadioPadPreferences } from "./services/preferences.js";
 import {
-  discoverAccounts,
-  discoverPlayer,
-  discoverPlayers,
-  discoverPresets,
-} from "./lib/discovery.js";
+  authStore,
+  controlStore,
+  listenStore,
+  preferencesStore,
+  settingsUiStore,
+  toastStore,
+} from "./store.js";
+import { RadioPadUI } from "./ui/index.js";
 
-class RadioPad {
-  constructor() {
-    this.STATE = new RadioPadState();
-    this.PREFS = new RadioPadPreferences();
-    this.LISTEN = new RadioListen();
-    this.CONTROL = new RadioControl();
-    this.UI = new RadioPadUI();
-    // PREFERENCE CHANGES
-    this.PREFS.registerEvent("on-change", async (data) => {
-      switch (data.key) {
-        case "registryUrl": {
-          try {
-            const accounts = await discoverAccounts(data.value);
-            await this.PREFS.setOptions("accountId", accounts);
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing accounts.",
-              error,
-            );
-          }
-          break;
-        }
-        case "accountId": {
-          try {
-            const [players, presets] = await Promise.all([
-              discoverPlayers(data.value, this.PREFS),
-              discoverPresets(data.value, this.PREFS),
-            ]);
-            this.STATE.set("available_players", players);
-            this.STATE.set("available_presets", presets);
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing account players/presets.",
-              error,
-            );
-          }
-          break;
-        }
-        case "playerId": {
-          try {
-            const player = await discoverPlayer(data.value, this.PREFS);
-            if (player) {
-              this.STATE.set("player", player);
-            }
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing player info.",
-              error,
-            );
-          }
-          break;
-        }
-        case "presetId": {
-          await this.loadStations(data.value, "listen");
-          break;
-        }
-      }
-      this.UI.updatePreference(data.key, data.value);
-    });
-    this.PREFS.registerEvent("options-changed", async (data) => {
-      this.UI.updatePreference(
-        data.key,
-        await this.PREFS.get(data.key),
-        data.options,
-      );
-    });
+addIcons(appIcons);
+defineCustomElements(window);
 
-    // STATE CHANGES
-    this.STATE.registerEvent("on-change", async (data) => {
-      switch (data.key) {
-        case "available_players":
-          await this.PREFS.setOptions("playerId", data.value);
-          break;
-        case "available_presets":
-          await this.PREFS.setOptions("presetId", data.value);
-          break;
-        case "player":
-          this.STATE.set("current_station", null);
-          this.UI.showStationsLoading("control");
-          await this.CONTROL.connect(data.value.switchboard_url);
-          break;
-        case "stations_url":
-          await this.loadStations(data.value, "control");
-          break;
-        case "current_station":
-          this.UI.highlightCurrentStation(data.value, "control");
-          break;
-        case "listen_station":
-          this.UI.highlightCurrentStation(data.value, "listen");
-          break;
-      }
-    });
-
-    // REMOTE CONTROL EVENTS
-    this.CONTROL.registerEvent("connect", (url) => {
-      this.UI.setTabInfo(`✅ Connected to ${this.STATE.get("player").name}`);
-    });
-    this.CONTROL.registerEvent("connecting", (url) => {
-      this.UI.setTabInfo(`🔄 Connecting...`);
-    });
-    this.CONTROL.registerEvent("disconnect", () => {
-      this.UI.setTabInfo("🔌 Disconnected. Reconnecting...");
-    });
-    this.CONTROL.registerEvent("error", (msg) => {
-      this.UI.setTabInfo(`⚠️ Error: ${msg}`);
-    });
-    this.CONTROL.registerEvent("station-playing", (stationName) => {
-      this.STATE.set("current_station", stationName);
-    });
-    this.CONTROL.registerEvent("stations-url", (url) => {
-      this.STATE.set("stations_url", url);
-    });
-
-    // UI EVENTS
-    this.UI.registerEvent("click-station", (data) => {
-      if (data.tab === "listen") {
-        this.LISTEN.play(data.station);
-        this.STATE.set("listen_station", data.station);
-      } else {
-        this.CONTROL.sendStationRequest(data.station);
-      }
-    });
-    this.UI.registerEvent("click-stop", (data) => {
-      if (data.tab === "listen") {
-        this.LISTEN.stop();
-        this.STATE.set("listen_station", null);
-      } else {
-        this.CONTROL.sendStationRequest(null);
-      }
-    });
-    this.UI.registerEvent("settings-save", async (settingsMap) => {
-      // Apply sequentially so downstream events fire in a predictable order.
-      for (const [key, value] of Object.entries(settingsMap)) {
-        await this.PREFS.set(key, value);
-      }
-    });
-  }
-
-  async start() {
-    this.UI.init();
-    await this.PREFS.init();
-    this.UI.renderPreferences(this.PREFS.preferences);
-  }
-
-  async loadStations(stations_url, tabName = "control") {
-    if (!this.stationRequests) {
-      // Track per-tab request ids so stale responses do not repaint the UI.
-      this.stationRequests = new Map();
-    }
-    this.UI.showStationsLoading(tabName);
-    const nextRequestId = (this.stationRequests.get(tabName) || 0) + 1;
-    this.stationRequests.set(tabName, nextRequestId);
-    try {
-      const response = await fetch(stations_url);
-      const station_data = await response.json();
-      if (nextRequestId !== this.stationRequests.get(tabName)) {
-        return;
-      }
-      if (tabName === "listen") {
-        this.LISTEN.setStations(station_data);
-      }
-      this.UI.renderStations(station_data, tabName);
-      const currentStation =
-        tabName === "listen"
-          ? this.STATE.get("listen_station")
-          : this.STATE.get("current_station");
-      this.UI.highlightCurrentStation(currentStation, tabName);
-    } catch (error) {
-      if (nextRequestId !== this.stationRequests.get(tabName)) {
-        return;
-      }
-      console.error("Error loading stations:", error);
-      await this.UI.showError({
-        summary: "⚠️ Failed loading stations.",
-        error,
-        tab: tabName,
-      });
-    }
-  }
+function bindStore(store, render) {
+  render(store.get());
+  return store.subscribe(render);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const app = new RadioPad();
-  app.start();
+async function bootstrap() {
+  const copyTokenAvailable = !Capacitor.isNativePlatform();
+  const prefs = new RadioPadPreferences();
+  const auth = new RadioPadAuth();
+  const listen = new RadioListen();
+  const control = new RadioControl();
+  const ui = new RadioPadUI({ copyTokenAvailable });
+
+  const controlActions = createControlActions({
+    control,
+    listen,
+  });
+  const settingsActions = createSettingsActions({
+    prefs,
+    auth,
+    onPlayerSelected: (player) => controlActions.selectPlayer(player),
+    onPresetSelected: (presetId) => controlActions.selectPreset(presetId),
+  });
+  const authActions = createAuthActions({
+    auth,
+    refreshAccountsForCurrentRegistry:
+      settingsActions.refreshAccountsForCurrentRegistry,
+  });
+
+  ui.init({
+    onSettingsEdited: () => settingsActions.markDirty(),
+    onSaveSettings: (settingsMap) => settingsActions.save(settingsMap),
+    onSignIn: () => authActions.signIn(),
+    onSignOut: () => authActions.signOut(),
+    onCopyToken: () => authActions.copyToken(),
+    onClickStation: (...args) => controlActions.clickStation(...args),
+    onStopStation: (tabName) => controlActions.stopStation(tabName),
+  });
+
+  for (const [store, render] of [
+    [preferencesStore, ({ definitions }) => ui.renderPreferences(definitions)],
+    [authStore, (state) => ui.updateAuthState(state)],
+    [settingsUiStore, ({ saveState }) => ui.setSettingsSaveState(saveState)],
+    [controlStore, (state) => ui.renderTabState("control", state)],
+    [listenStore, (state) => ui.renderTabState("listen", state)],
+    [toastStore, (notification) => ui.presentNotification(notification)],
+  ]) {
+    bindStore(store, render);
+  }
+
+  // Single initializer handles offline store boot, auth state, and network fallback
+  await settingsActions.initialize();
+}
+
+void bootstrap().catch((error) => {
+  console.error("Failed bootstrapping remote control app", error);
+  toastDanger("⚠️ Failed starting remote control.", error);
 });

@@ -2,6 +2,8 @@
 
 A 🎵 radio station player 🎵 with real-time syncing controllers.
 
+The registry API and datastore implementation live in [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry).
+
 ![radio-pad-logo](./shared/assets/logo-dark.svg)
 
 ## overview
@@ -41,32 +43,52 @@ there are four components that makeup radio-pad. each is broken out into a folde
   <img src="./shared/assets/icon-fancy-bg.svg" />
 </p>
 
-## Development
+## Architecture
 
-### Reference
+### Core control flow
 
 ```mermaid
 flowchart TD
-    %% Nodes
-    Macropad["Macropad Controller"]
-    Player["Player<br/>🎵🎵🎵"]
-    Switchboard["Switchboard<br/>(Syncs Player and Controls)"]
-    RemoteMobile["Remote Controller<br/>(Mobile App)"]
-    RemoteWeb["Remote Controller<br/>(Web App)"]
+    Macropad["Macropad controller"]
+    Player["Player device<br/>🎵🎵🎵"]
+    Switchboard["Switchboard"]
+    Remote["Remote-control app<br/>(mobile / web)"]
 
-    %% Connections
     Macropad <-- USB --> Player
     Player -- ws:station_playing --> Switchboard
     Switchboard -- ws:station_request --> Player
-    Switchboard -- ws:station_playing --> RemoteMobile
-    Switchboard -- ws:station_playing --> RemoteWeb
-    RemoteMobile -- ws:station_request --> Switchboard
-    RemoteWeb -- ws:station_request --> Switchboard
+    Switchboard -- ws:station_playing --> Remote
+    Remote -- ws:station_request --> Switchboard
 
-    %% Highlight Player and Switchboard
     style Player stroke:#f9f,stroke-width:3px
     style Switchboard stroke:#bbf,stroke-width:3px
 ```
+
+This is the baseline runtime view: controllers talk to players directly over USB or indirectly through the switchboard.
+
+### Registry and player access
+
+```mermaid
+flowchart TD
+    Human["Signed-in user"]
+    Remote["Remote-control app"]
+    Registry["radio-pad-registry API"]
+    Switchboard["Switchboard"]
+    Player["Player device"]
+
+    Human -->|"sign in"| Remote
+    Remote -->|"request player access"| Registry
+    Registry -->|"grant player access"| Remote
+    Remote -->|"control selected player"| Switchboard
+    Player -->|"connect as player"| Switchboard
+    Switchboard -->|"forward only to that player"| Player
+```
+
+Player control stays scoped instead of global:
+
+* remote-control signs in as the user and requests access to one player
+* the registry grants access only when the user is allowed to manage that player
+* the switchboard forwards control only to that player
 
 ### Contributing
 
@@ -80,5 +102,3 @@ For questions or help, please open an issue on the [GitHub repository](https://g
 
 * use MIDI control sequences or usb-cdc instead of keypresses for radio control. this is necessary to support bi-directial communication, e.g. to notify macropad of station changes from remote controls.
 * pass the list of stations to macropad (via usb connection) and controllers (via switchboard). we can thus handle live station updates, as well as defer startup until communication with the player has been established.
-
-

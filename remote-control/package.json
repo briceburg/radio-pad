@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "prettier --check src/",
-    "lint:fix": "prettier --write src/"
+    "lint:fix": "prettier --write src/",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -16,14 +18,19 @@
     "@capacitor/ios": "^8.0.0",
     "@capacitor/preferences": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
+    "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@ionic/core": "^8.6.3",
-    "@mediagrid/capacitor-native-audio": "^2.3.1"
+    "@mediagrid/capacitor-native-audio": "^2.3.1",
+    "lit-html": "^3.3.2",
+    "nanostores": "^1.2.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.0.0",
+    "jsdom": "^29.0.1",
     "prettier": "^3.6.2",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vitest": "^4.1.2"
   },
   "engines": {
     "node": ">=22.0.0"
