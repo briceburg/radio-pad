@@ -101,6 +101,48 @@ def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
     assert response.json()["detail"] == "Bearer token required for write access"
 
 
+def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
+    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
+    client = _build_client(
+        tmp_path,
+        AuthServices(
+            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
+            authz_store=authz_store,
+        ),
+    )
+
+    with client:
+        response = client.put(
+            "/v1/presets/fresh",
+            headers={"Authorization": "Basic not-a-bearer-token"},
+            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Bearer token required for write access"
+
+
+def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> None:
+    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
+    client = _build_client(
+        tmp_path,
+        AuthServices(
+            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
+            authz_store=authz_store,
+        ),
+    )
+
+    with client:
+        response = client.put(
+            "/v1/presets/fresh",
+            headers={"Authorization": "Bearer    "},
+            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Bearer token required for write access"
+
+
 def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:
     authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
     client = _build_client(

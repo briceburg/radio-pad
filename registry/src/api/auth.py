@@ -53,9 +53,17 @@ def current_identity(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    scheme, _, raw_token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not raw_token.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Bearer token required for write access",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     assert services.authenticate_user is not None
     try:
-        token = services.authenticate_user(auth_header)
+        token = services.authenticate_user(raw_token.strip())
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -19,7 +19,7 @@ class OIDCConfig:
     client_id: str
     issuer: str
     base_authorization_server_uri: str
-    audience: str | None
+    audience: str
     signature_cache_ttl: int
 
     @classmethod
@@ -33,7 +33,7 @@ class OIDCConfig:
             raise ValueError("REGISTRY_AUTH_OIDC_CLIENT_ID and REGISTRY_AUTH_OIDC_ISSUER must both be set")
 
         base_uri = os.environ.get("REGISTRY_AUTH_OIDC_BASE_URI", issuer)
-        audience = os.environ.get("REGISTRY_AUTH_OIDC_AUDIENCE")
+        audience = os.environ.get("REGISTRY_AUTH_OIDC_AUDIENCE") or client_id
         cache_ttl = int(os.environ.get("REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL", "3600"))
         return cls(
             client_id=client_id,
