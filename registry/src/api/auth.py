@@ -19,9 +19,9 @@ class AuthServices:
     def from_env(cls) -> AuthServices:
         config = OIDCConfig.from_env()
         if config is None:
-            logger.warning("Registry auth disabled: OIDC client_id/issuer not configured")
+            logger.warning("Registry auth disabled: OIDC client_ids/issuer not configured")
             return cls(authenticate_user=None, authz_store=None)
-        logger.info(f"Registry auth enabled: issuer={config.issuer}")
+        logger.info(f"Registry auth enabled: issuer={config.issuer}, client_ids={config.client_ids}")
         authz_store = AuthzStore()
         authz_store.seed()
         return cls(authenticate_user=config.build_auth_dependency(), authz_store=authz_store)

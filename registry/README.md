@@ -43,10 +43,9 @@ REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; write
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
 REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
 REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path for deploy-key authentication. | `None`
-REGISTRY_AUTH_OIDC_CLIENT_ID | OIDC client id used to verify bearer tokens for write access. When unset, write auth is disabled. | `None`
+REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client ids for write auth. | `None`
 REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for write access. | `None`
 REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc`; defaults to `REGISTRY_AUTH_OIDC_ISSUER`. | same as issuer
-REGISTRY_AUTH_OIDC_AUDIENCE | optional bearer token audience override; defaults to the client id when unset. | client id
 REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL | JWKS/discovery cache TTL in seconds for bearer token verification. | `3600`
 REGISTRY_AUTHZ_PATH | local private authz data path for owner/admin rules. This can share a Fly volume with the public datastore as long as it uses a separate directory. | `tmp/authz`
 REGISTRY_AUTHZ_PREFIX | prefix to apply to local private authz files. | `registry-authz-v1`
@@ -127,9 +126,18 @@ Use a volume for `REGISTRY_BACKEND_PATH` if startup clone latency becomes a prob
 
 ### Write authentication and authz seeding
 
-Read endpoints remain public. Write endpoints become protected when both `REGISTRY_AUTH_OIDC_CLIENT_ID` and `REGISTRY_AUTH_OIDC_ISSUER` are configured.
+Read endpoints remain public. Write endpoints become protected when both `REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured.
 
-The registry verifies OIDC bearer tokens with `fastapi-oidc` and then applies owner/admin ACL checks from a separate private local authz store.
+The registry verifies OIDC bearer tokens against an allowed client-id list and then applies owner/admin ACL checks from a separate private local authz store.
+
+For Google OIDC, use one issuer and list the web, Android, and iOS client ids used by `remote-control`:
+
+```sh
+REGISTRY_AUTH_OIDC_ISSUER=https://accounts.google.com
+REGISTRY_AUTH_OIDC_CLIENT_IDS=web-client-id.apps.googleusercontent.com,android-client-id.apps.googleusercontent.com,ios-client-id.apps.googleusercontent.com
+```
+
+Match this with the Google client setup documented in `radio-pad/remote-control/README.md`.
 
 The checked-in seed documents live under a dedicated `seed-data/` root:
 

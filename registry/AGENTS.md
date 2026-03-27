@@ -36,7 +36,7 @@ Guidance for coding agents working in `radio-pad-registry`.
 
 ## Auth and seeding conventions
 
-- Write-route auth uses OIDC bearer-token verification through `fastapi-oidc`; reads remain public.
+- Write-route auth verifies OIDC bearer tokens against a configured client-id allowlist; reads remain public.
 - Private authz data is stored separately from public content data and currently uses a local backend configured by `REGISTRY_AUTHZ_PATH`.
 - Checked-in seed data lives under `seed-data/`, with:
   - `store/...` for public datastore seeds
