@@ -16,14 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { SafeArea } from "@capacitor-community/safe-area";
-import { Capacitor } from "@capacitor/core";
-
-// Only enable SafeArea on native platforms
-if (Capacitor.isNativePlatform()) {
-  SafeArea.enable({ config: {} });
-}
-
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
 import { RadioListen } from "./lib/radio-listen.js";
