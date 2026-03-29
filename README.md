@@ -66,42 +66,29 @@ flowchart TD
 
 This is the baseline runtime view: controllers talk to players directly over USB or indirectly through the switchboard.
 
-### Registry auth and player access
+### Registry and player access
 
 ```mermaid
 flowchart TD
-    Human["Signed-in owner/admin"]
+    Human["Signed-in user"]
     Remote["Remote-control app"]
+    Registry["radio-pad-registry API"]
     Switchboard["Switchboard"]
     Player["Player device"]
-    Registry["radio-pad-registry API"]
-    Access["Ownership + access rules"]
 
-    Human -->|"sign in with OIDC provider"| Remote
+    Human -->|"sign in"| Remote
     Remote -->|"request player access"| Registry
-    Registry -->|"check access"| Access
-    Remote -->|"send player-scoped control"| Switchboard
+    Registry -->|"grant player access"| Remote
+    Remote -->|"control selected player"| Switchboard
     Player -->|"connect as player"| Switchboard
-    Switchboard -->|"forward only to matching player"| Player
-
-    Player -->|"public reads"| Registry
-    Remote -->|"public reads"| Registry
-    Remote -->|"authenticated write requests"| Registry
-
-    Note1["Remote-control acts as the signed-in human."]
-    Note2["Reads stay public. Writes require owner/admin auth."]
-    Note3["No global control path: only owned/admin-managed players can be controlled."]
-
-    Remote -.-> Note1
-    Registry -.-> Note2
-    Switchboard -.-> Note3
+    Switchboard -->|"forward only to that player"| Player
 ```
 
-This direction keeps player control scoped instead of global:
+Player control stays scoped instead of global:
 
-* remote-control signs in as the human and asks the registry for access to one player.
-* the registry only issues that player-scoped session when the user owns that player or is an admin.
-* the switchboard only forwards commands to the connected player that matches that session.
+* remote-control signs in as the user and requests access to one player
+* the registry grants access only when the user is allowed to manage that player
+* the switchboard forwards control only to that player
 
 ### Contributing
 
