@@ -22,7 +22,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - iOS also needs native Google SDK metadata in `ios/App/App/Info.plist`.
   - `GIDClientID` is wired through `$(GOOGLE_IOS_CLIENT_ID)`.
   - The URL scheme is wired through `$(GOOGLE_IOS_REVERSED_CLIENT_ID)`.
-  - Replace the checked-in placeholder values in `ios/App/App.xcodeproj/project.pbxproj`.
+  - Set those values in the local-only `ios/App/App/GoogleSignIn.local.xcconfig`.
 
 ## Environment conventions
 
@@ -42,6 +42,8 @@ Guidance for coding agents working in `radio-pad/remote-control`.
   - settings section rendering
 - Add assertion flags to the smoke script when you want a command to fail on regression.
 - Use Playwright-based local helpers for UI smoke checks before resorting to repeated agent-driven screenshots.
+- `playwright-core` is intentionally used to avoid automatic browser downloads during install.
+- If Chromium is missing locally, run `npx playwright install chromium` before `npm run smoke:settings`.
 
 ## Change preferences
 

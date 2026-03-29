@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 
 function parseArgs(argv) {
   const options = {
@@ -67,8 +67,12 @@ const browser = await chromium.launch({ headless: true });
 
 try {
   const page = await browser.newPage({ viewport: { width: 430, height: 932 } });
-  await page.goto(options.url, { waitUntil: "networkidle" });
+  await page.goto(options.url, { waitUntil: "domcontentloaded" });
+  await page.getByRole("tab", { name: "Settings" }).waitFor({
+    state: "visible",
+  });
   await page.getByRole("tab", { name: "Settings" }).click();
+  await page.locator("#auth-status").waitFor({ state: "visible" });
 
   if (options.screenshot) {
     await page.screenshot({ path: options.screenshot, fullPage: true });

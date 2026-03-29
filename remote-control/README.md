@@ -52,6 +52,8 @@ To smoke-check the Settings UI:
 npm run smoke:settings -- --url http://127.0.0.1:5173/
 ```
 
+If Chromium is not installed yet, run `npx playwright install chromium` once.
+
 For a simple assertion-based check:
 
 ```bash
@@ -87,7 +89,14 @@ Create a Google `iOS` OAuth client:
 - save the iOS client ID
 - save the reversed URL scheme
 
-Then update the checked-in iOS placeholders in `ios/App/App.xcodeproj/project.pbxproj`:
+Then create a local iOS config file:
+
+```bash
+cp ios/App/App/GoogleSignIn.local.xcconfig.example \
+  ios/App/App/GoogleSignIn.local.xcconfig
+```
+
+Set these values in `ios/App/App/GoogleSignIn.local.xcconfig`:
 
 - `GOOGLE_IOS_CLIENT_ID`
 - `GOOGLE_IOS_REVERSED_CLIENT_ID`

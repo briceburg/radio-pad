@@ -39,6 +39,42 @@ function getStringClaim(profile, key) {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function isExpiredUser(user) {
+  return typeof user?.expiresAt === "number" && user.expiresAt <= Date.now();
+}
+
+function normalizeStoredUser(user) {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const idToken = getStringClaim(user, "idToken");
+  if (!idToken) {
+    return null;
+  }
+
+  if (user.expiresAt != null && typeof user.expiresAt !== "number") {
+    return null;
+  }
+
+  for (const field of ["subject", "email", "name"]) {
+    if (user[field] != null && !getStringClaim(user, field)) {
+      return null;
+    }
+  }
+
+  const subject = getStringClaim(user, "subject");
+  const email = getStringClaim(user, "email");
+
+  return {
+    idToken,
+    subject,
+    email,
+    name: getStringClaim(user, "name") || email || subject,
+    expiresAt: user.expiresAt ?? null,
+  };
+}
+
 function decodeJwtPayload(token) {
   const payload = token?.split(".")?.[1];
   if (!payload) {
@@ -65,18 +101,17 @@ function buildCallbackCleanupUrl(currentUrl) {
 
 function buildUser(result) {
   const claims = decodeJwtPayload(result.idToken);
-  const email = result.email || getStringClaim(claims, "email");
-  const subject = result.userId || getStringClaim(claims, "sub");
-  const name =
-    result.displayName || getStringClaim(claims, "name") || email || subject;
-
-  return {
+  const user = normalizeStoredUser({
     idToken: result.idToken,
-    subject,
-    email,
-    name,
+    subject: result.userId || getStringClaim(claims, "sub"),
+    email: result.email || getStringClaim(claims, "email"),
+    name: result.displayName || getStringClaim(claims, "name"),
     expiresAt: typeof claims.exp === "number" ? claims.exp * 1000 : null,
-  };
+  });
+  if (!user) {
+    throw new Error("Google sign-in did not return a valid user.");
+  }
+  return user;
 }
 
 function isWebPlatform() {
@@ -87,6 +122,7 @@ export class RadioPadAuth extends EventEmitter {
   constructor() {
     super();
     this.config = this._buildConfig();
+    this.isWeb = isWebPlatform();
     this.user = null;
     this.initialized = false;
     this.initError = null;
@@ -112,10 +148,7 @@ export class RadioPadAuth extends EventEmitter {
       return null;
     }
 
-    if (
-      typeof this.user.expiresAt === "number" &&
-      this.user.expiresAt <= Date.now()
-    ) {
+    if (isExpiredUser(this.user)) {
       void this._clearStoredUser();
       this.user = null;
       return null;
@@ -138,15 +171,12 @@ export class RadioPadAuth extends EventEmitter {
     }
 
     try {
-      const parsed = JSON.parse(value);
-      if (
-        typeof parsed?.expiresAt === "number" &&
-        parsed.expiresAt <= Date.now()
-      ) {
+      const user = normalizeStoredUser(JSON.parse(value));
+      if (!user || isExpiredUser(user)) {
         await this._clearStoredUser();
         return null;
       }
-      return parsed;
+      return user;
     } catch (error) {
       console.warn("Failed restoring Google sign-in state", error);
       await this._clearStoredUser();
@@ -192,7 +222,7 @@ export class RadioPadAuth extends EventEmitter {
     try {
       await GoogleSignIn.initialize({
         clientId: this.config.clientId,
-        redirectUrl: isWebPlatform() ? this.config.redirectUrl : undefined,
+        redirectUrl: this.isWeb ? this.config.redirectUrl : undefined,
       });
       this.initialized = true;
       this.initError = null;
@@ -206,7 +236,7 @@ export class RadioPadAuth extends EventEmitter {
       return;
     }
 
-    if (isWebPlatform() && hasAuthCallbackParams(currentUrl)) {
+    if (this.isWeb && hasAuthCallbackParams(currentUrl)) {
       try {
         await this._applySignInResult(
           await GoogleSignIn.handleRedirectCallback(),
@@ -241,7 +271,7 @@ export class RadioPadAuth extends EventEmitter {
       throw this.initError;
     }
 
-    if (isWebPlatform()) {
+    if (this.isWeb) {
       await GoogleSignIn.signIn();
       return;
     }
