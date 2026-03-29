@@ -5,7 +5,7 @@
     <title>RadioPad</title>
     <meta
       name="viewport"
-      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
@@ -59,7 +59,7 @@
               <ion-title size="large"> Settings </ion-title>
             </ion-toolbar>
           </ion-header>
-          <ion-content fullscreen="true" class="ion-padding">
+          <ion-content class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
             <ion-list id="settings-list"></ion-list>
             <ion-button id="settings-save-button" expand="block"
@@ -72,7 +72,7 @@
     </ion-app>
 
     <template id="tab-player">
-      <ion-header translucent="true">
+      <ion-header>
         <ion-toolbar>
           <ion-title size="large">
             <span class="stations-name"></span>:
@@ -92,7 +92,7 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      <ion-content fullscreen="true" class="ion-padding">
+      <ion-content class="ion-padding">
         <div class="radio-info ion-text-center"></div>
         <ion-grid class="station-grid"></ion-grid>
       </ion-content>

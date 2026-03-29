@@ -11,18 +11,17 @@
     "lint:fix": "prettier --write src/"
   },
   "dependencies": {
-    "@capacitor-community/safe-area": "^7.0.0-alpha.1",
-    "@capacitor/android": "^7.4.1",
-    "@capacitor/core": "latest",
-    "@capacitor/ios": "^7.4.4",
-    "@capacitor/preferences": "^7.0.1",
-    "@capacitor/splash-screen": "^7.0.1",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
     "@ionic/core": "^8.6.3",
     "@mediagrid/capacitor-native-audio": "^2.3.1"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "latest",
+    "@capacitor/cli": "^8.0.0",
     "prettier": "^3.6.2",
     "vite": "^5.4.2"
   },
