@@ -56,6 +56,10 @@ export class RadioControl extends EventTarget {
 
   disconnect() {
     const hadSocket = Boolean(this.ws);
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -95,16 +99,17 @@ export class RadioControl extends EventTarget {
     }
 
     this.dispatchEvent(new CustomEvent("connecting", { detail: url }));
-    this.ws = new WebSocket(url);
+    const ws = new WebSocket(url);
+    this.ws = ws;
 
-    const connectTimeout = setTimeout(() => {
-      if (this.ws.readyState !== WebSocket.OPEN) {
-        this.ws.close();
+    this.connectTimer = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        ws.close();
       }
     }, 3000);
 
-    this.ws.onopen = () => {
-      clearTimeout(connectTimeout);
+    ws.onopen = () => {
+      clearTimeout(this.connectTimer);
       this.reconnectDelay = 1000;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -112,20 +117,20 @@ export class RadioControl extends EventTarget {
       this.dispatchEvent(new CustomEvent("connect", { detail: url }));
     };
 
-    this.ws.onclose = () => {
-      clearTimeout(connectTimeout);
+    ws.onclose = () => {
+      clearTimeout(this.connectTimer);
       this.dispatchEvent(new Event("disconnect"));
       this._scheduleReconnect();
     };
 
-    this.ws.onerror = () => {
-      clearTimeout(connectTimeout);
+    ws.onerror = () => {
+      clearTimeout(this.connectTimer);
       this.dispatchEvent(
         new CustomEvent("error", { detail: "WebSocket error." }),
       );
     };
 
-    this.ws.onmessage = (msg) => {
+    ws.onmessage = (msg) => {
       try {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {

@@ -44,13 +44,10 @@ export class RadioPadUI {
     this.actions = actions;
     this.auth = new AuthView((...args) => this.invokeAction(...args), {
       copyTokenAvailable,
-      rootSelector: selectors.authRoot || 'ion-tab[tab="settings"]',
+      rootSelector: selectors.authRoot || '#auth-container',
     });
     this.playerTabs = new PlayerTabsView(
       (...args) => this.invokeAction(...args),
-      {
-        templateSelector: selectors.playerTemplate || "#tab-player",
-      },
     );
     this.settings = new SettingsView((...args) => this.invokeAction(...args), {
       rootSelector: selectors.settingsRoot || 'ion-tab[tab="settings"]',

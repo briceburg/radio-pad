@@ -31,7 +31,7 @@ export function formatErrorMessage(error, fallback = "") {
   if (typeof error?.message === "string") {
     const msg = error.message.trim();
     if (msg.includes("NetworkError") || msg.includes("Failed to fetch")) {
-      return "Unable to connect. Please verify your Registry URL in Settings.";
+      return "Network connection failed.";
     }
     return msg;
   }
@@ -61,6 +61,10 @@ export class RegistryRequestError extends Error {
     if (error instanceof RegistryRequestError) {
       return error.toMessage();
     }
-    return formatErrorMessage(error, "Unknown registry error");
+    const msg = formatErrorMessage(error, "Unknown registry error");
+    if (msg === "Network connection failed.") {
+      return "Unable to connect. Please verify your Registry URL in Settings.";
+    }
+    return msg;
   }
 }

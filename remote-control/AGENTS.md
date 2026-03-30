@@ -12,8 +12,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - Run local web dev with `npm start`.
 - Validate production bundling with `npm run build`.
 - Formatting/linting uses `npm run lint` (`prettier --check src/`).
-- For quick Settings/auth UI checks, use:
-  - `npm run smoke:settings -- --url http://127.0.0.1:5173/`
+- Run headless logic tests via `npm test` or `npm run test:watch`.
 
 ## Auth conventions
 
@@ -37,20 +36,12 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 ## Testing/debugging preferences
 
-- Prefer `npm run smoke:settings` over repeated ad hoc browser inspection when checking:
-  - auth status text
-  - visible auth buttons
-  - sign-in button visibility
-  - settings section rendering
-- Add assertion flags to the smoke script when you want a command to fail on regression.
-- Use Playwright-based local helpers for UI smoke checks before resorting to repeated agent-driven screenshots.
-- `playwright-core` is intentionally used to avoid automatic browser downloads during install.
-- If Chromium is missing locally, run `npx playwright install chromium` before `npm run smoke:settings`.
+- `vitest` is used for isolated logical tests. Prefer `npm test` over UI checks for domain logic correctness.
+- Place structural logic / service unit tests inside the `tests/` directory at the project root.
 
 ## Change preferences
 
 - Keep platform-specific behavior explicit only where the plugin or native project metadata requires it.
 - Prefer small helpers over broad auth rewrites; the shared Google sign-in path should stay easy to reason about.
 - Preserve the grouped Settings UI structure (`ion-item-group` + `ion-item-divider`) when adjusting auth/settings presentation.
-- Preserve HTML `id` attributes on key elements (like `#auth-status`, `#auth-hint`) in lit templates, as the Playwright smoke tests rely on them for assertions.
 - Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.

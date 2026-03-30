@@ -46,24 +46,21 @@ For registry write testing on web, copy the API test token from `Settings` and u
 
 When you deploy the web app, add the deployed origin and redirect URI to the same Google web client, or create a separate production client.
 
-To smoke-check the Settings UI:
+### Testing
+
+The `remote-control` component uses Vitest + jsdom for headless domain logic testing.
+
+To run the test suite for client logic:
 
 ```bash
-npm run smoke:settings -- --url http://127.0.0.1:5173/
+npm test
 ```
 
-If Chromium is not installed yet, run `npx playwright install chromium` once.
-
-For a simple assertion-based check:
+To run tests in watch mode during development:
 
 ```bash
-npm run smoke:settings -- \
-  --url http://127.0.0.1:5173/ \
-  --expect-status "Signed out" \
-  --expect-sign-in-button-visible true
+npm run test:watch
 ```
-
-Add `--screenshot /tmp/settings.png` to save a capture.
 
 ### Android development
 

@@ -8,4 +8,10 @@ export default defineConfig({
     minify: false,
     emptyOutDir: true,
   },
+  test: {
+    root: "./",
+    environment: "jsdom",
+    include: ["tests/**/*.test.js", "tests/**/*.spec.js"],
+    globals: true,
+  }
 });
