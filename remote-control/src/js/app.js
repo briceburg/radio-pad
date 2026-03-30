@@ -70,10 +70,14 @@ class RadioPad {
     this.UI = new RadioPadUI();
     this.copyTokenAvailable = !Capacitor.isNativePlatform();
     this.isSavingSettings = false;
+    this.preferenceChangeIds = new Map();
     this.stationRequests = new Map();
     this.PREFS.registerEvent("on-change", ({ key, value }) => {
+      const changeId = this.nextPreferenceChangeId(key);
       void this.onPreferenceChange(key, value, {
         fromSettingsSave: this.isSavingSettings,
+        preferenceKey: key,
+        changeId,
       });
       this.UI.updatePreference(key, value);
     });
@@ -172,6 +176,20 @@ class RadioPad {
     });
   }
 
+  nextPreferenceChangeId(key) {
+    const nextId = (this.preferenceChangeIds.get(key) || 0) + 1;
+    this.preferenceChangeIds.set(key, nextId);
+    return nextId;
+  }
+
+  isCurrentPreferenceChange({ preferenceKey, changeId } = {}) {
+    return (
+      preferenceKey == null ||
+      changeId == null ||
+      this.preferenceChangeIds.get(preferenceKey) === changeId
+    );
+  }
+
   async onPreferenceChange(key, value, options = {}) {
     return {
       registryUrl: () =>
@@ -209,6 +227,7 @@ class RadioPad {
         ]),
       options,
     );
+    if (!this.isCurrentPreferenceChange(options)) return;
     if (!choices) return;
     const [players, presets] = choices;
     this.STATE.set("available_players", players);
@@ -221,6 +240,7 @@ class RadioPad {
       () => discoverPlayer(playerId, this.PREFS, this.AUTH),
       options,
     );
+    if (!this.isCurrentPreferenceChange(options)) return;
     if (player) this.STATE.set("player", player);
   }
 
@@ -241,10 +261,15 @@ class RadioPad {
     this.UI.setSettingsSaveState("saved");
   }
 
-  async withRegistryError(summary, task, { fromSettingsSave = false } = {}) {
+  async withRegistryError(summary, task, options = {}) {
+    const { fromSettingsSave = false } = options;
     try {
-      return await task();
+      const result = await task();
+      return this.isCurrentPreferenceChange(options) ? result : null;
     } catch (error) {
+      if (!this.isCurrentPreferenceChange(options)) {
+        return null;
+      }
       await this.UI.showRegistryError(
         fromSettingsSave
           ? `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`
@@ -274,6 +299,7 @@ class RadioPad {
       () => discoverAccounts(registryUrl, this.AUTH),
       options,
     );
+    if (!this.isCurrentPreferenceChange(options)) return;
     if (accounts) await this.PREFS.setOptions("accountId", accounts);
   }
 

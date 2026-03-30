@@ -137,10 +137,15 @@ async function readPreferences(page) {
 }
 
 async function waitForToastMessage(page, text) {
+  const previousMessage = await page.evaluate(
+    () => document.getElementById("global-toast")?.message ?? null,
+  );
   await page.waitForFunction(
-    (expected) =>
-      document.getElementById("global-toast")?.message?.includes(expected),
-    text,
+    ({ expected, previous }) => {
+      const current = document.getElementById("global-toast")?.message ?? null;
+      return current !== previous && current?.includes(expected);
+    },
+    { expected: text, previous: previousMessage },
   );
 }
 
