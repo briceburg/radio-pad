@@ -16,22 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { EventEmitter } from "./interfaces.js";
+import { createSafeInvoker } from "../utils/callbacks.js";
 
-export class RadioControl extends EventEmitter {
+export class RadioControl {
   constructor() {
-    super();
     this.ws = null;
     this.reconnectTimer = null;
-    this.reconnectDelay = 1000; // Initial reconnect delay
+    this.reconnectDelay = 1000;
     this._lastUrl = null;
+    this.onConnect = null;
+    this.onConnecting = null;
+    this.onDisconnect = null;
+    this.onError = null;
+    this.onStationPlaying = null;
+    this.onStationsUrl = null;
+    this._callbacks = createSafeInvoker("RadioControl callback");
   }
 
   async connect(url = null) {
     if (url) {
       this._lastUrl = url;
     }
-    this.disconnect(); // Ensure any existing connection is closed
+    this.disconnect();
     this._connectWebSocket(this._lastUrl);
   }
 
@@ -42,26 +48,13 @@ export class RadioControl extends EventEmitter {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      this.ws.onclose = null; // Prevent reconnect logic from firing on manual close
+      this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
     }
     if (hadSocket) {
-      this.emitEvent("disconnect");
+      this._callbacks.invoke(this.onDisconnect);
     }
-  }
-
-  play(station) {
-    this.sendStationRequest(station);
-  }
-
-  stop() {
-    this.sendStationRequest(null);
-  }
-
-  setVolume(level) {
-    // TODO: Implement volume control in switchboard/protocol if not already present
-    // this.sendVolumeRequest(level);
   }
 
   sendStationRequest(stationName) {
@@ -69,12 +62,13 @@ export class RadioControl extends EventEmitter {
       this.ws.send(
         JSON.stringify({ event: "station_request", data: stationName }),
       );
-    } else {
-      this.emitEvent(
-        "error",
-        "WebSocket not connected. Cannot send station request.",
-      );
+      return;
     }
+
+    this._callbacks.invoke(
+      this.onError,
+      "WebSocket not connected. Cannot send station request.",
+    );
   }
 
   _connectWebSocket(url) {
@@ -86,7 +80,7 @@ export class RadioControl extends EventEmitter {
       return;
     }
 
-    this.emitEvent("connecting", url);
+    this._callbacks.invoke(this.onConnecting, url);
     this.ws = new WebSocket(url);
 
     const connectTimeout = setTimeout(() => {
@@ -98,19 +92,21 @@ export class RadioControl extends EventEmitter {
     this.ws.onopen = () => {
       clearTimeout(connectTimeout);
       this.reconnectDelay = 1000;
-      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-      this.emitEvent("connect", url);
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+      }
+      this._callbacks.invoke(this.onConnect, url);
     };
 
     this.ws.onclose = () => {
       clearTimeout(connectTimeout);
-      this.emitEvent("disconnect");
+      this._callbacks.invoke(this.onDisconnect);
       this._scheduleReconnect();
     };
 
-    this.ws.onerror = (err) => {
+    this.ws.onerror = () => {
       clearTimeout(connectTimeout);
-      this.emitEvent("error", "WebSocket error.");
+      this._callbacks.invoke(this.onError, "WebSocket error.");
     };
 
     this.ws.onmessage = (msg) => {
@@ -118,20 +114,25 @@ export class RadioControl extends EventEmitter {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
           case "station_playing":
-            this.emitEvent("station-playing", data);
+            this._callbacks.invoke(this.onStationPlaying, data);
             break;
           case "stations_url":
-            this.emitEvent("stations-url", data);
+            this._callbacks.invoke(this.onStationsUrl, data);
             break;
         }
-      } catch (e) {
-        this.emitEvent("error", "Error parsing WebSocket message.");
+      } catch {
+        this._callbacks.invoke(
+          this.onError,
+          "Error parsing WebSocket message.",
+        );
       }
     };
   }
 
   _scheduleReconnect() {
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
     this.reconnectTimer = setTimeout(() => {
       if (this._lastUrl) {
         this._connectWebSocket(this._lastUrl);

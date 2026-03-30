@@ -13,13 +13,14 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
-    "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "@capacitor/preferences": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
+    "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@ionic/core": "^8.6.3",
-    "@mediagrid/capacitor-native-audio": "^2.3.1"
+    "@mediagrid/capacitor-native-audio": "^2.3.1",
+    "nanostores": "^1.2.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

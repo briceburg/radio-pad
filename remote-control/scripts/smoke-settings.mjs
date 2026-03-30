@@ -48,7 +48,10 @@ function parseArgs(argv) {
         options.expectToastContains = argv[++index];
         break;
       case "--expect-toast-duration":
-        options.expectToastDuration = Number(argv[++index]);
+        options.expectToastDuration = parseIntegerArg(
+          argv[++index],
+          "--expect-toast-duration",
+        );
         break;
       case "--reset-storage":
         options.resetStorage = true;
@@ -80,6 +83,19 @@ Options:
   }
 
   return options;
+}
+
+function parseIntegerArg(value, flagName) {
+  if (value == null || value === "") {
+    throw new Error(`Missing value for ${flagName}.`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid numeric value for ${flagName}: ${value}`);
+  }
+
+  return parsed;
 }
 
 async function readText(locator) {
@@ -136,10 +152,7 @@ async function readPreferences(page) {
     );
 }
 
-async function waitForToastMessage(page, text) {
-  const previousMessage = await page.evaluate(
-    () => document.getElementById("global-toast")?.message ?? null,
-  );
+async function waitForToastMessage(page, text, previousMessage = null) {
   await page.waitForFunction(
     ({ expected, previous }) => {
       const current = document.getElementById("global-toast")?.message ?? null;
@@ -162,9 +175,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 430, height: 932 } });
   await page.goto(options.url, { waitUntil: "domcontentloaded" });
   if (options.resetStorage) {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       window.localStorage.clear();
       window.sessionStorage.clear();
+      const preferences = window.Capacitor?.Plugins?.Preferences;
+      if (preferences?.clear) {
+        await preferences.clear();
+      }
     });
     await page.reload({ waitUntil: "domcontentloaded" });
   }
@@ -174,6 +191,12 @@ try {
     for (const [key, value] of Object.entries(options.setPreference)) {
       await setPreference(page, key, value);
     }
+    const previousToastMessage =
+      options.expectToastContains === null
+        ? null
+        : await page.evaluate(
+            () => document.getElementById("global-toast")?.message ?? null,
+          );
     await page.locator("#settings-save-button").evaluate((button) => {
       button.click();
     });
@@ -181,7 +204,11 @@ try {
       state: "attached",
     });
     if (options.expectToastContains) {
-      await waitForToastMessage(page, options.expectToastContains);
+      await waitForToastMessage(
+        page,
+        options.expectToastContains,
+        previousToastMessage,
+      );
     }
     if (options.reloadAfterSave) {
       await page.reload({ waitUntil: "domcontentloaded" });
