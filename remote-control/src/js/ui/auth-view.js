@@ -83,10 +83,12 @@ export class AuthView {
       </ion-item-divider>
       <ion-item lines="none">
         <ion-label>
-          <h3>${statusText}</h3>
-          <p>${hintText}</p>
+          <h3 id="auth-status">${statusText}</h3>
+          <p id="auth-hint">${hintText}</p>
           ${identityText
-            ? html`<p class="auth-identity">${identityText}</p>`
+            ? html`<p id="auth-identity" class="auth-identity">
+                ${identityText}
+              </p>`
             : ""}
         </ion-label>
       </ion-item>
