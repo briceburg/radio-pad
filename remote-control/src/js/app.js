@@ -55,9 +55,6 @@ async function bootstrap() {
   const control = new RadioControl();
   const ui = new RadioPadUI({ copyTokenAvailable });
 
-  await prefs.init();
-  await auth.init();
-
   const controlActions = createControlActions({
     control,
     listen,
@@ -84,8 +81,6 @@ async function bootstrap() {
     onStopStation: (tabName) => controlActions.stopStation(tabName),
   });
 
-  preferencesStore.set({ definitions: prefs.getSnapshot() });
-
   for (const [store, render] of [
     [preferencesStore, ({ definitions }) => ui.renderPreferences(definitions)],
     [authStore, (state) => ui.updateAuthState(state)],
@@ -97,7 +92,8 @@ async function bootstrap() {
     bindStore(store, render);
   }
 
-  await settingsActions.sync();
+  // Single initializer handles offline store boot, auth state, and network fallback
+  await settingsActions.initialize();
 }
 
 void bootstrap().catch((error) => {

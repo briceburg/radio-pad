@@ -77,6 +77,16 @@ export function createSettingsActions({
   }
 
   return {
+    async initialize() {
+      await prefs.init();
+      preferencesStore.set({ definitions: prefs.getSnapshot() });
+
+      await auth.init();
+      if (!auth.signedIn) {
+        await sync();
+      }
+    },
+
     sync: () => sync(),
 
     async save(settingsMap) {
