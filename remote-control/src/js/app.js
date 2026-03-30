@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import "@ionic/core/css/ionic.bundle.css";
+import { defineCustomElements } from "@ionic/core/loader/index.js";
 import { Capacitor } from "@capacitor/core";
+import { addIcons } from "ionicons";
+import * as appIcons from "./lib/icons.js";
 import { RadioPadPreferences } from "./lib/preferences.js";
 import { RadioPadState } from "./lib/state.js";
 import { RadioListen } from "./lib/radio-listen.js";
@@ -29,6 +33,9 @@ import {
   discoverPlayers,
   discoverPresets,
 } from "./lib/discovery.js";
+
+addIcons(appIcons);
+defineCustomElements(window);
 
 function resolveSwitchboardUrl(url) {
   const override = import.meta.env.VITE_SWITCHBOARD_URL?.trim();
@@ -62,192 +69,211 @@ class RadioPad {
     this.AUTH = new RadioPadAuth();
     this.UI = new RadioPadUI();
     this.copyTokenAvailable = !Capacitor.isNativePlatform();
-    // PREFERENCE CHANGES
-    this.PREFS.registerEvent("on-change", async (data) => {
-      switch (data.key) {
-        case "registryUrl": {
-          await this.refreshAccounts(
-            data.value,
-            "⚠️ Failed refreshing accounts.",
-          );
-          break;
-        }
-        case "accountId": {
-          try {
-            const [players, presets] = await Promise.all([
-              discoverPlayers(data.value, this.PREFS, this.AUTH),
-              discoverPresets(data.value, this.PREFS, this.AUTH),
-            ]);
-            this.STATE.set("available_players", players);
-            this.STATE.set("available_presets", presets);
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing account players/presets.",
-              error,
-            );
-          }
-          break;
-        }
-        case "playerId": {
-          try {
-            const player = await discoverPlayer(
-              data.value,
-              this.PREFS,
-              this.AUTH,
-            );
-            if (player) {
-              this.STATE.set("player", player);
-            }
-          } catch (error) {
-            await this.UI.showRegistryError(
-              "⚠️ Failed refreshing player info.",
-              error,
-            );
-          }
-          break;
-        }
-        case "presetId": {
-          await this.loadStations(data.value, "listen");
-          break;
-        }
-      }
-      this.UI.updatePreference(data.key, data.value);
+    this.isSavingSettings = false;
+    this.stationRequests = new Map();
+    this.PREFS.registerEvent("on-change", ({ key, value }) => {
+      void this.onPreferenceChange(key, value, {
+        fromSettingsSave: this.isSavingSettings,
+      });
+      this.UI.updatePreference(key, value);
     });
-    this.PREFS.registerEvent("options-changed", async (data) => {
-      this.UI.updatePreference(
-        data.key,
-        await this.PREFS.get(data.key),
-        data.options,
-      );
+    this.PREFS.registerEvent("options-changed", async ({ key, options }) => {
+      this.UI.updatePreference(key, await this.PREFS.get(key), options);
     });
-
-    // STATE CHANGES
-    this.STATE.registerEvent("on-change", async (data) => {
-      switch (data.key) {
-        case "available_players":
-          await this.PREFS.setOptions("playerId", data.value);
-          break;
-        case "available_presets":
-          await this.PREFS.setOptions("presetId", data.value);
-          break;
-        case "player":
-          this.STATE.set("current_station", null);
-          this.UI.showStationsLoading("control");
-          await this.CONTROL.connect(
-            resolveSwitchboardUrl(data.value.switchboard_url),
-          );
-          break;
-        case "stations_url":
-          await this.loadStations(data.value, "control");
-          break;
-        case "current_station":
-          this.UI.highlightCurrentStation(data.value, "control");
-          break;
-        case "listen_station":
-          this.UI.highlightCurrentStation(data.value, "listen");
-          break;
-      }
+    this.STATE.registerEvent("on-change", async ({ key, value }) => {
+      await this.onStateChange(key, value);
     });
-
-    // REMOTE CONTROL EVENTS
-    this.CONTROL.registerEvent("connect", (url) => {
-      this.UI.setTabInfo(`✅ Connected to ${this.STATE.get("player").name}`);
-    });
-    this.CONTROL.registerEvent("connecting", (url) => {
-      this.UI.setTabInfo(`🔄 Connecting...`);
-    });
-    this.CONTROL.registerEvent("disconnect", () => {
-      this.UI.setTabInfo("🔌 Disconnected. Reconnecting...");
-    });
-    this.CONTROL.registerEvent("error", (msg) => {
-      this.UI.setTabInfo(`⚠️ Error: ${msg}`);
-    });
-    this.CONTROL.registerEvent("station-playing", (stationName) => {
-      this.STATE.set("current_station", stationName);
-    });
-    this.CONTROL.registerEvent("stations-url", (url) => {
-      this.STATE.set("stations_url", url);
-    });
-
-    // UI EVENTS
-    this.UI.registerEvent("click-station", (data) => {
-      if (data.tab === "listen") {
-        this.LISTEN.play(data.station);
-        this.STATE.set("listen_station", data.station);
-      } else {
-        this.CONTROL.sendStationRequest(data.station);
-      }
-    });
-    this.UI.registerEvent("click-stop", (data) => {
-      if (data.tab === "listen") {
-        this.LISTEN.stop();
-        this.STATE.set("listen_station", null);
-      } else {
-        this.CONTROL.sendStationRequest(null);
-      }
-    });
-    this.UI.registerEvent("settings-save", async (settingsMap) => {
-      // Apply sequentially so downstream events fire in a predictable order.
-      for (const [key, value] of Object.entries(settingsMap)) {
-        await this.PREFS.set(key, value);
-      }
-    });
-    this.UI.registerEvent("auth-sign-in", async () => {
-      try {
-        await this.AUTH.signIn();
-      } catch (error) {
-        await this.UI.showError({
-          summary: "⚠️ Failed starting sign-in.",
-          error,
-          toastColor: "danger",
-        });
-      }
-    });
-    this.UI.registerEvent("auth-sign-out", async () => {
-      try {
-        await this.AUTH.signOut();
-        await this.UI.toastSuccess("Signed out.");
-      } catch (error) {
-        await this.UI.showError({
-          summary: "⚠️ Failed signing out.",
-          error,
-          toastColor: "danger",
-        });
-      }
-    });
-    this.UI.registerEvent("auth-copy-token", async () => {
-      const token = this.AUTH.getRegistryBearerToken();
-      if (!token) {
-        await this.UI.toastWarning("No API test token is available.");
+    this.bindControlEvents();
+    this.UI.registerEvent("click-station", ({ tab, station }) => {
+      if (tab === "listen") {
+        this.LISTEN.play(station);
+        this.STATE.set("listen_station", station);
         return;
       }
-
-      try {
+      this.CONTROL.sendStationRequest(station);
+    });
+    this.UI.registerEvent("click-stop", ({ tab }) => {
+      if (tab === "listen") {
+        this.LISTEN.stop();
+        this.STATE.set("listen_station", null);
+        return;
+      }
+      this.CONTROL.sendStationRequest(null);
+    });
+    this.UI.registerEvent("settings-save", (settingsMap) =>
+      this.saveSettings(settingsMap),
+    );
+    this.registerUiDangerAction(
+      "auth-sign-in",
+      "⚠️ Failed starting sign-in.",
+      () => this.AUTH.signIn(),
+    );
+    this.registerUiDangerAction(
+      "auth-sign-out",
+      "⚠️ Failed signing out.",
+      async () => {
+        await this.AUTH.signOut();
+        await this.UI.toastSuccess("Signed out.");
+      },
+    );
+    this.registerUiDangerAction(
+      "auth-copy-token",
+      "⚠️ Failed copying API test token.",
+      async () => {
+        const token = this.AUTH.getRegistryBearerToken();
+        if (!token) {
+          await this.UI.toastWarning("No API test token is available.");
+          return;
+        }
         await navigator.clipboard.writeText(token);
         await this.UI.toastSuccess("Copied API test token.");
-      } catch (error) {
-        await this.UI.showError({
-          summary: "⚠️ Failed copying API test token.",
-          error,
-          toastColor: "danger",
-        });
-      }
-    });
+      },
+    );
     this.AUTH.registerEvent("state-changed", async (state) => {
       this.UI.updateAuthState(state);
-      const registryUrl = await this.PREFS.get("registryUrl");
       await this.refreshAccounts(
-        registryUrl,
+        await this.PREFS.get("registryUrl"),
         "⚠️ Failed refreshing accounts after auth change.",
       );
     });
-    this.AUTH.registerEvent("error", async ({ summary, error }) => {
-      await this.UI.showError({
-        summary,
-        error,
-        toastColor: "danger",
-      });
+    this.AUTH.registerEvent("error", ({ summary, error }) =>
+      this.showDangerError(summary, error),
+    );
+  }
+
+  async showDangerError(summary, error) {
+    await this.UI.showError({
+      summary,
+      error,
+      toastColor: "danger",
     });
+  }
+
+  registerUiDangerAction(event, summary, action) {
+    this.UI.registerEvent(event, async () => {
+      try {
+        await action();
+      } catch (error) {
+        await this.showDangerError(summary, error);
+      }
+    });
+  }
+
+  bindControlEvents() {
+    this.CONTROL.registerEvent("connect", () => {
+      this.UI.setTabInfo(`✅ Connected to ${this.STATE.get("player").name}`);
+    });
+    for (const [event, message] of Object.entries({
+      connecting: "🔄 Connecting...",
+      disconnect: "🔌 Disconnected. Reconnecting...",
+    })) {
+      this.CONTROL.registerEvent(event, () => {
+        this.UI.setTabInfo(message);
+      });
+    }
+    this.CONTROL.registerEvent("error", (message) => {
+      this.UI.setTabInfo(`⚠️ Error: ${message}`);
+    });
+    this.CONTROL.registerEvent("station-playing", (value) => {
+      this.STATE.set("current_station", value);
+    });
+    this.CONTROL.registerEvent("stations-url", (value) => {
+      this.STATE.set("stations_url", value);
+    });
+  }
+
+  async onPreferenceChange(key, value, options = {}) {
+    return {
+      registryUrl: () =>
+        this.refreshAccounts(value, "⚠️ Failed refreshing accounts.", options),
+      accountId: () => this.refreshAccountChoices(value, options),
+      playerId: () => this.refreshPlayer(value, options),
+      presetId: () => this.loadStations(value, "listen"),
+    }[key]?.();
+  }
+
+  async onStateChange(key, value) {
+    return {
+      available_players: () => this.PREFS.setOptions("playerId", value),
+      available_presets: () => this.PREFS.setOptions("presetId", value),
+      player: async () => {
+        this.STATE.set("current_station", null);
+        this.UI.showStationsLoading("control");
+        await this.CONTROL.connect(
+          resolveSwitchboardUrl(value.switchboard_url),
+        );
+      },
+      stations_url: () => this.loadStations(value, "control"),
+      current_station: () => this.UI.highlightCurrentStation(value, "control"),
+      listen_station: () => this.UI.highlightCurrentStation(value, "listen"),
+    }[key]?.();
+  }
+
+  async refreshAccountChoices(accountId, options = {}) {
+    const choices = await this.withRegistryError(
+      "⚠️ Failed refreshing account players/presets.",
+      () =>
+        Promise.all([
+          discoverPlayers(accountId, this.PREFS, this.AUTH),
+          discoverPresets(accountId, this.PREFS, this.AUTH),
+        ]),
+      options,
+    );
+    if (!choices) return;
+    const [players, presets] = choices;
+    this.STATE.set("available_players", players);
+    this.STATE.set("available_presets", presets);
+  }
+
+  async refreshPlayer(playerId, options = {}) {
+    const player = await this.withRegistryError(
+      "⚠️ Failed refreshing player info.",
+      () => discoverPlayer(playerId, this.PREFS, this.AUTH),
+      options,
+    );
+    if (player) this.STATE.set("player", player);
+  }
+
+  async saveSettings(settingsMap) {
+    this.isSavingSettings = true;
+    try {
+      for (const [key, value] of Object.entries(settingsMap)) {
+        await this.PREFS.set(key, value);
+      }
+    } catch (error) {
+      this.UI.setSettingsSaveState("error");
+      await this.showDangerError("⚠️ Failed saving settings.", error);
+      return;
+    } finally {
+      this.isSavingSettings = false;
+    }
+
+    this.UI.setSettingsSaveState("saved");
+  }
+
+  async reportRegistryError(
+    summary,
+    error,
+    { fromSettingsSave = false, ...options } = {},
+  ) {
+    if (fromSettingsSave) {
+      await this.UI.showRegistryError(
+        `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`,
+        error,
+        options,
+      );
+      return;
+    }
+    await this.UI.showRegistryError(summary, error, options);
+  }
+
+  async withRegistryError(summary, task, options = {}) {
+    try {
+      return await task();
+    } catch (error) {
+      await this.reportRegistryError(summary, error, options);
+      return null;
+    }
   }
 
   async start() {
@@ -259,24 +285,20 @@ class RadioPad {
     this.UI.updateAuthState(this.AUTH.getState());
   }
 
-  async refreshAccounts(registryUrl, failureSummary) {
+  async refreshAccounts(registryUrl, failureSummary, options = {}) {
     if (!registryUrl) {
       return;
     }
 
-    try {
-      const accounts = await discoverAccounts(registryUrl, this.AUTH);
-      await this.PREFS.setOptions("accountId", accounts);
-    } catch (error) {
-      await this.UI.showRegistryError(failureSummary, error);
-    }
+    const accounts = await this.withRegistryError(
+      failureSummary,
+      () => discoverAccounts(registryUrl, this.AUTH),
+      options,
+    );
+    if (accounts) await this.PREFS.setOptions("accountId", accounts);
   }
 
   async loadStations(stations_url, tabName = "control") {
-    if (!this.stationRequests) {
-      // Track per-tab request ids so stale responses do not repaint the UI.
-      this.stationRequests = new Map();
-    }
     this.UI.showStationsLoading(tabName);
     const nextRequestId = (this.stationRequests.get(tabName) || 0) + 1;
     this.stationRequests.set(tabName, nextRequestId);
@@ -303,7 +325,7 @@ class RadioPad {
       await this.UI.showError({
         summary: "⚠️ Failed loading stations.",
         error,
-        tab: tabName,
+        tab: tabName === "control" ? "control" : null,
       });
     }
   }

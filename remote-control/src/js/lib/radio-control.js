@@ -36,6 +36,7 @@ export class RadioControl extends EventEmitter {
   }
 
   disconnect() {
+    const hadSocket = Boolean(this.ws);
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -45,7 +46,9 @@ export class RadioControl extends EventEmitter {
       this.ws.close();
       this.ws = null;
     }
-    this.emitEvent("disconnect");
+    if (hadSocket) {
+      this.emitEvent("disconnect");
+    }
   }
 
   play(station) {
