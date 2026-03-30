@@ -2,7 +2,9 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 ## Project shape
 
-- Ionic + Capacitor + Vanilla JS remote control UI.
+- Ionic + Capacitor + `lit-html` remote control UI.
+- `lit-html` is used declaratively for XSS-safe DOM bindings (do not use raw `.innerHTML` or `.innerText` assignments).
+- Services directly inherit native `EventTarget` (no custom emitters needed).
 - Web and native builds intentionally share most code.
 
 ## Runtime and tooling
@@ -50,4 +52,5 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - Keep platform-specific behavior explicit only where the plugin or native project metadata requires it.
 - Prefer small helpers over broad auth rewrites; the shared Google sign-in path should stay easy to reason about.
 - Preserve the grouped Settings UI structure (`ion-item-group` + `ion-item-divider`) when adjusting auth/settings presentation.
+- Preserve HTML `id` attributes on key elements (like `#auth-status`, `#auth-hint`) in lit templates, as the Playwright smoke tests rely on them for assertions.
 - Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.
