@@ -34,46 +34,52 @@ export function createSettingsActions({
   let lastPlayerId = null;
   let lastPresetId = null;
 
+  let syncPromise = null;
   async function sync(failureReason = "accounts", options = {}) {
-    try {
-      const url = await prefs.get("registryUrl");
-      if (!url) return;
+    if (syncPromise) return syncPromise;
+    syncPromise = (async () => {
+      try {
+        const url = await prefs.get("registryUrl");
+        if (!url) return;
 
-      const accounts = await discoverAccounts(url, auth, options);
-      await prefs.setOptions("accountId", accounts);
+        const accounts = await discoverAccounts(url, auth, options);
+        await prefs.setOptions("accountId", accounts);
 
-      const accountId = await prefs.get("accountId");
-      if (!accountId) return;
+        const accountId = await prefs.get("accountId");
+        if (!accountId) return;
 
-      const [players, presets] = await Promise.all([
-        discoverPlayers(accountId, prefs, auth, options),
-        discoverPresets(accountId, prefs, auth, options),
-      ]);
+        const [players, presets] = await Promise.all([
+          discoverPlayers(accountId, prefs, auth, options),
+          discoverPresets(accountId, prefs, auth, options),
+        ]);
 
-      await prefs.setOptions("playerId", players);
-      await prefs.setOptions("presetId", presets);
+        await prefs.setOptions("playerId", players);
+        await prefs.setOptions("presetId", presets);
 
-      const playerId = await prefs.get("playerId");
-      if (playerId && playerId !== lastPlayerId) {
-        const player = await discoverPlayer(playerId, prefs, auth, options);
-        if (player) {
-          lastPlayerId = playerId;
-          await onPlayerSelected(player);
+        const playerId = await prefs.get("playerId");
+        if (playerId && playerId !== lastPlayerId) {
+          const player = await discoverPlayer(playerId, prefs, auth, options);
+          if (player) {
+            lastPlayerId = playerId;
+            await onPlayerSelected(player);
+          }
         }
-      }
 
-      const presetId = await prefs.get("presetId");
-      if (presetId && presetId !== lastPresetId) {
-        lastPresetId = presetId;
-        await onPresetSelected(presetId);
+        const presetId = await prefs.get("presetId");
+        if (presetId && presetId !== lastPresetId) {
+          lastPresetId = presetId;
+          await onPresetSelected(presetId);
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          toastRegistryFailure(failureReason, error, options);
+        }
+      } finally {
+        preferencesStore.set({ definitions: prefs.getSnapshot() });
+        syncPromise = null;
       }
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        toastRegistryFailure(failureReason, error, options);
-      }
-    } finally {
-      preferencesStore.set({ definitions: prefs.getSnapshot() });
-    }
+    })();
+    return syncPromise;
   }
 
   return {

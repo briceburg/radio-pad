@@ -17,6 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
+import { html, render } from "lit-html";
+import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 
 const SETTINGS_SAVE_STATES = {
   idle: { label: "Save", color: null, disabled: false, busy: "false" },
@@ -77,47 +79,55 @@ export class SettingsView {
       {},
     );
 
-    this.settingsList.innerHTML = Object.entries(PREFERENCE_GROUPS)
-      .map(([groupKey, [label, icon]]) => {
+    const renderInput = (pref, value) => {
+      if (pref.type === "text") {
+        // Ionic Web Components are sometimes finicky when Lit binds boolean/string properties aggressively
+        // We use string interpolation here so the component mounts exactly as expected.
+        return html`<ion-input
+          id="pref-${pref.key}"
+          placeholder="${pref.placeholder || ""}"
+          value="${value}"
+        ></ion-input>`;
+      }
+      if (pref.type === "select") {
+        return html`
+          <ion-select id="pref-${pref.key}" value="${value}">
+            ${(pref.options || []).map(
+              (opt) =>
+                html`<ion-select-option value="${opt.value}"
+                  >${opt.label}</ion-select-option
+                >`,
+            )}
+          </ion-select>
+        `;
+      }
+      return "";
+    };
+
+    const template = html`
+      ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) => {
         if (!prefByGroup[groupKey]) return "";
 
-        const itemsHtml = prefByGroup[groupKey]
-          .map((pref) => {
-            const value = pref.value ?? "";
-            let inputHtml = "";
-
-            if (pref.type === "text") {
-              inputHtml = `<ion-input id="pref-${pref.key}" placeholder="${pref.placeholder || ""}" value="${value}"></ion-input>`;
-            } else if (pref.type === "select") {
-              const optionsHtml = (pref.options || [])
-                .map(
-                  (opt) =>
-                    `<ion-select-option value="${opt.value}">${opt.label}</ion-select-option>`,
-                )
-                .join("");
-              inputHtml = `<ion-select id="pref-${pref.key}" value="${value}">${optionsHtml}</ion-select>`;
-            }
-
-            return `
-          <ion-item>
-            <ion-label position="stacked">${pref.label}</ion-label>
-            ${inputHtml}
-          </ion-item>
+        return html`
+          <ion-item-group>
+            <ion-item-divider color="tertiary">
+              <ion-icon name="${icon}" slot="start"></ion-icon>
+              <ion-label>${label}</ion-label>
+            </ion-item-divider>
+            ${prefByGroup[groupKey].map(
+              (pref) => html`
+                <ion-item>
+                  <ion-label position="stacked">${pref.label}</ion-label>
+                  ${renderInput(pref, pref.value ?? "")}
+                </ion-item>
+              `,
+            )}
+          </ion-item-group>
         `;
-          })
-          .join("");
+      })}
+    `;
 
-        return `
-        <ion-item-group>
-          <ion-item-divider color="tertiary">
-            <ion-icon name="${icon}" slot="start"></ion-icon>
-            <ion-label>${label}</ion-label>
-          </ion-item-divider>
-          ${itemsHtml}
-        </ion-item-group>
-      `;
-      })
-      .join("");
+    render(template, this.settingsList);
   }
 
   setSaveState(state = "idle") {
@@ -127,7 +137,7 @@ export class SettingsView {
     this.saveState = state;
 
     Object.assign(this.saveButton, {
-      innerText: nextState.label,
+      textContent: nextState.label,
       disabled: nextState.disabled,
     });
     this.saveButton.setAttribute("aria-busy", nextState.busy);

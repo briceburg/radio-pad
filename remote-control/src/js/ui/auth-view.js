@@ -1,21 +1,15 @@
-/*
-This file is part of the radio-pad project.
-https://github.com/briceburg/radio-pad
-*/
-
 const AUTH_DISABLED_HINTS = {
   init_failed:
     "Sign-in could not be initialized. Check the Google client configuration and try reloading.",
   not_configured: "This build does not have account sign-in configured.",
 };
 
+import { html, render } from "lit-html";
+
 export class AuthView {
   constructor(
     invokeAction,
-    {
-      copyTokenAvailable = false,
-      rootSelector = 'ion-tab[tab="settings"]',
-    } = {},
+    { copyTokenAvailable = false, rootSelector = "#auth-container" } = {},
   ) {
     this.invokeAction = invokeAction;
     this.copyTokenAvailable = copyTokenAvailable;
@@ -27,57 +21,80 @@ export class AuthView {
       typeof this.rootSelector === "string"
         ? document.querySelector(this.rootSelector)
         : this.rootSelector;
-    this.status = this.root.querySelector("#auth-status");
-    this.hint = this.root.querySelector("#auth-hint");
-    this.identity = this.root.querySelector("#auth-identity");
-    this.actionsItem = this.root.querySelector("#auth-actions-item");
-    this.actions = this.root.querySelector("#auth-actions");
 
-    this.actions.addEventListener("click", (e) => {
-      const btn = e.target.closest("ion-button");
-      if (btn?.dataset.action) this.invokeAction(btn.dataset.action);
-    });
+    // Initial empty state
+    this.updateState({ enabled: false });
   }
 
   updateState(state) {
-    if (!this.status) return;
+    if (!this.root) return;
 
-    this.status.innerText = state.enabled
+    const statusText = state.enabled
       ? state.signedIn
         ? "Signed in"
         : "Signed out"
       : "Sign-in unavailable";
-    this.hint.innerText = state.enabled
+
+    const hintText = state.enabled
       ? state.signedIn
         ? "Your sign-in updates the Account and Player choices below."
         : "Sign in to load the accounts and players you can manage."
       : AUTH_DISABLED_HINTS[state.reason] ||
         "Sign-in is currently unavailable.";
 
-    this.identity.innerText =
+    const identityText =
       state.enabled && state.signedIn
         ? [state.name, state.email, state.subject].filter(Boolean).join(" · ")
         : "";
 
-    this._renderControls(state);
-  }
+    const renderControls = () => {
+      if (!state.enabled) return "";
 
-  _renderControls(state) {
-    if (!(this.actions && this.actionsItem)) return;
-
-    let html = "";
-    if (state?.enabled) {
       if (!state.signedIn) {
-        html += `<ion-button expand="block" data-action="onSignIn">Sign in with Google</ion-button>`;
-      } else {
-        html += `<ion-button expand="block" fill="outline" data-action="onSignOut">Sign out</ion-button>`;
-        if (this.copyTokenAvailable) {
-          html += `<ion-button expand="block" fill="outline" data-action="onCopyToken">Copy API test token</ion-button>`;
-        }
+        return html`<ion-button
+          expand="block"
+          @click=${() => this.invokeAction("onSignIn")}
+          >Sign in with Google</ion-button
+        >`;
       }
-    }
 
-    this.actionsItem.hidden = !html;
-    this.actions.innerHTML = html;
+      return html`
+        <ion-button
+          expand="block"
+          fill="outline"
+          @click=${() => this.invokeAction("onSignOut")}
+          >Sign out</ion-button
+        >
+        ${this.copyTokenAvailable
+          ? html`<ion-button
+              expand="block"
+              fill="outline"
+              @click=${() => this.invokeAction("onCopyToken")}
+              >Copy API test token</ion-button
+            >`
+          : ""}
+      `;
+    };
+
+    const template = html`
+      <ion-item-divider color="tertiary">
+        <ion-icon name="person-circle" slot="start"></ion-icon>
+        <ion-label>Account Sign-In</ion-label>
+      </ion-item-divider>
+      <ion-item lines="none">
+        <ion-label>
+          <h3>${statusText}</h3>
+          <p>${hintText}</p>
+          ${identityText
+            ? html`<p class="auth-identity">${identityText}</p>`
+            : ""}
+        </ion-label>
+      </ion-item>
+      <ion-item lines="none" ?hidden=${!state.enabled}>
+        <div class="auth-actions" style="width: 100%;">${renderControls()}</div>
+      </ion-item>
+    `;
+
+    render(template, this.root);
   }
 }
