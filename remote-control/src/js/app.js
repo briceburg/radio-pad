@@ -93,7 +93,13 @@ async function bootstrap() {
   }
 
   // Single initializer handles offline store boot, auth state, and network fallback
-  await settingsActions.initialize();
+  const wasOauthCallback = await settingsActions.initialize();
+  if (wasOauthCallback) {
+    const settingsTab = document.querySelector(
+      'ion-tab-button[tab="settings"]',
+    );
+    if (settingsTab) setTimeout(() => settingsTab.click(), 100);
+  }
 }
 
 void bootstrap().catch((error) => {

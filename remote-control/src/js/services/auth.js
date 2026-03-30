@@ -22,126 +22,24 @@ import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
 
 const AUTH_STORAGE_KEY = "radio-pad.google-sign-in.user";
-const CALLBACK_QUERY_KEYS = [
-  "code",
-  "state",
-  "scope",
-  "authuser",
-  "prompt",
-  "error",
-  "error_description",
-  "hd",
-];
-
-function getString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function hasAuthCallbackParams(currentUrl) {
-  const url = new URL(currentUrl);
-  return ["code", "state", "error"].some((key) => url.searchParams.has(key));
-}
-
-function buildCallbackCleanupUrl(currentUrl) {
-  const url = new URL(currentUrl);
-  for (const key of CALLBACK_QUERY_KEYS) {
-    url.searchParams.delete(key);
-  }
-  return `${url.pathname}${url.search}${url.hash}`;
-}
-
-function normalizeUser(profile) {
-  if (!profile || typeof profile !== "object") {
-    return null;
-  }
-
-  const idToken = getString(profile.idToken);
-  const subject = getString(profile.userId) || getString(profile.subject);
-  const email = getString(profile.email);
-  const name =
-    getString(profile.displayName) ||
-    getString(profile.name) ||
-    email ||
-    subject;
-
-  if (!idToken) {
-    return null;
-  }
-
-  return {
-    idToken,
-    subject,
-    email,
-    name,
-  };
-}
-
-function isWebPlatform() {
-  return Capacitor.getPlatform() === "web";
-}
 
 export class RadioPadAuth extends EventTarget {
   constructor() {
     super();
-    this.config = this._buildConfig();
-    this.isWeb = isWebPlatform();
+    this.isWeb = Capacitor.getPlatform() === "web";
     this.user = null;
     this.initialized = false;
     this.initError = null;
-  }
 
-  _buildConfig() {
-    const currentPath = `${window.location.origin}${window.location.pathname}`;
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || null;
-
-    if (!clientId) {
-      return null;
-    }
-
-    return {
-      clientId,
-      redirectUrl:
-        import.meta.env.VITE_GOOGLE_REDIRECT_URL?.trim() || currentPath,
-    };
-  }
-
-  async _storeUser(user) {
-    await Preferences.set({
-      key: AUTH_STORAGE_KEY,
-      value: JSON.stringify(user),
-    });
-  }
-
-  async _restoreStoredUser() {
-    const { value } = await Preferences.get({ key: AUTH_STORAGE_KEY });
-    if (!value) {
-      return null;
-    }
-
-    try {
-      const user = normalizeUser(JSON.parse(value));
-      if (!user) {
-        await this._clearStoredUser();
-        return null;
-      }
-      return user;
-    } catch (error) {
-      console.warn("Failed restoring Google sign-in state", error);
-      await this._clearStoredUser();
-      return null;
-    }
-  }
-
-  async _clearStoredUser() {
-    await Preferences.remove({ key: AUTH_STORAGE_KEY });
-  }
-
-  async _applySignInResult(result) {
-    this.user = normalizeUser(result);
-    if (!this.user) {
-      throw new Error("Google sign-in did not return a valid user.");
-    }
-    await this._storeUser(this.user);
+    this.config = clientId
+      ? {
+          clientId,
+          redirectUrl:
+            import.meta.env.VITE_GOOGLE_REDIRECT_URL?.trim() ||
+            `${window.location.origin}${window.location.pathname}`,
+        }
+      : null;
   }
 
   get enabled() {
@@ -155,20 +53,28 @@ export class RadioPadAuth extends EventTarget {
   }
 
   _getReason() {
-    if (!this.config?.clientId) {
-      return "not_configured";
-    }
-    if (this.initError) {
-      return "init_failed";
-    }
+    if (!this.config?.clientId) return "not_configured";
+    if (this.initError) return "init_failed";
     return null;
   }
 
+  async _storeUser(profile) {
+    if (!profile) return;
+    this.user = {
+      idToken: profile.idToken,
+      subject: profile.userId || profile.subject,
+      email: profile.email || null,
+      name:
+        profile.displayName || profile.name || profile.email || profile.userId,
+    };
+    await Preferences.set({
+      key: AUTH_STORAGE_KEY,
+      value: JSON.stringify(this.user),
+    });
+  }
+
   async init(currentUrl = window.location.href) {
-    if (!this.config?.clientId) {
-      await this.emitAuthState();
-      return;
-    }
+    if (!this.config?.clientId) return this.emitAuthState();
 
     try {
       await GoogleSignIn.initialize({
@@ -176,7 +82,6 @@ export class RadioPadAuth extends EventTarget {
         redirectUrl: this.isWeb ? this.config.redirectUrl : undefined,
       });
       this.initialized = true;
-      this.initError = null;
     } catch (error) {
       this.initError = error;
       this.dispatchEvent(
@@ -184,33 +89,33 @@ export class RadioPadAuth extends EventTarget {
           detail: { summary: "⚠️ Sign-in unavailable.", error },
         }),
       );
-      await this.emitAuthState();
-      return;
+      return this.emitAuthState();
     }
 
-    if (this.isWeb && hasAuthCallbackParams(currentUrl)) {
+    const isOauthCallback =
+      this.isWeb &&
+      currentUrl.includes("state=") &&
+      (currentUrl.includes("id_token=") || currentUrl.includes("error="));
+
+    if (isOauthCallback) {
       try {
-        await this._applySignInResult(
-          await GoogleSignIn.handleRedirectCallback(),
-        );
+        await this._storeUser(await GoogleSignIn.handleRedirectCallback());
       } catch (error) {
         this.dispatchEvent(
           new CustomEvent("error", {
             detail: { summary: "⚠️ Sign-in failed.", error },
           }),
         );
-      } finally {
-        window.history.replaceState(
-          {},
-          document.title,
-          buildCallbackCleanupUrl(currentUrl),
-        );
       }
-    } else {
-      this.user = await this._restoreStoredUser();
+    }
+
+    if (!this.user) {
+      const { value } = await Preferences.get({ key: AUTH_STORAGE_KEY });
+      this.user = value ? JSON.parse(value) : null;
     }
 
     await this.emitAuthState();
+    return isOauthCallback;
   }
 
   async signIn() {
@@ -219,27 +124,20 @@ export class RadioPadAuth extends EventTarget {
         "Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID.",
       );
     }
+    if (this.initError) throw this.initError;
 
-    if (this.initError) {
-      throw this.initError;
+    const result = await GoogleSignIn.signIn();
+    // On web, signIn redirects so this won't execute. On native, it returns the result.
+    if (result) {
+      await this._storeUser(result);
+      await this.emitAuthState();
     }
-
-    if (this.isWeb) {
-      await GoogleSignIn.signIn();
-      return;
-    }
-
-    await this._applySignInResult(await GoogleSignIn.signIn());
-    await this.emitAuthState();
   }
 
   async signOut() {
-    if (this.initialized) {
-      await GoogleSignIn.signOut();
-    }
-
-    await this._clearStoredUser();
     this.user = null;
+    await Preferences.remove({ key: AUTH_STORAGE_KEY });
+    if (this.initialized) await GoogleSignIn.signOut();
     await this.emitAuthState();
   }
 
@@ -248,15 +146,13 @@ export class RadioPadAuth extends EventTarget {
   }
 
   getState() {
-    const user = this.user;
-
     return {
       enabled: this.enabled,
       reason: this._getReason(),
-      signedIn: Boolean(user),
-      name: user?.name || null,
-      email: user?.email || null,
-      subject: user?.subject || null,
+      signedIn: this.signedIn,
+      name: this.user?.name || null,
+      email: this.user?.email || null,
+      subject: this.user?.subject || null,
       registryBearerToken: this.getRegistryBearerToken(),
     };
   }

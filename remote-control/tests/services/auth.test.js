@@ -59,7 +59,7 @@ describe("RadioPadAuth", () => {
     const errorSpy = vi.fn();
     auth.addEventListener('error', errorSpy);
     
-    await auth.init("http://localhost/?state=xyz&code=abc");
+    await auth.init("http://localhost/#state=xyz&id_token=abc");
     
     expect(errorSpy).toHaveBeenCalled();
   });

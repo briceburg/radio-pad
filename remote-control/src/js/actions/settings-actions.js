@@ -87,10 +87,11 @@ export function createSettingsActions({
       await prefs.init();
       preferencesStore.set({ definitions: prefs.getSnapshot() });
 
-      await auth.init();
+      const isOauthCallback = await auth.init();
       if (!auth.signedIn) {
         await sync();
       }
+      return isOauthCallback;
     },
 
     sync: () => sync(),
