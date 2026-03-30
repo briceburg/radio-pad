@@ -128,26 +128,21 @@ export class RadioPadUI extends EventEmitter {
     this.getTab(tabName)?.setInfo?.(message);
   }
 
-  async showError({
-    summary,
-    error = null,
-    tab = null,
-    toastColor = "warning",
-  }) {
+  async showError({ summary, error = null, toastColor = "warning" }) {
     const detailText = this._formatError(error);
     const message = detailText ? `${summary} ${detailText}`.trim() : summary;
-    if (tab) {
-      this.setTabInfo(message, tab);
-    }
     await this.toastError(message, { color: toastColor });
   }
 
-  async showRegistryError(summary, error, options = {}) {
+  async showDangerError(summary, error = null) {
+    await this.showError({ summary, error, toastColor: "danger" });
+  }
+
+  async showRegistryError(summary, error) {
     const registryDetail = RegistryRequestError.format(error);
     await this.showError({
       summary,
       error: { message: registryDetail },
-      ...options,
     });
   }
 

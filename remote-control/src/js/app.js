@@ -103,12 +103,10 @@ class RadioPad {
     this.UI.registerEvent("settings-save", (settingsMap) =>
       this.saveSettings(settingsMap),
     );
-    this.registerUiDangerAction(
-      "auth-sign-in",
-      "⚠️ Failed starting sign-in.",
-      () => this.AUTH.signIn(),
+    this.registerUiAction("auth-sign-in", "⚠️ Failed starting sign-in.", () =>
+      this.AUTH.signIn(),
     );
-    this.registerUiDangerAction(
+    this.registerUiAction(
       "auth-sign-out",
       "⚠️ Failed signing out.",
       async () => {
@@ -116,7 +114,7 @@ class RadioPad {
         await this.UI.toastSuccess("Signed out.");
       },
     );
-    this.registerUiDangerAction(
+    this.registerUiAction(
       "auth-copy-token",
       "⚠️ Failed copying API test token.",
       async () => {
@@ -137,24 +135,16 @@ class RadioPad {
       );
     });
     this.AUTH.registerEvent("error", ({ summary, error }) =>
-      this.showDangerError(summary, error),
+      this.UI.showDangerError(summary, error),
     );
   }
 
-  async showDangerError(summary, error) {
-    await this.UI.showError({
-      summary,
-      error,
-      toastColor: "danger",
-    });
-  }
-
-  registerUiDangerAction(event, summary, action) {
+  registerUiAction(event, summary, action) {
     this.UI.registerEvent(event, async () => {
       try {
         await action();
       } catch (error) {
-        await this.showDangerError(summary, error);
+        await this.UI.showDangerError(summary, error);
       }
     });
   }
@@ -172,7 +162,7 @@ class RadioPad {
       });
     }
     this.CONTROL.registerEvent("error", (message) => {
-      this.UI.setTabInfo(`⚠️ Error: ${message}`);
+      this.UI.showError({ summary: `⚠️ ${message}` });
     });
     this.CONTROL.registerEvent("station-playing", (value) => {
       this.STATE.set("current_station", value);
@@ -242,7 +232,7 @@ class RadioPad {
       }
     } catch (error) {
       this.UI.setSettingsSaveState("error");
-      await this.showDangerError("⚠️ Failed saving settings.", error);
+      await this.UI.showDangerError("⚠️ Failed saving settings.", error);
       return;
     } finally {
       this.isSavingSettings = false;
@@ -251,27 +241,16 @@ class RadioPad {
     this.UI.setSettingsSaveState("saved");
   }
 
-  async reportRegistryError(
-    summary,
-    error,
-    { fromSettingsSave = false, ...options } = {},
-  ) {
-    if (fromSettingsSave) {
-      await this.UI.showRegistryError(
-        `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`,
-        error,
-        options,
-      );
-      return;
-    }
-    await this.UI.showRegistryError(summary, error, options);
-  }
-
-  async withRegistryError(summary, task, options = {}) {
+  async withRegistryError(summary, task, { fromSettingsSave = false } = {}) {
     try {
       return await task();
     } catch (error) {
-      await this.reportRegistryError(summary, error, options);
+      await this.UI.showRegistryError(
+        fromSettingsSave
+          ? `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`
+          : summary,
+        error,
+      );
       return null;
     }
   }
@@ -325,7 +304,6 @@ class RadioPad {
       await this.UI.showError({
         summary: "⚠️ Failed loading stations.",
         error,
-        tab: tabName === "control" ? "control" : null,
       });
     }
   }
