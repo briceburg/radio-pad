@@ -19,6 +19,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { Preferences } from "@capacitor/preferences";
 import { EventEmitter } from "./interfaces.js";
 
+export const PREFERENCE_GROUPS = {
+  default: ["Primary Settings", "settings"],
+  "radio-control": ["Control Settings", "radio"],
+  "radio-listen": ["Listen Settings", "headset"],
+};
+
 export class RadioPadPreferences extends EventEmitter {
   constructor(
     prefs = {
@@ -41,13 +47,11 @@ export class RadioPadPreferences extends EventEmitter {
             return false;
           }
         },
-        group: "default",
       },
       accountId: {
         type: "select",
         label: "Account",
         options: [],
-        group: "default",
       },
       playerId: {
         type: "select",
