@@ -16,21 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { createSafeInvoker } from "../utils/callbacks.js";
-
-export class RadioControl {
+export class RadioControl extends EventTarget {
   constructor() {
+    super();
     this.ws = null;
     this.reconnectTimer = null;
     this.reconnectDelay = 1000;
     this._lastUrl = null;
-    this.onConnect = null;
-    this.onConnecting = null;
-    this.onDisconnect = null;
-    this.onError = null;
-    this.onStationPlaying = null;
-    this.onStationsUrl = null;
-    this._callbacks = createSafeInvoker("RadioControl callback");
   }
 
   async connect(url = null) {
@@ -53,7 +45,7 @@ export class RadioControl {
       this.ws = null;
     }
     if (hadSocket) {
-      this._callbacks.invoke(this.onDisconnect);
+      this.dispatchEvent(new Event("disconnect"));
     }
   }
 
@@ -65,9 +57,10 @@ export class RadioControl {
       return;
     }
 
-    this._callbacks.invoke(
-      this.onError,
-      "WebSocket not connected. Cannot send station request.",
+    this.dispatchEvent(
+      new CustomEvent("error", {
+        detail: "WebSocket not connected. Cannot send station request.",
+      }),
     );
   }
 
@@ -80,7 +73,7 @@ export class RadioControl {
       return;
     }
 
-    this._callbacks.invoke(this.onConnecting, url);
+    this.dispatchEvent(new CustomEvent("connecting", { detail: url }));
     this.ws = new WebSocket(url);
 
     const connectTimeout = setTimeout(() => {
@@ -95,18 +88,20 @@ export class RadioControl {
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
       }
-      this._callbacks.invoke(this.onConnect, url);
+      this.dispatchEvent(new CustomEvent("connect", { detail: url }));
     };
 
     this.ws.onclose = () => {
       clearTimeout(connectTimeout);
-      this._callbacks.invoke(this.onDisconnect);
+      this.dispatchEvent(new Event("disconnect"));
       this._scheduleReconnect();
     };
 
     this.ws.onerror = () => {
       clearTimeout(connectTimeout);
-      this._callbacks.invoke(this.onError, "WebSocket error.");
+      this.dispatchEvent(
+        new CustomEvent("error", { detail: "WebSocket error." }),
+      );
     };
 
     this.ws.onmessage = (msg) => {
@@ -114,16 +109,21 @@ export class RadioControl {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
           case "station_playing":
-            this._callbacks.invoke(this.onStationPlaying, data);
+            this.dispatchEvent(
+              new CustomEvent("stationplaying", { detail: data }),
+            );
             break;
           case "stations_url":
-            this._callbacks.invoke(this.onStationsUrl, data);
+            this.dispatchEvent(
+              new CustomEvent("stationsurl", { detail: data }),
+            );
             break;
         }
       } catch {
-        this._callbacks.invoke(
-          this.onError,
-          "Error parsing WebSocket message.",
+        this.dispatchEvent(
+          new CustomEvent("error", {
+            detail: "Error parsing WebSocket message.",
+          }),
         );
       }
     };

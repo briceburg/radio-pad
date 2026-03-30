@@ -82,18 +82,26 @@ export function createControlActions({ control, listen }) {
     }
   }
 
-  control.onConnect = () =>
+  control.addEventListener("connect", () =>
     updateTab("control", {
       statusText: `✅ Connected to ${controlStore.get().player.name}`,
-    });
-  control.onConnecting = () =>
-    updateTab("control", { statusText: "🔄 Connecting..." });
-  control.onDisconnect = () =>
-    updateTab("control", { statusText: "🔌 Disconnected. Reconnecting..." });
-  control.onError = (message) => toastWarning(`⚠️ ${message}`);
-  control.onStationPlaying = (stationName) =>
-    updateTab("control", { currentStation: stationName });
-  control.onStationsUrl = (url) => loadStations(url, "control");
+    }),
+  );
+  control.addEventListener("connecting", () =>
+    updateTab("control", { statusText: "🔄 Connecting..." }),
+  );
+  control.addEventListener("disconnect", () =>
+    updateTab("control", { statusText: "🔌 Disconnected. Reconnecting..." }),
+  );
+  control.addEventListener("error", (event) =>
+    toastWarning(`⚠️ ${event.detail}`),
+  );
+  control.addEventListener("stationplaying", (event) =>
+    updateTab("control", { currentStation: event.detail }),
+  );
+  control.addEventListener("stationsurl", (event) =>
+    loadStations(event.detail, "control"),
+  );
 
   return {
     async selectPlayer(player) {

@@ -20,7 +20,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
-import { createSafeInvoker } from "../utils/callbacks.js";
 
 const AUTH_STORAGE_KEY = "radio-pad.google-sign-in.user";
 const CALLBACK_QUERY_KEYS = [
@@ -81,16 +80,14 @@ function isWebPlatform() {
   return Capacitor.getPlatform() === "web";
 }
 
-export class RadioPadAuth {
+export class RadioPadAuth extends EventTarget {
   constructor() {
+    super();
     this.config = this._buildConfig();
     this.isWeb = isWebPlatform();
     this.user = null;
     this.initialized = false;
     this.initError = null;
-    this.onStateChange = null;
-    this.onError = null;
-    this._callbacks = createSafeInvoker("RadioPadAuth callback");
   }
 
   _buildConfig() {
@@ -182,10 +179,11 @@ export class RadioPadAuth {
       this.initError = null;
     } catch (error) {
       this.initError = error;
-      await this._callbacks.wait(this.onError, {
-        summary: "⚠️ Sign-in unavailable.",
-        error,
-      });
+      this.dispatchEvent(
+        new CustomEvent("error", {
+          detail: { summary: "⚠️ Sign-in unavailable.", error },
+        }),
+      );
       await this.emitAuthState();
       return;
     }
@@ -196,10 +194,11 @@ export class RadioPadAuth {
           await GoogleSignIn.handleRedirectCallback(),
         );
       } catch (error) {
-        await this._callbacks.wait(this.onError, {
-          summary: "⚠️ Sign-in failed.",
-          error,
-        });
+        this.dispatchEvent(
+          new CustomEvent("error", {
+            detail: { summary: "⚠️ Sign-in failed.", error },
+          }),
+        );
       } finally {
         window.history.replaceState(
           {},
@@ -263,6 +262,8 @@ export class RadioPadAuth {
   }
 
   async emitAuthState() {
-    await this._callbacks.wait(this.onStateChange, this.getState());
+    this.dispatchEvent(
+      new CustomEvent("statechange", { detail: this.getState() }),
+    );
   }
 }

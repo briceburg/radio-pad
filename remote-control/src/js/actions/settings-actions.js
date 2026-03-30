@@ -77,10 +77,7 @@ export function createSettingsActions({
   }
 
   return {
-    async initialize() {
-      await prefs.init();
-      await sync();
-    },
+    sync: () => sync(),
 
     async save(settingsMap) {
       settingsUiStore.set({ saveState: "saving" });

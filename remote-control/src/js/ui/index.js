@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { invokeSafely } from "../utils/callbacks.js";
 import { formatErrorMessage, RegistryRequestError } from "../utils/errors.js";
 import { AuthView } from "./auth-view.js";
 import { PlayerTabsView } from "./player-tabs-view.js";
@@ -55,11 +54,12 @@ export class RadioPadUI {
   }
 
   invokeAction(actionName, ...args) {
-    invokeSafely(
-      this.actions[actionName],
-      `UI action "${actionName}"`,
-      ...args,
-    );
+    const handler = this.actions[actionName];
+    if (handler) {
+      void Promise.resolve(handler(...args)).catch((error) => {
+        console.error(`UI action "${actionName}" failed`, error);
+      });
+    }
   }
 
   init(actions = this.actions) {

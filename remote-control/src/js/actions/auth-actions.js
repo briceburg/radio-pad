@@ -20,19 +20,18 @@ import { authStore, patchStore } from "../store.js";
 import { toastDanger, toastSuccess, toastWarning } from "../notifications.js";
 
 export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
-  auth.onStateChange = async (state) => {
-    patchStore(authStore, state);
+  auth.addEventListener("statechange", async (event) => {
+    patchStore(authStore, event.detail);
     await refreshAccountsForCurrentRegistry("auth_accounts");
-  };
-  auth.onError = async ({ summary, error }) => {
+  });
+  auth.addEventListener("error", async (event) => {
+    const { summary, error } = event.detail;
     toastDanger(summary, error);
-  };
+  });
+
+  patchStore(authStore, auth.getState());
 
   return {
-    async initialize() {
-      await auth.init();
-    },
-
     async signIn() {
       try {
         await auth.signIn();

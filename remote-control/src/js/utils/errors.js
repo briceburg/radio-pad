@@ -29,7 +29,11 @@ export function sanitizeUrl(targetUrl) {
 
 export function formatErrorMessage(error, fallback = "") {
   if (typeof error?.message === "string") {
-    return error.message.trim();
+    const msg = error.message.trim();
+    if (msg.includes("NetworkError") || msg.includes("Failed to fetch")) {
+      return "Unable to connect. Please verify your Registry URL in Settings.";
+    }
+    return msg;
   }
   return fallback;
 }
