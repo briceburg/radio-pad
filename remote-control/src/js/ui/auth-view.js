@@ -10,14 +10,23 @@ const AUTH_DISABLED_HINTS = {
 };
 
 export class AuthView {
-  constructor(invokeAction, { copyTokenAvailable = false, rootSelector = 'ion-tab[tab="settings"]' } = {}) {
+  constructor(
+    invokeAction,
+    {
+      copyTokenAvailable = false,
+      rootSelector = 'ion-tab[tab="settings"]',
+    } = {},
+  ) {
     this.invokeAction = invokeAction;
     this.copyTokenAvailable = copyTokenAvailable;
     this.rootSelector = rootSelector;
   }
 
   init() {
-    this.root = typeof this.rootSelector === 'string' ? document.querySelector(this.rootSelector) : this.rootSelector;
+    this.root =
+      typeof this.rootSelector === "string"
+        ? document.querySelector(this.rootSelector)
+        : this.rootSelector;
     this.status = this.root.querySelector("#auth-status");
     this.hint = this.root.querySelector("#auth-hint");
     this.identity = this.root.querySelector("#auth-identity");

@@ -38,7 +38,10 @@ export class SettingsView {
   }
 
   init() {
-    this.root = typeof this.rootSelector === 'string' ? document.querySelector(this.rootSelector) : this.rootSelector;
+    this.root =
+      typeof this.rootSelector === "string"
+        ? document.querySelector(this.rootSelector)
+        : this.rootSelector;
     this.saveButton = this.root.querySelector("#settings-save-button");
     this.settingsList = this.root.querySelector("#settings-list");
 

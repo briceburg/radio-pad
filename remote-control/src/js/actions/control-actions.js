@@ -16,28 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { Capacitor } from "@capacitor/core";
 import { controlStore, listenStore, patchStore } from "../store.js";
 import { toastWarning } from "../notifications.js";
-
-function resolvePlayerSwitchboardUrl(url) {
-  const override = import.meta.env.VITE_SWITCHBOARD_URL?.trim();
-  if (!(override && url) || Capacitor.isNativePlatform()) {
-    return url;
-  }
-
-  try {
-    const target = new URL(url);
-    const local = new URL(override);
-    local.pathname = `${local.pathname.replace(/\/$/, "")}${target.pathname}`;
-    local.search = target.search;
-    local.hash = target.hash;
-    return local.toString();
-  } catch (error) {
-    console.warn("Invalid VITE_SWITCHBOARD_URL override.", error);
-    return url;
-  }
-}
 
 export function createControlActions({ control, listen }) {
   const getTabStore = (tabName) =>
@@ -106,9 +86,7 @@ export function createControlActions({ control, listen }) {
   return {
     async selectPlayer(player) {
       updateTab("control", { player, currentStation: null, loading: true });
-      await control.connect(
-        resolvePlayerSwitchboardUrl(player.switchboard_url),
-      );
+      await control.connect(player.switchboard_url);
     },
 
     async selectPreset(presetId) {

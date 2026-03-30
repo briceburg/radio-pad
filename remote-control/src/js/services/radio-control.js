@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { Capacitor } from "@capacitor/core";
+
+function resolvePlayerSwitchboardUrl(url) {
+  const override = import.meta.env.VITE_SWITCHBOARD_URL?.trim();
+  if (!(override && url) || Capacitor.isNativePlatform()) {
+    return url;
+  }
+
+  try {
+    const target = new URL(url);
+    const local = new URL(override);
+    local.pathname = `${local.pathname.replace(/\/$/, "")}${target.pathname}`;
+    local.search = target.search;
+    local.hash = target.hash;
+    return local.toString();
+  } catch (error) {
+    console.warn("Invalid VITE_SWITCHBOARD_URL override.", error);
+    return url;
+  }
+}
+
 export class RadioControl extends EventTarget {
   constructor() {
     super();
@@ -27,7 +48,7 @@ export class RadioControl extends EventTarget {
 
   async connect(url = null) {
     if (url) {
-      this._lastUrl = url;
+      this._lastUrl = resolvePlayerSwitchboardUrl(url);
     }
     this.disconnect();
     this._connectWebSocket(this._lastUrl);
