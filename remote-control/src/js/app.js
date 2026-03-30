@@ -20,15 +20,15 @@ import "@ionic/core/css/ionic.bundle.css";
 import { Capacitor } from "@capacitor/core";
 import { defineCustomElements } from "@ionic/core/loader/index.js";
 import { addIcons } from "ionicons";
-import * as appIcons from "./lib/ui/icons.js";
-import { createAuthActions } from "./lib/actions/auth-actions.js";
-import { createControlActions } from "./lib/actions/control-actions.js";
-import { createSettingsActions } from "./lib/actions/settings-actions.js";
-import { toastDanger } from "./lib/notifications.js";
-import { RadioPadAuth } from "./lib/services/auth.js";
-import { RadioListen } from "./lib/services/radio-listen.js";
-import { RadioControl } from "./lib/services/radio-control.js";
-import { RadioPadPreferences } from "./lib/services/preferences.js";
+import * as appIcons from "./ui/icons.js";
+import { createAuthActions } from "./actions/auth-actions.js";
+import { createControlActions } from "./actions/control-actions.js";
+import { createSettingsActions } from "./actions/settings-actions.js";
+import { toastDanger } from "./notifications.js";
+import { RadioPadAuth } from "./services/auth.js";
+import { RadioListen } from "./services/radio-listen.js";
+import { RadioControl } from "./services/radio-control.js";
+import { RadioPadPreferences } from "./services/preferences.js";
 import {
   authStore,
   controlStore,
@@ -36,8 +36,8 @@ import {
   preferencesStore,
   settingsUiStore,
   toastStore,
-} from "./lib/state-store/app-store.js";
-import { RadioPadUI } from "./lib/ui/radio-pad-ui.js";
+} from "./store.js";
+import { RadioPadUI } from "./ui/index.js";
 
 addIcons(appIcons);
 defineCustomElements(window);

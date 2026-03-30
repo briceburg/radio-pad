@@ -17,9 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 function setText(node, text = "") {
-  if (node) {
-    node.innerText = text;
-  }
+  if (node) node.innerText = text;
 }
 
 export class PlayerTabsView {
@@ -37,13 +35,10 @@ export class PlayerTabsView {
   }
 
   renderTabState(tabName, state) {
-    if (tabName === "control") {
-      this.setTabInfo(state.statusText || "", tabName);
-    }
+    if (tabName === "control") this.setTabInfo(state.statusText || "", tabName);
 
     if (state.loading || !state.stationsData) {
-      this.showStationsLoading(tabName);
-      return;
+      return this.showStationsLoading(tabName);
     }
 
     this.renderStations(state.stationsData, tabName);
@@ -54,27 +49,30 @@ export class PlayerTabsView {
     const tab = this.tabs[tabName];
     if (!tab) return;
 
-    tab.stationButtons = {};
-    tab.stationGrid.innerHTML = "";
-
-    let ionRow;
+    let html = "";
     stationsData.stations.forEach((station, index) => {
-      if (index % 3 === 0) {
-        ionRow = document.createElement("ion-row");
-        tab.stationGrid.appendChild(ionRow);
+      if (index % 3 === 0) html += `<ion-row>`;
+      html += `
+        <ion-col>
+          <ion-button expand="block" data-station="${station.name}">
+            ${station.name}
+          </ion-button>
+        </ion-col>
+      `;
+      if (index % 3 === 2 || index === stationsData.stations.length - 1) {
+        html += `</ion-row>`;
       }
-      const ionCol = document.createElement("ion-col");
-      const ionButton = document.createElement("ion-button");
-      ionButton.innerText = station.name;
-      ionButton.expand = "block";
-      ionButton.addEventListener("click", () => {
-        ionButton.setAttribute("color", "light");
-        this.invokeAction("onClickStation", tabName, station.name);
-      });
-      tab.stationButtons[station.name] = ionButton;
-      ionCol.appendChild(ionButton);
-      ionRow.appendChild(ionCol);
     });
+
+    tab.stationGrid.innerHTML = html;
+
+    // Store button references for fast highlighting
+    tab.stationButtons = Object.fromEntries(
+      [...tab.stationGrid.querySelectorAll("ion-button")].map((btn) => [
+        btn.dataset.station,
+        btn,
+      ]),
+    );
 
     setText(tab.stationsName, stationsData.name);
   }
@@ -84,19 +82,21 @@ export class PlayerTabsView {
     if (!tab) return;
 
     tab.stationButtons = {};
-    tab.stationGrid.innerHTML = "";
-    for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
-      const ionRow = document.createElement("ion-row");
-      ionRow.className = "station-placeholder";
-      for (let colIndex = 0; colIndex < cols; colIndex += 1) {
-        const ionCol = document.createElement("ion-col");
-        const skeleton = document.createElement("ion-skeleton-text");
-        skeleton.setAttribute("animated", "");
-        ionCol.appendChild(skeleton);
-        ionRow.appendChild(ionCol);
-      }
-      tab.stationGrid.appendChild(ionRow);
-    }
+    tab.stationGrid.innerHTML = Array.from({ length: rows })
+      .map(
+        () => `
+        <ion-row class="station-placeholder">
+          ${Array.from({ length: cols })
+            .map(
+              () => `
+            <ion-col><ion-skeleton-text animated></ion-skeleton-text></ion-col>
+          `,
+            )
+            .join("")}
+        </ion-row>
+      `,
+      )
+      .join("");
 
     this._setNowPlaying(tab, null);
   }
@@ -105,12 +105,12 @@ export class PlayerTabsView {
     const tab = this.tabs[tabName];
     if (!tab) return;
 
-    Object.entries(tab.stationButtons).forEach(([name, button]) => {
+    for (const [name, button] of Object.entries(tab.stationButtons)) {
       button.setAttribute(
         "color",
         name === currentStation ? "success" : "primary",
       );
-    });
+    }
     this._setNowPlaying(tab, currentStation);
   }
 
@@ -119,8 +119,7 @@ export class PlayerTabsView {
     const template = document.getElementById("tab-player");
     if (!template || !tabEl) return;
 
-    const clone = template.content.cloneNode(true);
-    tabEl.appendChild(clone);
+    tabEl.appendChild(template.content.cloneNode(true));
 
     const tab = {
       stationsName: tabEl.querySelector(".stations-name"),
@@ -131,22 +130,25 @@ export class PlayerTabsView {
       stationButtons: {},
     };
 
-    this.tabs[tabName] = tab;
-
-    this.showStationsLoading(tabName);
-    tab.stopButton?.addEventListener("click", () => {
-      this.invokeAction("onStopStation", tabName);
+    // Event delegation on the parent grid instead of attaching to every single button
+    tab.stationGrid.addEventListener("click", (e) => {
+      const button = e.target.closest("ion-button");
+      if (!button || !button.dataset.station) return;
+      button.setAttribute("color", "light");
+      this.invokeAction("onClickStation", tabName, button.dataset.station);
     });
+
+    tab.stopButton?.addEventListener("click", () =>
+      this.invokeAction("onStopStation", tabName),
+    );
+
+    this.tabs[tabName] = tab;
+    this.showStationsLoading(tabName);
   }
 
   _setNowPlaying(tab, stationName = null) {
-    if (!tab) {
-      return;
-    }
-
+    if (!tab) return;
     setText(tab.nowPlaying, stationName || "...");
-    if (tab.stopButton) {
-      tab.stopButton.disabled = !stationName;
-    }
+    if (tab.stopButton) tab.stopButton.disabled = !stationName;
   }
 }

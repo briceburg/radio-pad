@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { authStore, patchStore } from "../state-store/app-store.js";
+import { authStore, patchStore } from "../store.js";
 import { toastDanger, toastSuccess, toastWarning } from "../notifications.js";
 
 export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
