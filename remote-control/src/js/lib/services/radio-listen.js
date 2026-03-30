@@ -18,7 +18,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { Capacitor } from "@capacitor/core";
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
-import { EventEmitter } from "./interfaces.js";
 
 const AUDIO_ID = "radio-pad-stream";
 
@@ -136,9 +135,8 @@ const createNativeAudioPlayer = () => {
   };
 };
 
-export class RadioListen extends EventEmitter {
+export class RadioListen {
   constructor() {
-    super();
     this.player = Capacitor.isNativePlatform()
       ? createNativeAudioPlayer()
       : createWebAudioPlayer();
@@ -152,19 +150,16 @@ export class RadioListen extends EventEmitter {
 
   async play(stationName) {
     const url = this.stations.get(stationName);
-    // TODO: support .pls URLS
-    if (url) {
-      await this.player.play(url, stationName);
-      this.emitEvent("station-playing", stationName);
+    if (!url) {
+      return false;
     }
+
+    await this.player.play(url, stationName);
+    return true;
   }
 
   async stop() {
     await this.player.stop();
-    this.emitEvent("station-playing", null);
-  }
-
-  setVolume(level) {
-    // TODO: Implement volume control for local player
+    return true;
   }
 }

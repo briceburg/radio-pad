@@ -27,6 +27,17 @@ export function sanitizeUrl(targetUrl) {
   }
 }
 
+export function formatErrorMessage(error, fallback = "") {
+  if (typeof error?.message === "string") {
+    return error.message.trim();
+  }
+  return fallback;
+}
+
+export function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
 export class RegistryRequestError extends Error {
   constructor({ url, status = "unknown", cause } = {}) {
     const sanitized = sanitizeUrl(url);
@@ -46,9 +57,6 @@ export class RegistryRequestError extends Error {
     if (error instanceof RegistryRequestError) {
       return error.toMessage();
     }
-    if (error && typeof error.message === "string" && error.message.trim()) {
-      return error.message;
-    }
-    return "Unknown registry error";
+    return formatErrorMessage(error, "Unknown registry error");
   }
 }

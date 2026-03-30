@@ -20,7 +20,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
-import { EventEmitter } from "./interfaces.js";
+import { createSafeInvoker } from "../utils/callbacks.js";
 
 const AUTH_STORAGE_KEY = "radio-pad.google-sign-in.user";
 const CALLBACK_QUERY_KEYS = [
@@ -34,56 +34,8 @@ const CALLBACK_QUERY_KEYS = [
   "hd",
 ];
 
-function getStringClaim(profile, key) {
-  const value = profile?.[key];
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function isExpiredUser(user) {
-  return typeof user?.expiresAt === "number" && user.expiresAt <= Date.now();
-}
-
-function normalizeStoredUser(user) {
-  if (!user || typeof user !== "object") {
-    return null;
-  }
-
-  const idToken = getStringClaim(user, "idToken");
-  if (!idToken) {
-    return null;
-  }
-
-  if (user.expiresAt != null && typeof user.expiresAt !== "number") {
-    return null;
-  }
-
-  for (const field of ["subject", "email", "name"]) {
-    if (user[field] != null && !getStringClaim(user, field)) {
-      return null;
-    }
-  }
-
-  const subject = getStringClaim(user, "subject");
-  const email = getStringClaim(user, "email");
-
-  return {
-    idToken,
-    subject,
-    email,
-    name: getStringClaim(user, "name") || email || subject,
-    expiresAt: user.expiresAt ?? null,
-  };
-}
-
-function decodeJwtPayload(token) {
-  const payload = token?.split(".")?.[1];
-  if (!payload) {
-    throw new Error("Google sign-in did not return a valid ID token.");
-  }
-
-  const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-  return JSON.parse(window.atob(padded));
+function getString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function hasAuthCallbackParams(currentUrl) {
@@ -99,33 +51,46 @@ function buildCallbackCleanupUrl(currentUrl) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function buildUser(result) {
-  const claims = decodeJwtPayload(result.idToken);
-  const user = normalizeStoredUser({
-    idToken: result.idToken,
-    subject: result.userId || getStringClaim(claims, "sub"),
-    email: result.email || getStringClaim(claims, "email"),
-    name: result.displayName || getStringClaim(claims, "name"),
-    expiresAt: typeof claims.exp === "number" ? claims.exp * 1000 : null,
-  });
-  if (!user) {
-    throw new Error("Google sign-in did not return a valid user.");
+function normalizeUser(profile) {
+  if (!profile || typeof profile !== "object") {
+    return null;
   }
-  return user;
+
+  const idToken = getString(profile.idToken);
+  const subject = getString(profile.userId) || getString(profile.subject);
+  const email = getString(profile.email);
+  const name =
+    getString(profile.displayName) ||
+    getString(profile.name) ||
+    email ||
+    subject;
+
+  if (!idToken) {
+    return null;
+  }
+
+  return {
+    idToken,
+    subject,
+    email,
+    name,
+  };
 }
 
 function isWebPlatform() {
   return Capacitor.getPlatform() === "web";
 }
 
-export class RadioPadAuth extends EventEmitter {
+export class RadioPadAuth {
   constructor() {
-    super();
     this.config = this._buildConfig();
     this.isWeb = isWebPlatform();
     this.user = null;
     this.initialized = false;
     this.initError = null;
+    this.onStateChange = null;
+    this.onError = null;
+    this._callbacks = createSafeInvoker("RadioPadAuth callback");
   }
 
   _buildConfig() {
@@ -143,20 +108,6 @@ export class RadioPadAuth extends EventEmitter {
     };
   }
 
-  _getActiveUser() {
-    if (!this.user) {
-      return null;
-    }
-
-    if (isExpiredUser(this.user)) {
-      void this._clearStoredUser();
-      this.user = null;
-      return null;
-    }
-
-    return this.user;
-  }
-
   async _storeUser(user) {
     await Preferences.set({
       key: AUTH_STORAGE_KEY,
@@ -171,8 +122,8 @@ export class RadioPadAuth extends EventEmitter {
     }
 
     try {
-      const user = normalizeStoredUser(JSON.parse(value));
-      if (!user || isExpiredUser(user)) {
+      const user = normalizeUser(JSON.parse(value));
+      if (!user) {
         await this._clearStoredUser();
         return null;
       }
@@ -189,7 +140,10 @@ export class RadioPadAuth extends EventEmitter {
   }
 
   async _applySignInResult(result) {
-    this.user = buildUser(result);
+    this.user = normalizeUser(result);
+    if (!this.user) {
+      throw new Error("Google sign-in did not return a valid user.");
+    }
     await this._storeUser(this.user);
   }
 
@@ -200,7 +154,7 @@ export class RadioPadAuth extends EventEmitter {
   }
 
   get signedIn() {
-    return Boolean(this._getActiveUser());
+    return Boolean(this.user);
   }
 
   _getReason() {
@@ -228,7 +182,7 @@ export class RadioPadAuth extends EventEmitter {
       this.initError = null;
     } catch (error) {
       this.initError = error;
-      await this.emitEvent("error", {
+      await this._callbacks.wait(this.onError, {
         summary: "⚠️ Sign-in unavailable.",
         error,
       });
@@ -242,7 +196,7 @@ export class RadioPadAuth extends EventEmitter {
           await GoogleSignIn.handleRedirectCallback(),
         );
       } catch (error) {
-        await this.emitEvent("error", {
+        await this._callbacks.wait(this.onError, {
           summary: "⚠️ Sign-in failed.",
           error,
         });
@@ -291,11 +245,11 @@ export class RadioPadAuth extends EventEmitter {
   }
 
   getRegistryBearerToken() {
-    return this._getActiveUser()?.idToken || null;
+    return this.user?.idToken || null;
   }
 
   getState() {
-    const user = this._getActiveUser();
+    const user = this.user;
 
     return {
       enabled: this.enabled,
@@ -309,6 +263,6 @@ export class RadioPadAuth extends EventEmitter {
   }
 
   async emitAuthState() {
-    await this.emitEvent("state-changed", this.getState());
+    await this._callbacks.wait(this.onStateChange, this.getState());
   }
 }
