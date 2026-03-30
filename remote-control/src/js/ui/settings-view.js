@@ -31,14 +31,16 @@ const SETTINGS_SAVE_STATES = {
 };
 
 export class SettingsView {
-  constructor(invokeAction) {
+  constructor(invokeAction, { rootSelector = 'ion-tab[tab="settings"]' } = {}) {
     this.invokeAction = invokeAction;
+    this.rootSelector = rootSelector;
     this.saveState = "idle";
   }
 
   init() {
-    this.saveButton = document.getElementById("settings-save-button");
-    this.settingsList = document.getElementById("settings-list");
+    this.root = typeof this.rootSelector === 'string' ? document.querySelector(this.rootSelector) : this.rootSelector;
+    this.saveButton = this.root.querySelector("#settings-save-button");
+    this.settingsList = this.root.querySelector("#settings-list");
 
     ["ionInput", "ionChange"].forEach((event) => {
       this.settingsList.addEventListener(event, () => {

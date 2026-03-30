@@ -36,15 +36,18 @@ const TOAST_SEVERITY = {
 };
 
 export class RadioPadUI {
-  constructor({ actions = {}, copyTokenAvailable = false } = {}) {
+  constructor({ actions = {}, copyTokenAvailable = false, selectors = {} } = {}) {
     this.actions = actions;
     this.auth = new AuthView((...args) => this.invokeAction(...args), {
       copyTokenAvailable,
+      rootSelector: selectors.authRoot || 'ion-tab[tab="settings"]'
     });
-    this.playerTabs = new PlayerTabsView((...args) =>
-      this.invokeAction(...args),
-    );
-    this.settings = new SettingsView((...args) => this.invokeAction(...args));
+    this.playerTabs = new PlayerTabsView((...args) => this.invokeAction(...args), {
+      templateSelector: selectors.playerTemplate || '#tab-player'
+    });
+    this.settings = new SettingsView((...args) => this.invokeAction(...args), {
+      rootSelector: selectors.settingsRoot || 'ion-tab[tab="settings"]'
+    });
     this._toast = null;
     this._lastToastId = 0;
   }
@@ -62,9 +65,9 @@ export class RadioPadUI {
     }
   }
 
-  init(actions = this.actions) {
+  init(actions = this.actions, { toastSelector = "#global-toast" } = {}) {
     this.setActions(actions);
-    this._toast = document.getElementById("global-toast");
+    this._toast = document.querySelector(toastSelector);
 
     this.auth.init();
     this.settings.init();

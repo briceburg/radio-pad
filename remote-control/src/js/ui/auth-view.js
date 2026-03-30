@@ -10,17 +10,19 @@ const AUTH_DISABLED_HINTS = {
 };
 
 export class AuthView {
-  constructor(invokeAction, { copyTokenAvailable = false } = {}) {
+  constructor(invokeAction, { copyTokenAvailable = false, rootSelector = 'ion-tab[tab="settings"]' } = {}) {
     this.invokeAction = invokeAction;
     this.copyTokenAvailable = copyTokenAvailable;
+    this.rootSelector = rootSelector;
   }
 
   init() {
-    this.status = document.getElementById("auth-status");
-    this.hint = document.getElementById("auth-hint");
-    this.identity = document.getElementById("auth-identity");
-    this.actionsItem = document.getElementById("auth-actions-item");
-    this.actions = document.getElementById("auth-actions");
+    this.root = typeof this.rootSelector === 'string' ? document.querySelector(this.rootSelector) : this.rootSelector;
+    this.status = this.root.querySelector("#auth-status");
+    this.hint = this.root.querySelector("#auth-hint");
+    this.identity = this.root.querySelector("#auth-identity");
+    this.actionsItem = this.root.querySelector("#auth-actions-item");
+    this.actions = this.root.querySelector("#auth-actions");
 
     this.actions.addEventListener("click", (e) => {
       const btn = e.target.closest("ion-button");

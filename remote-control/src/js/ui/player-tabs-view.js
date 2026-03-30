@@ -21,8 +21,9 @@ function setText(node, text = "") {
 }
 
 export class PlayerTabsView {
-  constructor(invokeAction) {
+  constructor(invokeAction, { templateSelector = '#tab-player' } = {}) {
     this.invokeAction = invokeAction;
+    this.templateSelector = templateSelector;
     this.tabs = {};
   }
 
@@ -116,7 +117,7 @@ export class PlayerTabsView {
 
   _initPlayerTab(tabName) {
     const tabEl = document.querySelector(`ion-tab[tab="${tabName}"]`);
-    const template = document.getElementById("tab-player");
+    const template = typeof this.templateSelector === 'string' ? document.querySelector(this.templateSelector) : this.templateSelector;
     if (!template || !tabEl) return;
 
     tabEl.appendChild(template.content.cloneNode(true));
