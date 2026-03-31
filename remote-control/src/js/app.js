@@ -30,7 +30,6 @@ import { RadioControl } from "./services/radio-control.js";
 import { RadioPadPreferences } from "./services/preferences.js";
 
 // Import our Lit Web Components to register them
-import "./ui/radio-auth.js";
 import "./ui/radio-player-tab.js";
 import "./ui/radio-settings.js";
 
