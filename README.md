@@ -6,38 +6,38 @@ The registry API and datastore implementation live in [`radio-pad-registry`](htt
 
 ![radio-pad-logo](./shared/assets/logo-dark.svg)
 
-## overview
+## Overview
 
-* the radio-pad [player](./player/) runs on a host, such as a raspberry pi, connected to a stereo/speakers.
-* controllers, such as a USB-connected [macropad](./macropad-control/), request the station to play.
-* [stations](./player/stations.json) are configurable.
+* The radio-pad [player](./player/) runs on a host (such as a Raspberry Pi) connected to a stereo/speakers.
+* Controllers, such as a USB-connected [macropad](./macropad-control/), request the station to play.
+* [Stations](./player/stations.json) are configurable.
 
-### local control
+### Local control
 
 **radio-pad** lets you use a USB-connected [macropad](./macropad-control/) as a controller for playing internet radio stations on your computer (such as a Raspberry Pi).
 
-* each Macropad button is mapped to a different station.
-* the encoder knob adjusts volume if a station is playing, or switches station pages if there are more than 12 stations.
-* pressing the encoder knob will stop playing.
+* Each Macropad button is mapped to a different station.
+* The encoder knob adjusts volume if a station is playing, or switches station pages if there are more than 12 stations.
+* Pressing the encoder knob will stop playing.
 
 ![ai-enhanced-macropad-image](./shared/assets/radio-macropad-ai-image.webp)
 
-### remote control
+### Remote control
 
 **radio-pad** is optionally controlled through a [switchboard](./switchboard/) of connected [clients](./remote-control/), such as mobile apps or web browsers.
 
-* clients and the radio-pad player connect to the switchboard to request and broadcast station changes.
-* the switchboard can run on the local network, or as an internet available service.
-* websockets are used for real-time syncing of clients, such as updating the currently playing station.
+* Clients and the radio-pad player connect to the switchboard to request and broadcast station changes.
+* The switchboard can run on the local network or as an internet-available service.
+* WebSockets are used for real-time syncing of clients, such as updating the currently playing station.
 
-## getting started
+## Getting started
 
-there are four components that makeup radio-pad. each is broken out into a folder which _may_ become a git repository. visit this folder for details/installation/use.
+There are four components that make up radio-pad. Each is broken out into a folder which _may_ become a git repository. Visit these folders for details on installation and usage:
 
-* the [player](./player/), this runs on a host and defines [stations](./player/README.md#editing-stations).
-* the [macropad-control](./macropad-control/), this connects to the host over USB.
-* the [switchboard](./switchboard/), this is _optional_ and needed to support remote-control.
-* the [remote-control](./remote-control/), used to create mobile and web clients for controlling the player.
+* The [player](./player/) runs on a host and defines [stations](./player/README.md#editing-stations).
+* The [macropad-control](./macropad-control/) connects to the host over USB.
+* The [switchboard](./switchboard/) is _optional_ and needed to support remote-control.
+* The [remote-control](./remote-control/) is used to create mobile and web clients for controlling the player.
 
 <p align="center" width="100%">
   <img src="./shared/assets/icon-fancy-bg.svg" />
@@ -70,25 +70,29 @@ This is the baseline runtime view: controllers talk to players directly over USB
 
 ```mermaid
 flowchart TD
-    Human["Signed-in user"]
+    User["Signed-in user"]
     Remote["Remote-control app"]
     Registry["radio-pad-registry API"]
     Switchboard["Switchboard"]
     Player["Player device"]
 
-    Human -->|"sign in"| Remote
-    Remote -->|"request player access"| Registry
-    Registry -->|"grant player access"| Remote
-    Remote -->|"control selected player"| Switchboard
-    Player -->|"connect as player"| Switchboard
-    Switchboard -->|"forward only to that player"| Player
+    User -- "Google OIDC Auth" --> Remote
+    Remote -- "[Bearer] Access registered players" --> Registry
+    Registry -- "Return assigned players" --> Remote
+    Remote -- "[?token=] Connect to Switchboard" --> Switchboard
+    Switchboard -- "[Bearer] Validate token on handshake" --> Registry
+    Registry -- "HTTP 200 OK (Validated)" --> Switchboard
+    Player -- "Connect as Player" --> Switchboard
+    Switchboard -- "Route controls to Player" --> Player
 ```
 
-Player control stays scoped instead of global:
+Player control stays strictly authenticated end-to-end:
 
-* remote-control signs in as the user and requests access to one player
-* the registry grants access only when the user is allowed to manage that player
-* the switchboard forwards control only to that player
+* The remote-control signs in to get an OIDC Bearer token.
+* Controllers request access to their registered resources using this token.
+* During WebSocket connection, controllers supply their OIDC validation token.
+* The switchboard makes a synchronous HTTP validation check back to the registry before upgrading the socket.
+* Unauthorized connections are outright rejected.
 
 ### Contributing
 
@@ -100,5 +104,5 @@ For questions or help, please open an issue on the [GitHub repository](https://g
 
 ### TODO
 
-* use MIDI control sequences or usb-cdc instead of keypresses for radio control. this is necessary to support bi-directial communication, e.g. to notify macropad of station changes from remote controls.
-* pass the list of stations to macropad (via usb connection) and controllers (via switchboard). we can thus handle live station updates, as well as defer startup until communication with the player has been established.
+* Use MIDI control sequences or usb-cdc instead of keypresses for radio control. This is necessary to support bi-directional communication, e.g. to notify macropad of station changes from remote controls.
+* Pass the list of stations to macropad (via USB connection) and controllers (via switchboard). We can thus handle live station updates, as well as defer startup until communication with the player has been established.
