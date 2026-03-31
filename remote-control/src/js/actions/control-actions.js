@@ -83,6 +83,23 @@ export function createControlActions({ control, listen }) {
     loadStations(event.detail, "control"),
   );
 
+  let lastAuthToken = authStore.get()?.registryBearerToken;
+  authStore.subscribe((authState) => {
+    const newToken = authState.registryBearerToken;
+    if (newToken !== lastAuthToken) {
+      lastAuthToken = newToken;
+      // Only proactively reconnect if we have a new token.
+      // If we signed out (lost token), we rely on settings sync to gracefully
+      // drop the player if it's no longer accessible.
+      if (newToken) {
+        const player = controlStore.get().player;
+        if (player?.switchboard_url) {
+          control.connect(player.switchboard_url, newToken);
+        }
+      }
+    }
+  });
+
   return {
     async selectPlayer(player) {
       updateTab("control", {

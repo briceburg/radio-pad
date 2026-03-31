@@ -5,27 +5,26 @@
   }
 }
 
+.auth-identity {
+  word-break: break-word;
+}
+
+.icon-hero {
+  font-size: 64px;
+}
+
+.text-sm {
+  font-size: 0.9em;
+}
+
 ion-row.station-placeholder ion-skeleton-text {
   height: 2em;
   width: 100%;
 }
 
-.auth-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.auth-actions-item {
-  --inner-padding-end: 0;
-}
-
-.auth-actions ion-button {
-  flex: 1 1 10rem;
-  min-width: 0;
-}
-
-.auth-identity {
-  word-break: break-word;
+/* Web Component display overrides to preserve Ionic flexbox and list layout while preserving accessibility semantics (avoid display: contents on custom elements) */
+radio-auth,
+radio-settings,
+radio-player-tab {
+  display: block;
 }

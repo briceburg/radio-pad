@@ -37,8 +37,12 @@
           </ion-tab-button>
         </ion-tab-bar>
 
-        <ion-tab tab="control"></ion-tab>
-        <ion-tab tab="listen"></ion-tab>
+        <ion-tab tab="control">
+          <radio-player-tab tab-name="control"></radio-player-tab>
+        </ion-tab>
+        <ion-tab tab="listen">
+          <radio-player-tab tab-name="listen"></radio-player-tab>
+        </ion-tab>
 
         <!-- settings page -->
         <ion-tab tab="settings">
@@ -50,12 +54,9 @@
           <ion-content class="ion-padding">
             <div id="debug-info" class="ion-text-center"></div>
             <ion-list>
-              <ion-item-group id="auth-container"></ion-item-group>
+              <radio-auth></radio-auth>
             </ion-list>
-            <ion-list id="settings-list"></ion-list>
-            <ion-button id="settings-save-button" expand="block"
-              >Save</ion-button
-            >
+            <radio-settings></radio-settings>
           </ion-content>
         </ion-tab>
       </ion-tabs>
