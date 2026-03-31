@@ -106,15 +106,34 @@ export class SettingsView {
 
     const template = html`
       ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) => {
-        if (!prefByGroup[groupKey]) return "";
+        const prefs = prefByGroup[groupKey];
+        if (!prefs) return "";
+
+        const visiblePrefs = prefs.filter((p) => {
+          if (p.type !== "select") return true;
+          if (!p.options || p.options.length === 0) return false;
+          if (p.key === "accountId" && p.options.length <= 1) return false;
+          return true;
+        });
+
+        if (visiblePrefs.length === 0) return "";
+
+        const advancedPrefs = visiblePrefs.filter((p) => p.advanced);
+        const regularPrefs = visiblePrefs.filter((p) => !p.advanced);
+
+        if (regularPrefs.length === 0 && advancedPrefs.length === 0) return "";
 
         return html`
           <ion-item-group>
-            <ion-item-divider color="tertiary">
-              <ion-icon name="${icon}" slot="start"></ion-icon>
-              <ion-label>${label}</ion-label>
-            </ion-item-divider>
-            ${prefByGroup[groupKey].map(
+            ${groupKey === "radio-account"
+              ? ""
+              : html`
+                  <ion-item-divider color="tertiary">
+                    <ion-icon name="${icon}" slot="start"></ion-icon>
+                    <ion-label>${label}</ion-label>
+                  </ion-item-divider>
+                `}
+            ${regularPrefs.map(
               (pref) => html`
                 <ion-item>
                   <ion-label position="stacked">${pref.label}</ion-label>
@@ -122,6 +141,29 @@ export class SettingsView {
                 </ion-item>
               `,
             )}
+            ${advancedPrefs.length > 0
+              ? html`
+                  <ion-accordion-group>
+                    <ion-accordion value="advanced">
+                      <ion-item slot="header">
+                        <ion-label>Advanced settings</ion-label>
+                      </ion-item>
+                      <div class="ion-padding" slot="content">
+                        ${advancedPrefs.map(
+                          (pref) => html`
+                            <ion-item lines="none">
+                              <ion-label position="stacked"
+                                >${pref.label}</ion-label
+                              >
+                              ${renderInput(pref, pref.value ?? "")}
+                            </ion-item>
+                          `,
+                        )}
+                      </div>
+                    </ion-accordion>
+                  </ion-accordion-group>
+                `
+              : ""}
           </ion-item-group>
         `;
       })}

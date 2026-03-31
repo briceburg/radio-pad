@@ -44,17 +44,21 @@ export class RadioControl extends EventTarget {
     this.reconnectTimer = null;
     this.reconnectDelay = 1000;
     this._lastUrl = null;
+    this._lastToken = null;
   }
 
-  async connect(url = null) {
-    if (url) {
-      this._lastUrl = resolvePlayerSwitchboardUrl(url);
-    }
+  async connect(url = null, token = null) {
+    const nextUrl = url ? resolvePlayerSwitchboardUrl(url) : this._lastUrl;
+    const nextToken = token !== undefined ? token : this._lastToken;
     this.disconnect();
-    this._connectWebSocket(this._lastUrl);
+    this._lastUrl = nextUrl;
+    this._lastToken = nextToken;
+    this._connectWebSocket(this._lastUrl, this._lastToken);
   }
 
   disconnect() {
+    this._lastUrl = null;
+    this._lastToken = null;
     const hadSocket = Boolean(this.ws);
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
@@ -65,7 +69,10 @@ export class RadioControl extends EventTarget {
       this.reconnectTimer = null;
     }
     if (this.ws) {
+      this.ws.onopen = null;
       this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
       this.ws.close();
       this.ws = null;
     }
@@ -89,7 +96,7 @@ export class RadioControl extends EventTarget {
     );
   }
 
-  _connectWebSocket(url) {
+  _connectWebSocket(url, token) {
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
@@ -99,14 +106,23 @@ export class RadioControl extends EventTarget {
     }
 
     this.dispatchEvent(new CustomEvent("connecting", { detail: url }));
-    const ws = new WebSocket(url);
+
+    let wsUrl = url;
+    if (token) {
+      try {
+        const u = new URL(wsUrl);
+        u.searchParams.set("token", token);
+        wsUrl = u.toString();
+      } catch {}
+    }
+    const ws = new WebSocket(wsUrl);
     this.ws = ws;
 
     this.connectTimer = setTimeout(() => {
       if (ws.readyState !== WebSocket.OPEN) {
         ws.close();
       }
-    }, 3000);
+    }, 10000);
 
     ws.onopen = () => {
       clearTimeout(this.connectTimer);
@@ -159,9 +175,12 @@ export class RadioControl extends EventTarget {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
     }
+    // Only schedule a reconnect if we still have an active URL and haven't explicitly disconnected
+    if (!this._lastUrl) return;
+
     this.reconnectTimer = setTimeout(() => {
       if (this._lastUrl) {
-        this._connectWebSocket(this._lastUrl);
+        this._connectWebSocket(this._lastUrl, this._lastToken);
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
       }
     }, this.reconnectDelay);

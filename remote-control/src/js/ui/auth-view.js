@@ -97,7 +97,7 @@ export class AuthView {
     const template = html`
       <ion-item-divider color="tertiary">
         <ion-icon name="person-circle" slot="start"></ion-icon>
-        <ion-label>Account Sign-In</ion-label>
+        <ion-label>Account</ion-label>
       </ion-item-divider>
       <ion-item lines="none">
         <ion-label>

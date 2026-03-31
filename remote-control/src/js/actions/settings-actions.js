@@ -33,6 +33,7 @@ export function createSettingsActions({
 }) {
   let lastPlayerId = null;
   let lastPresetId = null;
+  let hasSyncedOnce = false;
 
   let syncPromise = null;
   async function sync(failureReason = "accounts", options = {}) {
@@ -42,39 +43,73 @@ export function createSettingsActions({
         const url = await prefs.get("registryUrl");
         if (!url) return;
 
-        const accounts = await discoverAccounts(url, auth, options);
+        let accounts = [];
+        try {
+          accounts = await discoverAccounts(url, auth, options);
+        } catch (err) {
+          console.warn("Failed to discover accounts", err);
+        }
         await prefs.setOptions("accountId", accounts);
 
-        const accountId = await prefs.get("accountId");
-        if (!accountId) return;
+        const accountId = (await prefs.get("accountId")) || null;
 
-        const [players, presets] = await Promise.all([
-          discoverPlayers(accountId, prefs, auth, options),
-          discoverPresets(accountId, prefs, auth, options),
-        ]);
+        // Discover APIs natively handle null accountId safely
+        let players = [],
+          presets = [];
+        try {
+          const results = await Promise.allSettled([
+            discoverPlayers(accountId, prefs, auth, options),
+            discoverPresets(accountId, prefs, auth, options),
+          ]);
+          players = results[0].status === "fulfilled" ? results[0].value : [];
+          presets = results[1].status === "fulfilled" ? results[1].value : [];
+        } catch (err) {
+          console.warn("Error resolving players or presets", err);
+        }
 
         await prefs.setOptions("playerId", players);
         await prefs.setOptions("presetId", presets);
 
-        const playerId = await prefs.get("playerId");
-        if (playerId && playerId !== lastPlayerId) {
-          const player = await discoverPlayer(playerId, prefs, auth, options);
-          if (player) {
-            lastPlayerId = playerId;
-            await onPlayerSelected(player);
+        const playerId = (await prefs.get("playerId")) || null;
+        // Validate against available options, clear if no longer available (e.g. signed out)
+        const isPlayerValid =
+          !playerId ||
+          players === null ||
+          players.some((p) => p.value === playerId);
+        const resolvedPlayerId = isPlayerValid ? playerId : null;
+
+        if (resolvedPlayerId) {
+          if (resolvedPlayerId !== lastPlayerId || !hasSyncedOnce) {
+            const player = await discoverPlayer(
+              resolvedPlayerId,
+              prefs,
+              auth,
+              options,
+            );
+            await onPlayerSelected(player || null);
+            lastPlayerId = player ? resolvedPlayerId : null;
           }
+        } else if (lastPlayerId !== null || !hasSyncedOnce) {
+          await onPlayerSelected(null);
+          lastPlayerId = null;
         }
 
-        const presetId = await prefs.get("presetId");
-        if (presetId && presetId !== lastPresetId) {
+        const presetId = (await prefs.get("presetId")) || null;
+        if (presetId !== lastPresetId || !hasSyncedOnce) {
+          await onPresetSelected(presetId || null);
           lastPresetId = presetId;
-          await onPresetSelected(presetId);
         }
+        hasSyncedOnce = true;
       } catch (error) {
         if (error.name !== "AbortError") {
           toastRegistryFailure(failureReason, error, options);
         }
       } finally {
+        if (!hasSyncedOnce) {
+          await onPlayerSelected(null);
+          await onPresetSelected(null);
+          hasSyncedOnce = true;
+        }
         preferencesStore.set({ definitions: prefs.getSnapshot() });
         syncPromise = null;
       }

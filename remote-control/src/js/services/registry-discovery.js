@@ -53,6 +53,20 @@ async function fetchAllPages(
   return items;
 }
 
+const withAuthFallback = async (fallback, promiseCallback) => {
+  try {
+    return await promiseCallback();
+  } catch (error) {
+    if (
+      error instanceof RegistryRequestError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return fallback;
+    }
+    throw error;
+  }
+};
+
 export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   if (!registryUrl) return [];
   const items = await fetchAllPages(
@@ -71,13 +85,20 @@ export async function discoverPlayers(
   options = {},
 ) {
   if (!accountId) return [];
+  if (auth && !auth.signedIn) return [];
 
   const registryUrl = await prefs.get("registryUrl");
   if (!registryUrl) return [];
 
-  const path = `/v1/accounts/${accountId}/players/`;
-  const items = await fetchAllPages(path, registryUrl, auth, options.signal);
-  return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  return withAuthFallback([], async () => {
+    const items = await fetchAllPages(
+      `/v1/accounts/${accountId}/players/`,
+      registryUrl,
+      auth,
+      options.signal,
+    );
+    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
+  });
 }
 
 export async function discoverPresets(
@@ -95,15 +116,22 @@ export async function discoverPresets(
     `/v1/presets/`,
   ];
 
-  for (const path of paths) {
-    const items = await fetchAllPages(path, registryUrl, auth, options.signal);
-    presets.push(
-      ...items.map((i) => ({
-        value: `${registryUrl}${path}${i.id}`,
-        label: i.name || i.id,
-      })),
-    );
-  }
+  await withAuthFallback([], async () => {
+    for (const path of paths) {
+      const items = await fetchAllPages(
+        path,
+        registryUrl,
+        auth,
+        options.signal,
+      );
+      presets.push(
+        ...items.map((i) => ({
+          value: `${registryUrl}${path}${i.id}`,
+          label: i.name || i.id,
+        })),
+      );
+    }
+  });
 
   return presets;
 }
@@ -115,6 +143,7 @@ export async function discoverPlayer(
   options = {},
 ) {
   if (!playerId) return null;
+  if (auth && !auth.signedIn) return null;
 
   const [accountId, registryUrl] = await Promise.all([
     prefs.get("accountId"),
@@ -123,10 +152,15 @@ export async function discoverPlayer(
 
   if (!(registryUrl && accountId)) return null;
 
-  const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
-  const response = await fetch(url, buildRequestOptions(auth, options.signal));
-  if (!response.ok) {
-    throw new RegistryRequestError({ url, status: response.status });
-  }
-  return response.json();
+  return withAuthFallback(null, async () => {
+    const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
+    const response = await fetch(
+      url,
+      buildRequestOptions(auth, options.signal),
+    );
+    if (!response.ok) {
+      throw new RegistryRequestError({ url, status: response.status });
+    }
+    return await response.json();
+  });
 }
