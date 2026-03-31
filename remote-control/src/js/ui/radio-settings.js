@@ -22,6 +22,8 @@ import { StoreController } from "@nanostores/lit";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
 
+const ACCOUNT_GROUP_KEY = "radio-account";
+
 const SETTINGS_SAVE_STATES = {
   idle: { label: "Save", color: null, disabled: false, busy: "false" },
   saving: { label: "Saving...", color: "medium", disabled: true, busy: "true" },
@@ -33,6 +35,33 @@ const SETTINGS_SAVE_STATES = {
     busy: "false",
   },
 };
+
+export function groupPreferencesByGroup(preferences = {}) {
+  return Object.entries(preferences).reduce((groups, [key, pref]) => {
+    const groupKey = pref.group || "default";
+    groups[groupKey] = groups[groupKey] || [];
+    groups[groupKey].push({ ...pref, key });
+    return groups;
+  }, {});
+}
+
+export function getVisiblePreferences(preferences = []) {
+  return preferences.filter((pref) => {
+    if (pref.type !== "select") return true;
+
+    const optionCount = pref.options?.length || 0;
+    if (optionCount === 0) return false;
+    if (pref.key === "accountId" && optionCount <= 1) return false;
+    return true;
+  });
+}
+
+function splitPreferences(preferences = []) {
+  return {
+    regular: preferences.filter((pref) => !pref.advanced),
+    advanced: preferences.filter((pref) => pref.advanced),
+  };
+}
 
 export class RadioSettings extends LitElement {
   prefsController = new StoreController(this, preferencesStore);
@@ -106,87 +135,79 @@ export class RadioSettings extends LitElement {
     return "";
   }
 
+  renderGroupDivider(groupKey, label, icon) {
+    if (groupKey === ACCOUNT_GROUP_KEY) {
+      // `radio-auth` already renders the Account section heading and sign-in controls
+      // immediately above these account-specific preference fields.
+      return "";
+    }
+
+    return html`
+      <ion-item-divider color="tertiary">
+        <ion-icon name="${icon}" slot="start"></ion-icon>
+        <ion-label>${label}</ion-label>
+      </ion-item-divider>
+    `;
+  }
+
+  renderPreferenceItems(preferences, { lines = "full" } = {}) {
+    return preferences.map(
+      (pref) => html`
+        <ion-item lines=${lines}>
+          <ion-label position="stacked">${pref.label}</ion-label>
+          ${this.renderInput(pref, pref.value ?? "")}
+        </ion-item>
+      `,
+    );
+  }
+
+  renderPreferenceGroup(groupKey, label, icon, preferences) {
+    const visiblePrefs = getVisiblePreferences(preferences);
+    if (visiblePrefs.length === 0) return "";
+
+    const { regular, advanced } = splitPreferences(visiblePrefs);
+    if (regular.length === 0 && advanced.length === 0) return "";
+
+    return html`
+      <ion-item-group>
+        ${this.renderGroupDivider(groupKey, label, icon)}
+        ${this.renderPreferenceItems(regular)}
+        ${advanced.length > 0
+          ? html`
+              <ion-accordion-group>
+                <ion-accordion value="advanced">
+                  <ion-item slot="header">
+                    <ion-label>Advanced settings</ion-label>
+                  </ion-item>
+                  <div class="ion-padding" slot="content">
+                    ${this.renderPreferenceItems(advanced, { lines: "none" })}
+                  </div>
+                </ion-accordion>
+              </ion-accordion-group>
+            `
+          : ""}
+      </ion-item-group>
+    `;
+  }
+
   render() {
     const preferences = this.prefsController.value.definitions || {};
     const saveStateRaw = this.uiController.value.saveState;
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
 
-    const prefByGroup = Object.entries(preferences).reduce(
-      (acc, [key, pref]) => {
-        const g = pref.group || "default";
-        acc[g] = acc[g] || [];
-        acc[g].push({ ...pref, key });
-        return acc;
-      },
-      {},
-    );
+    const prefByGroup = groupPreferencesByGroup(preferences);
 
     return html`
       <ion-list id="settings-list">
-        ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) => {
-          const prefs = prefByGroup[groupKey];
-          if (!prefs) return "";
-
-          const visiblePrefs = prefs.filter((p) => {
-            if (p.type !== "select") return true;
-            if (!p.options || p.options.length === 0) return false;
-            if (p.key === "accountId" && p.options.length <= 1) return false;
-            return true;
-          });
-
-          if (visiblePrefs.length === 0) return "";
-
-          const advancedPrefs = visiblePrefs.filter((p) => p.advanced);
-          const regularPrefs = visiblePrefs.filter((p) => !p.advanced);
-
-          if (regularPrefs.length === 0 && advancedPrefs.length === 0)
-            return "";
-
-          return html`
-            <ion-item-group>
-              ${groupKey === "radio-account"
-                ? ""
-                : html`
-                    <ion-item-divider color="tertiary">
-                      <ion-icon name="${icon}" slot="start"></ion-icon>
-                      <ion-label>${label}</ion-label>
-                    </ion-item-divider>
-                  `}
-              ${regularPrefs.map(
-                (pref) => html`
-                  <ion-item>
-                    <ion-label position="stacked">${pref.label}</ion-label>
-                    ${this.renderInput(pref, pref.value ?? "")}
-                  </ion-item>
-                `,
-              )}
-              ${advancedPrefs.length > 0
-                ? html`
-                    <ion-accordion-group>
-                      <ion-accordion value="advanced">
-                        <ion-item slot="header">
-                          <ion-label>Advanced settings</ion-label>
-                        </ion-item>
-                        <div class="ion-padding" slot="content">
-                          ${advancedPrefs.map(
-                            (pref) => html`
-                              <ion-item lines="none">
-                                <ion-label position="stacked"
-                                  >${pref.label}</ion-label
-                                >
-                                ${this.renderInput(pref, pref.value ?? "")}
-                              </ion-item>
-                            `,
-                          )}
-                        </div>
-                      </ion-accordion>
-                    </ion-accordion-group>
-                  `
-                : ""}
-            </ion-item-group>
-          `;
-        })}
+        ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) =>
+          this.renderPreferenceGroup(
+            groupKey,
+            label,
+            icon,
+            prefByGroup[groupKey] || [],
+          ),
+        )}
       </ion-list>
       <ion-button
         exportparts="button"

@@ -89,7 +89,9 @@ async function bootstrap() {
       settingsActions.refreshAccountsForCurrentRegistry,
   });
 
-  // Attach global event listeners from the Lit web components
+  // Attach global event listeners from the Lit web components. `radio-auth`
+  // owns sign-in state/actions, while `radio-settings` owns the saved
+  // preferences that appear below it on the Settings tab.
   document.addEventListener("auth-signin", () => authActions.signIn());
   document.addEventListener("auth-signout", () => authActions.signOut());
   document.addEventListener("auth-copytoken", () => authActions.copyToken());
