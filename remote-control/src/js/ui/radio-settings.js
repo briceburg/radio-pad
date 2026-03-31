@@ -3,6 +3,7 @@ This file is part of the radio-pad project.
 */
 
 import { LitElement, html } from "lit";
+import { keyed } from "lit/directives/keyed.js";
 import { StoreController } from "@nanostores/lit";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
@@ -53,6 +54,8 @@ export class RadioSettings extends LitElement {
 
   renderInput(pref, value) {
     if (pref.type === "text") {
+      // Use string interpolation (attribute) instead of Lit property binding (.value)
+      // preventing the component from overriding user drafts when the save state triggers UI re-renders!
       return html`<ion-input
         id="pref-${pref.key}"
         placeholder="${pref.placeholder || ""}"
@@ -62,20 +65,26 @@ export class RadioSettings extends LitElement {
       ></ion-input>`;
     }
     if (pref.type === "select") {
-      return html`
-        <ion-select
-          id="pref-${pref.key}"
-          value="${value}"
-          @ionChange=${this._onChange}
-        >
-          ${(pref.options || []).map(
-            (opt) =>
-              html`<ion-select-option value="${opt.value}"
-                >${opt.label}</ion-select-option
-              >`,
-          )}
-        </ion-select>
-      `;
+      const options = pref.options || [];
+      // Use the 'keyed' directive to force Lit to completely destroy and re-create
+      // the Ionic component when options change so it doesn't freeze the slot
+      return keyed(
+        options.length,
+        html`
+          <ion-select
+            id="pref-${pref.key}"
+            value="${value}"
+            @ionChange=${this._onChange}
+          >
+            ${options.map(
+              (opt) =>
+                html`<ion-select-option value="${opt.value}"
+                  >${opt.label}</ion-select-option
+                >`,
+            )}
+          </ion-select>
+        `,
+      );
     }
     return "";
   }
