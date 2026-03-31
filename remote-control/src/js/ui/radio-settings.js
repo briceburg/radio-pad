@@ -52,6 +52,8 @@ export class RadioSettings extends LitElement {
 
   _onSave() {
     const settingsList = this.querySelector("#settings-list");
+    if (!settingsList) return;
+
     const settingsMap = Object.fromEntries(
       [...settingsList.querySelectorAll("ion-input, ion-select")]
         .map((input) => [input.id?.replace(/^pref-/, ""), input.value])
@@ -82,8 +84,9 @@ export class RadioSettings extends LitElement {
       const options = pref.options || [];
       // Use the 'keyed' directive to force Lit to completely destroy and re-create
       // the Ionic component when options change so it doesn't freeze the slot
+      const optionsKey = options.map((o) => o.value).join(",");
       return keyed(
-        options.length,
+        optionsKey,
         html`
           <ion-select
             id="pref-${pref.key}"
@@ -201,4 +204,6 @@ export class RadioSettings extends LitElement {
   }
 }
 
-customElements.define("radio-settings", RadioSettings);
+if (!customElements.get("radio-settings")) {
+  customElements.define("radio-settings", RadioSettings);
+}

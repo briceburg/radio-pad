@@ -169,4 +169,6 @@ export class RadioPlayerTab extends LitElement {
   }
 }
 
-customElements.define("radio-player-tab", RadioPlayerTab);
+if (!customElements.get("radio-player-tab")) {
+  customElements.define("radio-player-tab", RadioPlayerTab);
+}
