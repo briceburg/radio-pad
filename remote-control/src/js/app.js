@@ -3,7 +3,6 @@ This file is part of the radio-pad project.
 */
 
 import "@ionic/core/css/ionic.bundle.css";
-import { Capacitor } from "@capacitor/core";
 import { defineCustomElements } from "@ionic/core/loader/index.js";
 import { addIcons } from "ionicons";
 import * as appIcons from "./ui/icons.js";
