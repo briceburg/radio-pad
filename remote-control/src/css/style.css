@@ -22,9 +22,9 @@ ion-row.station-placeholder ion-skeleton-text {
   width: 100%;
 }
 
-/* Web Component display overrides to preserve Ionic flexbox and list layout */
+/* Web Component display overrides to preserve Ionic flexbox and list layout while preserving accessibility semantics (avoid display: contents on custom elements) */
 radio-auth,
 radio-settings,
 radio-player-tab {
-  display: contents;
+  display: block;
 }

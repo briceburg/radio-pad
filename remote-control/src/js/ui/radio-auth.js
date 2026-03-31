@@ -112,4 +112,6 @@ export class RadioAuth extends LitElement {
     `;
   }
 }
-customElements.define("radio-auth", RadioAuth);
+if (!customElements.get("radio-auth")) {
+  customElements.define("radio-auth", RadioAuth);
+}
