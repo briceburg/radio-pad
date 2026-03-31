@@ -99,7 +99,6 @@ describe("RadioControl", () => {
       // Trigger onclose to schedule a reconnect
       rc.ws.onclose();
       // Capture the delay used for the next setTimeout
-      const lastCall = vi.getTimerCount();
       const delay = rc.reconnectDelay;
       delays.push(delay);
 
