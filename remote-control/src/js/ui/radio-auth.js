@@ -16,8 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { StoreController } from "@nanostores/lit";
+import { RadioElement } from "./radio-element.js";
 import { authStore } from "../store.js";
 import { Capacitor } from "@capacitor/core";
 
@@ -27,25 +28,12 @@ const AUTH_DISABLED_HINTS = {
   not_configured: "This build does not have account sign-in configured.",
 };
 
-export class RadioAuth extends LitElement {
+export class RadioAuth extends RadioElement {
   authController = new StoreController(this, authStore);
-
-  createRenderRoot() {
-    return this;
-  }
-
-  _dispatch(name) {
-    this.dispatchEvent(
-      new CustomEvent(name, { bubbles: true, composed: true }),
-    );
-  }
 
   _renderBtn(label, event, fill = "solid") {
     return html`<ion-col size="12" size-sm="auto"
-      ><ion-button
-        expand="block"
-        fill=${fill}
-        @click=${() => this._dispatch(event)}
+      ><ion-button expand="block" fill=${fill} @click=${() => this._emit(event)}
         >${label}</ion-button
       ></ion-col
     >`;
@@ -73,45 +61,37 @@ export class RadioAuth extends LitElement {
         : "";
 
     return html`
-      <ion-item-group>
-        <ion-item-divider color="tertiary"
-          ><ion-icon name="person-circle" slot="start"></ion-icon
-          ><ion-label>Account</ion-label></ion-item-divider
+      <ion-item lines="none">
+        <ion-label
+          ><h3 id="auth-status">${txt[0]}</h3>
+          <p id="auth-hint">${txt[1]}</p>
+          ${identityText
+            ? html`<p id="auth-identity" class="ion-text-wrap auth-identity">
+                ${identityText}
+              </p>`
+            : ""}</ion-label
         >
-        <ion-item lines="none">
-          <ion-label
-            ><h3 id="auth-status">${txt[0]}</h3>
-            <p id="auth-hint">${txt[1]}</p>
-            ${identityText
-              ? html`<p id="auth-identity" class="ion-text-wrap auth-identity">
-                  ${identityText}
-                </p>`
-              : ""}</ion-label
-          >
-        </ion-item>
-        <ion-item lines="none" ?hidden=${!s.enabled}>
-          <ion-grid class="ion-no-padding"
-            ><ion-row class="ion-justify-content-start">
-              ${s.enabled && !s.signedIn
-                ? this._renderBtn("Sign in with Google", "auth-signin")
-                : ""}
-              ${s.enabled && s.signedIn
-                ? html`${this._renderBtn("Sign out", "auth-signout", "outline")}
-                  ${!Capacitor.isNativePlatform()
-                    ? this._renderBtn(
-                        "Copy API test token",
-                        "auth-copytoken",
-                        "outline",
-                      )
-                    : ""}`
-                : ""}
-            </ion-row></ion-grid
-          >
-        </ion-item>
-      </ion-item-group>
+      </ion-item>
+      <ion-item lines="none" ?hidden=${!s.enabled}>
+        <ion-grid class="ion-no-padding"
+          ><ion-row class="ion-justify-content-start">
+            ${s.enabled && !s.signedIn
+              ? this._renderBtn("Sign in with Google", "auth-signin")
+              : ""}
+            ${s.enabled && s.signedIn
+              ? html`${this._renderBtn("Sign out", "auth-signout", "outline")}
+                ${!Capacitor.isNativePlatform()
+                  ? this._renderBtn(
+                      "Copy API test token",
+                      "auth-copytoken",
+                      "outline",
+                    )
+                  : ""}`
+              : ""}
+          </ion-row></ion-grid
+        >
+      </ion-item>
     `;
   }
 }
-if (!customElements.get("radio-auth")) {
-  customElements.define("radio-auth", RadioAuth);
-}
+RadioAuth.register("radio-auth");

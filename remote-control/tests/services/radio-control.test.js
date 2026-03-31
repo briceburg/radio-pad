@@ -74,4 +74,44 @@ describe("RadioControl", () => {
     
     expect(errorSpy).toHaveBeenCalled();
   });
+
+  it("connect with falsy URL does not create a WebSocket", () => {
+    const rc = new RadioControl();
+
+    rc.connect(null);
+    expect(global.WebSocket).not.toHaveBeenCalled();
+
+    rc.connect("");
+    expect(global.WebSocket).not.toHaveBeenCalled();
+
+    rc.connect(undefined);
+    expect(global.WebSocket).not.toHaveBeenCalled();
+  });
+
+  it("reconnect delay grows with jitter and is capped at 30 s", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const rc = new RadioControl();
+    rc.connect("ws://example.com/");
+
+    // Simulate successive close → reconnect cycles
+    const delays = [];
+    for (let i = 0; i < 15; i++) {
+      // Trigger onclose to schedule a reconnect
+      rc.ws.onclose();
+      // Capture the delay used for the next setTimeout
+      const lastCall = vi.getTimerCount();
+      const delay = rc.reconnectDelay;
+      delays.push(delay);
+
+      // Advance timers to fire the reconnect
+      vi.advanceTimersByTime(delay);
+    }
+
+    // Delays should increase monotonically (with jitter) up to the 30 s cap
+    for (let i = 1; i < delays.length; i++) {
+      expect(delays[i]).toBeGreaterThanOrEqual(delays[i - 1]);
+    }
+    // The cap is 30 000 ms
+    expect(delays[delays.length - 1]).toBeLessThanOrEqual(30000);
+  });
 });

@@ -16,8 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { StoreController } from "@nanostores/lit";
+import { RadioElement } from "./radio-element.js";
 import { controlStore, listenStore } from "../store.js";
 
 function renderSkeleton() {
@@ -34,7 +35,7 @@ function renderSkeleton() {
   `;
 }
 
-export class RadioPlayerTab extends LitElement {
+export class RadioPlayerTab extends RadioElement {
   static properties = {
     tabName: { type: String, attribute: "tab-name" },
   };
@@ -46,34 +47,10 @@ export class RadioPlayerTab extends LitElement {
     this.listenController = new StoreController(this, listenStore);
   }
 
-  createRenderRoot() {
-    return this;
-  }
-
   get state() {
     return this.tabName === "listen"
       ? this.listenController.value
       : this.controlController.value;
-  }
-
-  _onSelectStation(stationName) {
-    this.dispatchEvent(
-      new CustomEvent("station-click", {
-        bubbles: true,
-        composed: true,
-        detail: { tabName: this.tabName, stationName },
-      }),
-    );
-  }
-
-  _onStopStation() {
-    this.dispatchEvent(
-      new CustomEvent("station-stop", {
-        bubbles: true,
-        composed: true,
-        detail: { tabName: this.tabName },
-      }),
-    );
   }
 
   renderEmptyState() {
@@ -114,7 +91,11 @@ export class RadioPlayerTab extends LitElement {
               <ion-button
                 expand="block"
                 color=${isActive ? "success" : "primary"}
-                @click=${() => this._onSelectStation(station.name)}
+                @click=${() =>
+                  this._emit("station-click", {
+                    tabName: this.tabName,
+                    stationName: station.name,
+                  })}
               >
                 ${station.name}
               </ion-button>
@@ -153,7 +134,8 @@ export class RadioPlayerTab extends LitElement {
               size="small"
               color="danger"
               .disabled=${!s.currentStation}
-              @click=${this._onStopStation}
+              @click=${() =>
+                this._emit("station-stop", { tabName: this.tabName })}
               aria-label="Stop playback"
             >
               <ion-icon slot="icon-only" name="stop"></ion-icon>
@@ -169,6 +151,4 @@ export class RadioPlayerTab extends LitElement {
   }
 }
 
-if (!customElements.get("radio-player-tab")) {
-  customElements.define("radio-player-tab", RadioPlayerTab);
-}
+RadioPlayerTab.register("radio-player-tab");
