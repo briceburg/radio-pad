@@ -17,114 +17,85 @@ export class RadioAuth extends LitElement {
   authController = new StoreController(this, authStore);
 
   createRenderRoot() {
-    // Disable shadow DOM so Ionic styles apply seamlessly.
     return this;
   }
 
-  get copyTokenAvailable() {
-    return !Capacitor.isNativePlatform();
-  }
-
-  _onSignIn() {
+  _dispatch(name) {
     this.dispatchEvent(
-      new CustomEvent("auth-signin", { bubbles: true, composed: true }),
+      new CustomEvent(name, { bubbles: true, composed: true }),
     );
   }
 
-  _onSignOut() {
-    this.dispatchEvent(
-      new CustomEvent("auth-signout", { bubbles: true, composed: true }),
-    );
-  }
-
-  _onCopyToken() {
-    this.dispatchEvent(
-      new CustomEvent("auth-copytoken", { bubbles: true, composed: true }),
-    );
+  _renderBtn(label, event, fill = "solid") {
+    return html`<ion-col size="12" size-sm="auto"
+      ><ion-button
+        expand="block"
+        fill=${fill}
+        @click=${() => this._dispatch(event)}
+        >${label}</ion-button
+      ></ion-col
+    >`;
   }
 
   render() {
-    const state = this.authController.value;
-
-    const statusText = state.enabled
-      ? state.signedIn
-        ? "Signed in"
-        : "Signed out"
-      : "Sign-in unavailable";
-
-    const hintText = state.enabled
-      ? state.signedIn
-        ? "Your sign-in updates the Account and Player choices below."
-        : "Sign in to load the accounts and players you can manage."
-      : AUTH_DISABLED_HINTS[state.reason] ||
-        "Sign-in is currently unavailable.";
-
+    const s = this.authController.value;
+    const txt = s.enabled
+      ? s.signedIn
+        ? [
+            "Signed in",
+            "Your sign-in updates the Account and Player choices below.",
+          ]
+        : [
+            "Signed out",
+            "Sign in to load the accounts and players you can manage.",
+          ]
+      : [
+          "Sign-in unavailable",
+          AUTH_DISABLED_HINTS[s.reason] || "Sign-in is currently unavailable.",
+        ];
     const identityText =
-      state.enabled && state.signedIn
-        ? [state.name, state.email, state.subject].filter(Boolean).join(" · ")
+      s.enabled && s.signedIn
+        ? [s.name, s.email, s.subject].filter(Boolean).join(" · ")
         : "";
 
     return html`
       <ion-item-group>
-        <ion-item-divider color="tertiary">
-          <ion-icon name="person-circle" slot="start"></ion-icon>
-          <ion-label>Account</ion-label>
-        </ion-item-divider>
+        <ion-item-divider color="tertiary"
+          ><ion-icon name="person-circle" slot="start"></ion-icon
+          ><ion-label>Account</ion-label></ion-item-divider
+        >
         <ion-item lines="none">
-          <ion-label>
-            <h3 id="auth-status">${statusText}</h3>
-            <p id="auth-hint">${hintText}</p>
+          <ion-label
+            ><h3 id="auth-status">${txt[0]}</h3>
+            <p id="auth-hint">${txt[1]}</p>
             ${identityText
               ? html`<p id="auth-identity" class="ion-text-wrap auth-identity">
                   ${identityText}
                 </p>`
-              : ""}
-          </ion-label>
+              : ""}</ion-label
+          >
         </ion-item>
-        <ion-item lines="none" ?hidden=${!state.enabled}>
-          <ion-grid class="ion-no-padding">
-            <ion-row class="ion-justify-content-start">
-              ${this._renderControls(state)}
-            </ion-row>
-          </ion-grid>
+        <ion-item lines="none" ?hidden=${!s.enabled}>
+          <ion-grid class="ion-no-padding"
+            ><ion-row class="ion-justify-content-start">
+              ${s.enabled && !s.signedIn
+                ? this._renderBtn("Sign in with Google", "auth-signin")
+                : ""}
+              ${s.enabled && s.signedIn
+                ? html`${this._renderBtn("Sign out", "auth-signout", "outline")}
+                  ${!Capacitor.isNativePlatform()
+                    ? this._renderBtn(
+                        "Copy API test token",
+                        "auth-copytoken",
+                        "outline",
+                      )
+                    : ""}`
+                : ""}
+            </ion-row></ion-grid
+          >
         </ion-item>
       </ion-item-group>
     `;
   }
-
-  _renderControls(state) {
-    if (!state.enabled) return "";
-
-    if (!state.signedIn) {
-      return html`
-        <ion-col size="12" size-sm="auto">
-          <ion-button expand="block" @click=${this._onSignIn}
-            >Sign in with Google</ion-button
-          >
-        </ion-col>
-      `;
-    }
-
-    return html`
-      <ion-col size="12" size-sm="auto">
-        <ion-button expand="block" fill="outline" @click=${this._onSignOut}
-          >Sign out</ion-button
-        >
-      </ion-col>
-      ${this.copyTokenAvailable
-        ? html`
-            <ion-col size="12" size-sm="auto">
-              <ion-button
-                expand="block"
-                fill="outline"
-                @click=${this._onCopyToken}
-                >Copy API test token</ion-button
-              >
-            </ion-col>
-          `
-        : ""}
-    `;
-  }
 }
-
 customElements.define("radio-auth", RadioAuth);

@@ -185,7 +185,10 @@ export class RadioControl extends EventTarget {
         this._connectWebSocket(this._lastUrl, this._lastToken);
         // Exponential backoff with a bit of random jitter (up to 1s) to avoid server stampedes
         const jitter = Math.random() * 1000;
-        this.reconnectDelay = Math.min((this.reconnectDelay * 1.5) + jitter, 30000);
+        this.reconnectDelay = Math.min(
+          this.reconnectDelay * 1.5 + jitter,
+          30000,
+        );
       }
     }, this.reconnectDelay);
   }
