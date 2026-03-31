@@ -10,6 +10,7 @@ primary_region = 'iad' # https://fly.io/docs/reference/regions/
 
 [env]
   SWITCHBOARD_PORT = '1980'
+  REGISTRY_URL = 'https://registry.radiopad.dev'
 
 [http_service]
   internal_port = 1980

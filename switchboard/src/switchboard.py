@@ -23,23 +23,26 @@ import json
 import logging
 import os
 import signal
+import urllib.parse
 from collections import defaultdict
 from http import HTTPStatus
+from typing import Any
 
+import httpx
 import websockets
 from websockets.asyncio.server import ServerConnection, broadcast, serve
 
-CURRENT_STATION_BY_PLAYER = defaultdict(lambda: None)
-STATIONS_URL_BY_PLAYER = defaultdict(lambda: None)
-WEBSOCKETS_BY_PLAYER = defaultdict(set)
+CURRENT_STATION_BY_PLAYER: defaultdict[str, Any] = defaultdict(lambda: None)
+STATIONS_URL_BY_PLAYER: defaultdict[str, str | None] = defaultdict(lambda: None)
+WEBSOCKETS_BY_PLAYER: defaultdict[str, set[ServerConnection]] = defaultdict(set)
 LOGGER = logging.getLogger("switchboard")
 
 
-def get_connections(player_key: str) -> set:
+def get_connections(player_key: str) -> set[ServerConnection]:
     return WEBSOCKETS_BY_PLAYER.get(player_key, set())
 
 
-def mkmsg(player_key: str, event: str, data=None) -> str:
+def mkmsg(player_key: str, event: str, data: Any = None) -> str:
     if data is None:
         if event == "station_playing":
             data = CURRENT_STATION_BY_PLAYER[player_key]
@@ -48,13 +51,13 @@ def mkmsg(player_key: str, event: str, data=None) -> str:
     return json.dumps({"event": event, "data": data})
 
 
-def broadcast_all(player_key: str, event: str, data=None) -> None:
+def broadcast_all(player_key: str, event: str, data: Any = None) -> None:
     connections = get_connections(player_key)
     if connections:
         broadcast(connections, mkmsg(player_key, event, data))
 
 
-async def switchboard(websocket):
+async def switchboard(websocket: ServerConnection) -> None:
     player_key = getattr(websocket, "player_key", None)
     if not player_key:
         return await websocket.close(code=1008, reason="Missing player identifier.")
@@ -71,16 +74,16 @@ async def switchboard(websocket):
 
         async for msg in websocket:
             try:
-                event, data = (lambda m: (m.get("event"), m.get("data")))(
-                    json.loads(msg)
-                )
+                payload = json.loads(msg)
+                event = payload.get("event")
+                data = payload.get("data")
 
                 if not event:
                     return await websocket.close(
                         code=1007,
                         reason='Invalid message format. Missing "event" field.',
                     )
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, AttributeError):
                 return await websocket.close(
                     code=1007,
                     reason='Invalid message format. Expected JSON with "event" and "data" fields.',
@@ -90,6 +93,11 @@ async def switchboard(websocket):
                 CURRENT_STATION_BY_PLAYER[player_key] = data
                 broadcast_all(player_key, "station_playing")
             elif event == "station_request":
+                if not getattr(websocket, "is_authenticated_controller", False):
+                    LOGGER.warning(
+                        f"Unauthenticated station_request received for {player_key}"
+                    )
+                    continue
                 broadcast_all(player_key, "station_request", data)
             else:
                 return await websocket.close(
@@ -133,18 +141,49 @@ async def switchboard_connect(
 
     # Require account_id and player_id in the path
     try:
-        account_id, player_id = request.path.strip("/").split("/")
-        # TODO: validate account_id/player_id authn from registry
+        parsed_url = urllib.parse.urlparse(request.path)
+        account_id, player_id = parsed_url.path.strip("/").split("/")
     except ValueError:
         return connection.respond(
             HTTPStatus.BAD_REQUEST,
             "Invalid path. Expected /{account_id}/{player_id}.\n",
         )
 
+    is_player = request.headers.get("User-Agent", "").startswith("RadioPad/")
+
+    if not is_player:
+        token = urllib.parse.parse_qs(parsed_url.query).get("token", [None])[0]
+        if not token:
+            return connection.respond(
+                HTTPStatus.UNAUTHORIZED,
+                "Authentication token required.\n",
+            )
+
+        registry_url = os.environ.get("REGISTRY_URL", "http://localhost:8000")
+        url = f"{registry_url.rstrip('/')}/v1/accounts/{account_id}/players/{player_id}"
+
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(
+                    url, headers={"Authorization": f"Bearer {token}"}
+                )
+                if resp.status_code != 200:
+                    return connection.respond(
+                        HTTPStatus.FORBIDDEN,
+                        "Unauthorized player access.\n",
+                    )
+            except httpx.RequestError as e:
+                LOGGER.error(f"Registry validation failed: {e}")
+                return connection.respond(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to validate player access.\n",
+                )
+
     player_key = f"{account_id}/{player_id}"
     setattr(connection, "player_key", player_key)
+    setattr(connection, "is_authenticated_controller", not is_player)
 
-    if request.headers.get("User-Agent", "").startswith("RadioPad/"):
+    if is_player:
         setattr(connection, "is_radio_pad", True)
 
         stations_url = request.headers.get("RadioPad-Stations-Url")
