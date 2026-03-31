@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { controlStore, listenStore, patchStore } from "../store.js";
+import { authStore, controlStore, listenStore, patchStore } from "../store.js";
 import { toastWarning } from "../notifications.js";
 
 export function createControlActions({ control, listen }) {
@@ -85,8 +85,19 @@ export function createControlActions({ control, listen }) {
 
   return {
     async selectPlayer(player) {
-      updateTab("control", { player, currentStation: null, loading: true });
-      await control.connect(player.switchboard_url);
+      updateTab("control", {
+        player,
+        stationsData: null,
+        currentStation: null,
+        statusText: "",
+        loading: player ? true : false,
+      });
+      if (!player) {
+        control.disconnect();
+        return;
+      }
+      const token = authStore.get()?.registryBearerToken || null;
+      await control.connect(player.switchboard_url, token);
     },
 
     async selectPreset(presetId) {

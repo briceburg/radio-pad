@@ -18,6 +18,66 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { html, render } from "lit-html";
 
+function renderEmptyState(tabName) {
+  const noun = tabName === "listen" ? "preset" : "player";
+  return html`
+    <div class="ion-text-center ion-padding" style="margin-top: 2rem;">
+      <ion-icon
+        name="radio-outline"
+        style="font-size: 64px; color: var(--ion-color-medium);"
+      ></ion-icon>
+      <h2 style="color: var(--ion-color-medium);">No ${noun} selected</h2>
+      <p>
+        Please select a ${noun} from the
+        <ion-icon name="settings-outline"></ion-icon>
+        <strong>Settings</strong> tab to begin.
+      </p>
+      ${tabName === "control"
+        ? html`<p
+            style="color: var(--ion-color-medium); font-size: 0.9em; margin-top: 1rem;"
+          >
+            Note: You may need to sign in to access private players.
+          </p>`
+        : ""}
+    </div>
+  `;
+}
+
+function renderSkeleton() {
+  return html`
+    <ion-row class="station-placeholder">
+      ${Array.from({ length: 9 }).map(
+        () => html`
+          <ion-col size="4">
+            <ion-skeleton-text animated></ion-skeleton-text>
+          </ion-col>
+        `,
+      )}
+    </ion-row>
+  `;
+}
+
+function renderStationButtons(stations, currentStation, onSelect) {
+  return html`
+    <ion-row>
+      ${stations.map((station) => {
+        const isActive = station.name === currentStation;
+        return html`
+          <ion-col size="4">
+            <ion-button
+              expand="block"
+              color=${isActive ? "success" : "primary"}
+              @click=${() => onSelect(station.name)}
+            >
+              ${station.name}
+            </ion-button>
+          </ion-col>
+        `;
+      })}
+    </ion-row>
+  `;
+}
+
 export class PlayerTabsView {
   constructor(invokeAction) {
     this.invokeAction = invokeAction;
@@ -28,7 +88,6 @@ export class PlayerTabsView {
   }
 
   init(tabNames = ["control", "listen"]) {
-    // We just set up initial renders
     tabNames.forEach((tabName) => this._renderTab(tabName));
   }
 
@@ -37,49 +96,19 @@ export class PlayerTabsView {
     const tabEl = document.querySelector(`ion-tab[tab="${tabName}"]`);
     if (!tabEl) return;
 
-    // Helper functions for inner templates
-    const renderStations = () => {
-      if (state.loading || !state.stationsData) {
-        // Skeleton loader
-        return html`${Array.from({ length: 3 }).map(
-          () =>
-            html`<ion-row class="station-placeholder">
-              ${Array.from({ length: 3 }).map(
-                () =>
-                  html`<ion-col
-                    ><ion-skeleton-text animated></ion-skeleton-text
-                  ></ion-col>`,
-              )}
-            </ion-row>`,
-        )}`;
-      }
-
-      // Station buttons
-      const rows = [];
-      const stations = state.stationsData.stations || [];
-      for (let i = 0; i < stations.length; i += 3) {
-        rows.push(stations.slice(i, i + 3));
-      }
-
-      return html`${rows.map(
-        (row) =>
-          html`<ion-row>
-            ${row.map((station) => {
-              const isActive = station.name === state.currentStation;
-              return html`<ion-col>
-                <ion-button
-                  expand="block"
-                  color=${isActive ? "success" : "primary"}
-                  @click=${() =>
-                    this.invokeAction("onClickStation", tabName, station.name)}
-                >
-                  ${station.name}
-                </ion-button>
-              </ion-col>`;
-            })}
-          </ion-row>`,
-      )}`;
-    };
+    let content;
+    if (state.loading) {
+      content = renderSkeleton();
+    } else if (!state.stationsData) {
+      content = renderEmptyState(tabName);
+    } else {
+      content = renderStationButtons(
+        state.stationsData.stations || [],
+        state.currentStation,
+        (stationName) =>
+          this.invokeAction("onClickStation", tabName, stationName),
+      );
+    }
 
     const template = html`
       <ion-header>
@@ -105,7 +134,7 @@ export class PlayerTabsView {
       </ion-header>
       <ion-content class="ion-padding">
         <div class="radio-info ion-text-center">${state.statusText || ""}</div>
-        <ion-grid class="station-grid"> ${renderStations()} </ion-grid>
+        <ion-grid class="station-grid">${content}</ion-grid>
       </ion-content>
     `;
 

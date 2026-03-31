@@ -19,9 +19,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { Preferences } from "@capacitor/preferences";
 
 export const PREFERENCE_GROUPS = {
-  default: ["Primary Settings", "settings"],
-  "radio-control": ["Control Settings", "radio"],
-  "radio-listen": ["Listen Settings", "headset"],
+  "radio-account": ["Account", "person"],
+  "radio-control": ["Control", "radio"],
+  "radio-listen": ["Listen", "headset"],
 };
 
 function isPresent(value) {
@@ -61,10 +61,18 @@ function validateOptions(options) {
 }
 
 const DEFAULT_PREFERENCES = {
+  accountId: {
+    type: "select",
+    label: "Account",
+    options: [],
+    group: "radio-account",
+  },
   registryUrl: {
     type: "text",
     label: "Registry URL",
     placeholder: "Enter registry URL",
+    group: "radio-account",
+    advanced: true,
     default:
       import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
     normalize: (value) => {
@@ -80,11 +88,6 @@ const DEFAULT_PREFERENCES = {
         return false;
       }
     },
-  },
-  accountId: {
-    type: "select",
-    label: "Account",
-    options: [],
   },
   playerId: {
     type: "select",
