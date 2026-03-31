@@ -5,9 +5,12 @@ from dataclasses import dataclass
 from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from auth import AuthenticatedIdentity, AuthzStore, OIDCConfig, RegistryIDToken
 from lib.logging import logger
+
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @dataclass(frozen=True)
@@ -39,31 +42,22 @@ def get_auth_services(request: Request) -> AuthServices:
 
 
 def current_identity(
-    request: Request,
     services: Annotated[AuthServices, Depends(get_auth_services)],
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> AuthenticatedIdentity | None:
     if not services.enabled:
         return None
 
-    auth_header = request.headers.get("Authorization")
-    if auth_header is None:
+    if not creds:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer token required for write access",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    scheme, _, raw_token = auth_header.partition(" ")
-    if scheme.lower() != "bearer" or not raw_token.strip():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer token required for write access",
+            detail="Bearer token required",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     assert services.authenticate_user is not None
     try:
-        token = services.authenticate_user(raw_token.strip())
+        token = services.authenticate_user(creds.credentials)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,7 +68,10 @@ def current_identity(
         issuer=token.iss,
         subject=token.sub,
         email=token.email,
-        email_verified=token.email_verified is True,
+        # Treat missing email_verified as True, particularly for Google id_tokens which
+        # may omit it when implicit (like via mobile Capacitor SDKs).
+        # Only explicitly False means unverified.
+        email_verified=token.email_verified is not False,
     )
 
 
@@ -108,6 +105,13 @@ def require_account_manager(
     assert services.authz_store is not None
     if services.authz_store.can_manage_account(account_id, identity):
         return identity
+
+    logger.warning(f"403 Forbidden for {account_id}. Identity: {identity.model_dump()}")
+    access = services.authz_store.get_account_access(account_id)
+    if access:
+        logger.warning(f"Account access allows emails: {access.emails}, subjects: {access.subjects}")
+    else:
+        logger.warning(f"No account access seeded for {account_id}")
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

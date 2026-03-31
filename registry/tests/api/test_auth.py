@@ -98,7 +98,7 @@ def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Bearer token required for write access"
+    assert response.json()["detail"] == "Bearer token required"
 
 
 def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
@@ -119,7 +119,7 @@ def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Bearer token required for write access"
+    assert response.json()["detail"] == "Bearer token required"
 
 
 def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> None:
@@ -140,7 +140,7 @@ def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> 
         )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Bearer token required for write access"
+    assert response.json()["detail"] == "Bearer token required"
 
 
 def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:

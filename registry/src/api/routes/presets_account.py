@@ -3,8 +3,7 @@ from fastapi import APIRouter, Depends
 from models import AccountStationPreset, AccountStationPresetCreate, AccountStationPresetSummary
 
 from ..auth import require_account_manager
-from ..exceptions import NotFoundError
-from ..helpers import paginated_summary
+from ..helpers import get_or_404, get_paginated
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, AccountId, PageParams, PresetId
@@ -35,10 +34,12 @@ async def get_account_preset(
     preset_id: PresetId,
     ds: DS,
 ) -> AccountStationPreset:
-    preset = ds.account_presets.get(preset_id, path_params={"account_id": account_id})
-    if preset is None:
-        raise NotFoundError("Station preset not found", details={"account_id": account_id, "preset_id": preset_id})
-    return preset
+    return get_or_404(
+        ds.account_presets.get(preset_id, path_params={"account_id": account_id}),
+        "Station preset not found",
+        account_id=account_id,
+        preset_id=preset_id,
+    )
 
 
 @router.get(
@@ -51,5 +52,6 @@ async def list_account_presets(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[AccountStationPresetSummary]:
-    items = ds.account_presets.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    return paginated_summary(items, AccountStationPresetSummary, page=paging.page, per_page=paging.per_page)
+    return get_paginated(
+        ds.account_presets, AccountStationPresetSummary, paging, path_params={"account_id": account_id}
+    )

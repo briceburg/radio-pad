@@ -3,8 +3,7 @@ from fastapi import APIRouter, Depends
 from models import GlobalStationPreset, GlobalStationPresetCreate, GlobalStationPresetSummary
 
 from ..auth import require_admin
-from ..exceptions import NotFoundError
-from ..helpers import paginated_summary
+from ..helpers import get_or_404, get_paginated
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, PageParams, PresetId
@@ -33,10 +32,7 @@ async def get_global_preset(
     preset_id: PresetId,
     ds: DS,
 ) -> GlobalStationPreset:
-    preset = ds.global_presets.get(preset_id)
-    if preset is None:
-        raise NotFoundError("Station preset not found", details={"preset_id": preset_id})
-    return preset
+    return get_or_404(ds.global_presets.get(preset_id), "Station preset not found", preset_id=preset_id)
 
 
 @router.get(
@@ -48,5 +44,4 @@ async def list_global_presets(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[GlobalStationPresetSummary]:
-    items = ds.global_presets.list(page=paging.page, per_page=paging.per_page)
-    return paginated_summary(items, GlobalStationPresetSummary, page=paging.page, per_page=paging.per_page)
+    return get_paginated(ds.global_presets, GlobalStationPresetSummary, paging)

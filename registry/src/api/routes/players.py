@@ -3,8 +3,7 @@ from fastapi import APIRouter, Depends
 from models import Account, Player, PlayerCreate, PlayerSummary
 
 from ..auth import require_account_manager
-from ..exceptions import NotFoundError
-from ..helpers import paginated_summary
+from ..helpers import get_or_404, get_paginated
 from ..models import PaginatedList
 from ..responses import ERROR_409
 from ..types import DS, AccountId, PageParams, PlayerId
@@ -32,11 +31,14 @@ async def get_player(
     account_id: AccountId,
     player_id: PlayerId,
     ds: DS,
+    _identity: object = Depends(require_account_manager),
 ) -> Player:
-    player = ds.players.get(player_id, path_params={"account_id": account_id})
-    if player is None:
-        raise NotFoundError("Player not found", details={"account_id": account_id, "player_id": player_id})
-    return player
+    return get_or_404(
+        ds.players.get(player_id, path_params={"account_id": account_id}),
+        "Player not found",
+        account_id=account_id,
+        player_id=player_id,
+    )
 
 
 @router.get("/", response_model=PaginatedList[PlayerSummary])
@@ -44,6 +46,6 @@ async def list_players(
     account_id: AccountId,
     ds: DS,
     paging: PageParams,
+    _identity: object = Depends(require_account_manager),
 ) -> PaginatedList[PlayerSummary]:
-    items = ds.players.list(path_params={"account_id": account_id}, page=paging.page, per_page=paging.per_page)
-    return paginated_summary(items, PlayerSummary, page=paging.page, per_page=paging.per_page)
+    return get_paginated(ds.players, PlayerSummary, paging, path_params={"account_id": account_id})
