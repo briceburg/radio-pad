@@ -76,3 +76,16 @@ export function patchStore(store, patch) {
     ...patch,
   }));
 }
+
+if (import.meta.env.DEV) {
+  import("@nanostores/logger").then(({ logger }) => {
+    logger({
+      authStore,
+      preferencesStore,
+      settingsUiStore,
+      controlStore,
+      listenStore,
+      toastStore,
+    });
+  });
+}

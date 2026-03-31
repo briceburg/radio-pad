@@ -97,6 +97,8 @@ export class RadioControl extends EventTarget {
   }
 
   _connectWebSocket(url, token) {
+    if (!url) return;
+
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
@@ -181,7 +183,12 @@ export class RadioControl extends EventTarget {
     this.reconnectTimer = setTimeout(() => {
       if (this._lastUrl) {
         this._connectWebSocket(this._lastUrl, this._lastToken);
-        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+        // Exponential backoff with a bit of random jitter (up to 1s) to avoid server stampedes
+        const jitter = Math.random() * 1000;
+        this.reconnectDelay = Math.min(
+          this.reconnectDelay * 1.5 + jitter,
+          30000,
+        );
       }
     }, this.reconnectDelay);
   }

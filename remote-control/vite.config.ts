@@ -5,7 +5,6 @@ export default defineConfig({
   envDir: "..",
   build: {
     outDir: "../dist",
-    minify: false,
     emptyOutDir: true,
   },
   test: {
