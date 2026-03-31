@@ -17,6 +17,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { atom } from "nanostores";
+import { logger } from "@nanostores/logger";
 
 const EMPTY_PLAYER = {
   id: null,
@@ -75,4 +76,15 @@ export function patchStore(store, patch) {
     ...state,
     ...patch,
   }));
+}
+
+if (import.meta.env.DEV) {
+  logger({
+    authStore,
+    preferencesStore,
+    settingsUiStore,
+    controlStore,
+    listenStore,
+    toastStore,
+  });
 }
