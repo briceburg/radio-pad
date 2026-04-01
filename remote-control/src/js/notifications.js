@@ -79,3 +79,45 @@ export function toastSuccess(summary) {
     severity: "success",
   });
 }
+
+import { formatErrorMessage, RegistryRequestError } from "./utils/errors.js";
+
+async function presentToast(notification) {
+  const toast = document.querySelector("#global-toast");
+  if (!toast || !notification?.summary) return;
+
+  const TOAST_SEVERITY = {
+    danger: { color: "danger", duration: 0, position: "top" },
+    warning: { color: "warning", duration: 0, position: "top" },
+    success: { color: "success", duration: 3000, position: "bottom" },
+  };
+
+  const config =
+    TOAST_SEVERITY[notification.severity] || TOAST_SEVERITY.warning;
+  const detailText =
+    notification.format === "registry"
+      ? RegistryRequestError.format(notification.error)
+      : formatErrorMessage(notification.error);
+  const message = detailText
+    ? `${notification.summary} ${detailText}`.trim()
+    : notification.summary;
+
+  toast.message = message;
+  toast.duration = notification.persistent ? 0 : config.duration;
+  toast.color = config.color;
+  toast.buttons = notification.persistent
+    ? [{ text: "Dismiss", role: "cancel" }]
+    : [];
+  toast.position = config.position;
+  await toast.present();
+}
+
+export function initNotifications() {
+  let lastToastId = 0;
+  toastStore.subscribe((notification) => {
+    if (notification.id !== lastToastId) {
+      lastToastId = notification.id;
+      void presentToast(notification).catch(console.error);
+    }
+  });
+}

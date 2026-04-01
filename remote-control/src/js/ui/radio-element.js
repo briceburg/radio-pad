@@ -16,15 +16,22 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-export {
-  construct,
-  headset,
-  headsetOutline,
-  person,
-  personCircle,
-  radio,
-  radioOutline,
-  settings,
-  settingsOutline,
-  stop,
-} from "ionicons/icons";
+import { LitElement } from "lit";
+
+export class RadioElement extends LitElement {
+  createRenderRoot() {
+    return this;
+  }
+
+  _emit(name, detail = null) {
+    this.dispatchEvent(
+      new CustomEvent(name, { bubbles: true, composed: true, detail }),
+    );
+  }
+
+  static register(tagName) {
+    if (!customElements.get(tagName)) {
+      customElements.define(tagName, this);
+    }
+  }
+}

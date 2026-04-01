@@ -5,10 +5,6 @@
   }
 }
 
-.auth-identity {
-  word-break: break-word;
-}
-
 .icon-hero {
   font-size: 64px;
 }
@@ -20,22 +16,4 @@
 ion-row.station-placeholder ion-skeleton-text {
   height: 2em;
   width: 100%;
-}
-
-/* Web Component display overrides to preserve Ionic flexbox and list layout while preserving accessibility semantics (avoid display: contents on custom elements) */
-radio-auth,
-radio-settings {
-  display: block;
-}
-
-radio-player-tab {
-  display: flex;
-  flex-direction: column;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  contain: layout size style;
-  overflow: hidden;
 }

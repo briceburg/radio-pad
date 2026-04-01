@@ -77,7 +77,7 @@ export function patchStore(store, patch) {
   }));
 }
 
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
   import("@nanostores/logger").then(({ logger }) => {
     logger({
       authStore,

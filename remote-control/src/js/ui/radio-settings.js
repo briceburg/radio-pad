@@ -16,11 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
+import { RadioElement } from "./radio-element.js";
 import { keyed } from "lit/directives/keyed.js";
 import { StoreController } from "@nanostores/lit";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
+
+const ACCOUNT_GROUP_KEY = "radio-account";
 
 const SETTINGS_SAVE_STATES = {
   idle: { label: "Save", color: null, disabled: false, busy: "false" },
@@ -34,19 +37,33 @@ const SETTINGS_SAVE_STATES = {
   },
 };
 
-export class RadioSettings extends LitElement {
+export function groupPreferencesByGroup(preferences = {}) {
+  return Object.entries(preferences).reduce((groups, [key, pref]) => {
+    const groupKey = pref.group || "default";
+    groups[groupKey] = groups[groupKey] || [];
+    groups[groupKey].push({ ...pref, key });
+    return groups;
+  }, {});
+}
+
+export function getVisiblePreferences(preferences = []) {
+  return preferences.filter((pref) => {
+    if (pref.type !== "select") return true;
+
+    const optionCount = pref.options?.length || 0;
+    if (optionCount === 0) return false;
+    if (pref.key === "accountId" && optionCount <= 1) return false;
+    return true;
+  });
+}
+
+export class RadioSettings extends RadioElement {
   prefsController = new StoreController(this, preferencesStore);
   uiController = new StoreController(this, settingsUiStore);
 
-  createRenderRoot() {
-    return this;
-  }
-
   _onChange() {
     if (this.uiController.value.saveState !== "saving") {
-      this.dispatchEvent(
-        new CustomEvent("settings-edited", { bubbles: true, composed: true }),
-      );
+      this._emit("settings-edited");
     }
   }
 
@@ -59,13 +76,7 @@ export class RadioSettings extends LitElement {
         .map((input) => [input.id?.replace(/^pref-/, ""), input.value])
         .filter(([key]) => key),
     );
-    this.dispatchEvent(
-      new CustomEvent("settings-save", {
-        bubbles: true,
-        composed: true,
-        detail: settingsMap,
-      }),
-    );
+    this._emit("settings-save", settingsMap);
   }
 
   renderInput(pref, value) {
@@ -76,8 +87,8 @@ export class RadioSettings extends LitElement {
         id="pref-${pref.key}"
         placeholder="${pref.placeholder || ""}"
         value="${value}"
-        @ionInput=${this._onChange}
-        @ionChange=${this._onChange}
+        @ionInput=${() => this._onChange()}
+        @ionChange=${() => this._onChange()}
       ></ion-input>`;
     }
     if (pref.type === "select") {
@@ -91,7 +102,7 @@ export class RadioSettings extends LitElement {
           <ion-select
             id="pref-${pref.key}"
             value="${value}"
-            @ionChange=${this._onChange}
+            @ionChange=${() => this._onChange()}
           >
             ${options.map(
               (opt) =>
@@ -106,87 +117,62 @@ export class RadioSettings extends LitElement {
     return "";
   }
 
+  renderGroupHeader(groupKey, label, icon) {
+    return html`
+      <ion-item-divider color="tertiary">
+        <ion-icon name="${icon}" slot="start"></ion-icon>
+        <ion-label>${label}</ion-label>
+      </ion-item-divider>
+    `;
+  }
+
+  renderPreferenceItems(preferences, { lines = "full" } = {}) {
+    return preferences.map(
+      (pref) => html`
+        <ion-item lines=${lines}>
+          <ion-label position="stacked" color="tertiary"
+            >${pref.label}</ion-label
+          >
+          ${this.renderInput(pref, pref.value ?? "")}
+        </ion-item>
+      `,
+    );
+  }
+
+  renderPreferenceGroup(groupKey, label, icon, preferences) {
+    const visiblePrefs = getVisiblePreferences(preferences);
+
+    if (visiblePrefs.length === 0 && groupKey !== ACCOUNT_GROUP_KEY) {
+      return "";
+    }
+
+    return html`
+      <ion-item-group>
+        ${this.renderGroupHeader(groupKey, label, icon)}
+        ${groupKey === ACCOUNT_GROUP_KEY ? html`<radio-auth></radio-auth>` : ""}
+        ${this.renderPreferenceItems(visiblePrefs)}
+      </ion-item-group>
+    `;
+  }
+
   render() {
     const preferences = this.prefsController.value.definitions || {};
     const saveStateRaw = this.uiController.value.saveState;
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
 
-    const prefByGroup = Object.entries(preferences).reduce(
-      (acc, [key, pref]) => {
-        const g = pref.group || "default";
-        acc[g] = acc[g] || [];
-        acc[g].push({ ...pref, key });
-        return acc;
-      },
-      {},
-    );
+    const prefByGroup = groupPreferencesByGroup(preferences);
 
     return html`
       <ion-list id="settings-list">
-        ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) => {
-          const prefs = prefByGroup[groupKey];
-          if (!prefs) return "";
-
-          const visiblePrefs = prefs.filter((p) => {
-            if (p.type !== "select") return true;
-            if (!p.options || p.options.length === 0) return false;
-            if (p.key === "accountId" && p.options.length <= 1) return false;
-            return true;
-          });
-
-          if (visiblePrefs.length === 0) return "";
-
-          const advancedPrefs = visiblePrefs.filter((p) => p.advanced);
-          const regularPrefs = visiblePrefs.filter((p) => !p.advanced);
-
-          if (regularPrefs.length === 0 && advancedPrefs.length === 0)
-            return "";
-
-          return html`
-            <ion-item-group>
-              ${groupKey === "radio-account"
-                ? ""
-                : html`
-                    <ion-item-divider color="tertiary">
-                      <ion-icon name="${icon}" slot="start"></ion-icon>
-                      <ion-label>${label}</ion-label>
-                    </ion-item-divider>
-                  `}
-              ${regularPrefs.map(
-                (pref) => html`
-                  <ion-item>
-                    <ion-label position="stacked">${pref.label}</ion-label>
-                    ${this.renderInput(pref, pref.value ?? "")}
-                  </ion-item>
-                `,
-              )}
-              ${advancedPrefs.length > 0
-                ? html`
-                    <ion-accordion-group>
-                      <ion-accordion value="advanced">
-                        <ion-item slot="header">
-                          <ion-label>Advanced settings</ion-label>
-                        </ion-item>
-                        <div class="ion-padding" slot="content">
-                          ${advancedPrefs.map(
-                            (pref) => html`
-                              <ion-item lines="none">
-                                <ion-label position="stacked"
-                                  >${pref.label}</ion-label
-                                >
-                                ${this.renderInput(pref, pref.value ?? "")}
-                              </ion-item>
-                            `,
-                          )}
-                        </div>
-                      </ion-accordion>
-                    </ion-accordion-group>
-                  `
-                : ""}
-            </ion-item-group>
-          `;
-        })}
+        ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) =>
+          this.renderPreferenceGroup(
+            groupKey,
+            label,
+            icon,
+            prefByGroup[groupKey] || [],
+          ),
+        )}
       </ion-list>
       <ion-button
         exportparts="button"
@@ -196,7 +182,7 @@ export class RadioSettings extends LitElement {
         .disabled=${saveState.disabled}
         aria-busy=${saveState.busy}
         data-save-state=${saveStateRaw}
-        @click=${this._onSave}
+        @click=${() => this._onSave()}
       >
         ${saveState.label}
       </ion-button>
@@ -204,6 +190,4 @@ export class RadioSettings extends LitElement {
   }
 }
 
-if (!customElements.get("radio-settings")) {
-  customElements.define("radio-settings", RadioSettings);
-}
+RadioSettings.register("radio-settings");
