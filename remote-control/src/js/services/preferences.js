@@ -22,6 +22,7 @@ export const PREFERENCE_GROUPS = {
   "radio-account": ["Account", "person"],
   "radio-control": ["Control", "radio"],
   "radio-listen": ["Listen", "headset"],
+  "radio-advanced": ["Advanced", "construct"],
 };
 
 function isPresent(value) {
@@ -71,8 +72,7 @@ const DEFAULT_PREFERENCES = {
     type: "text",
     label: "Registry URL",
     placeholder: "Enter registry URL",
-    group: "radio-account",
-    advanced: true,
+    group: "radio-advanced",
     default:
       import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
     normalize: (value) => {

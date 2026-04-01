@@ -8,7 +8,6 @@
       content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="msapplication-tap-highlight" content="no" />
 
     <script type="module" src="/js/app.js"></script>
 
@@ -38,10 +37,16 @@
         </ion-tab-bar>
 
         <ion-tab tab="control">
-          <radio-player-tab tab-name="control"></radio-player-tab>
+          <radio-player-tab
+            class="ion-page"
+            tab-name="control"
+          ></radio-player-tab>
         </ion-tab>
         <ion-tab tab="listen">
-          <radio-player-tab tab-name="listen"></radio-player-tab>
+          <radio-player-tab
+            class="ion-page"
+            tab-name="listen"
+          ></radio-player-tab>
         </ion-tab>
 
         <!-- settings page -->
@@ -52,10 +57,6 @@
             </ion-toolbar>
           </ion-header>
           <ion-content class="ion-padding">
-            <div id="debug-info" class="ion-text-center"></div>
-            <ion-list>
-              <radio-auth></radio-auth>
-            </ion-list>
             <radio-settings></radio-settings>
           </ion-content>
         </ion-tab>
