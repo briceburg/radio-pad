@@ -58,11 +58,12 @@ def _build_client(tmp_path: Path, auth_services: AuthServices) -> TestClient:
     app = create_app()
 
     from api.types import get_store
+    from lib.constants import API_PREFIX
 
     app.dependency_overrides[get_store] = lambda: data_store
     app.state.store = data_store
     app.state.auth = auth_services
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, raise_server_exceptions=False, base_url=f"http://testserver{API_PREFIX}/")
 
 
 def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
@@ -76,7 +77,7 @@ def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
     )
 
     with client:
-        response = client.get("/v1/presets/briceburg")
+        response = client.get("/presets/briceburg")
 
     assert response.status_code == 200
 
@@ -93,7 +94,7 @@ def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/presets/fresh",
+            "/presets/fresh",
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
 
@@ -113,7 +114,7 @@ def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/presets/fresh",
+            "/presets/fresh",
             headers={"Authorization": "Basic not-a-bearer-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -134,7 +135,7 @@ def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> 
 
     with client:
         response = client.put(
-            "/v1/presets/fresh",
+            "/presets/fresh",
             headers={"Authorization": "Bearer    "},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -158,7 +159,7 @@ def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/presets/fresh",
+            "/presets/fresh",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -185,7 +186,7 @@ def test_admin_can_write_global_preset(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/presets/fresh",
+            "/presets/fresh",
             headers={"Authorization": "Bearer admin-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -212,7 +213,7 @@ def test_account_owner_can_update_owned_account(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/accounts/testuser1",
+            "/accounts/testuser1",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Updated User 1"},
         )
@@ -239,7 +240,7 @@ def test_account_owner_cannot_update_other_account(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/v1/accounts/testuser2",
+            "/accounts/testuser2",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Updated User 2"},
         )

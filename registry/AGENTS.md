@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for coding agents working in `radio-pad-registry`.
+Guidance for coding agents working in `radio-pad/registry`.
 
 ## Project shape
 
@@ -13,13 +13,18 @@ Guidance for coding agents working in `radio-pad-registry`.
 
 - The checked-in project target is Python `3.13`, even if the local environment is newer.
 - Run commands from an activated virtual environment: `source venv/bin/activate`.
-- Static checks are run with `bin/ci`.
-- The main test command is `pytest`.
+- `bin/ci` runs static checks (mypy, ruff) and `pytest`.
 
 ## Dependency workflow
 
 - Edit runtime dependencies in `requirements-latest.txt` first.
-- Re-freeze runtime dependencies into `requirements.txt`.
+- Re-freeze runtime dependencies into `requirements.txt`:
+  ```sh
+  python -m venv /tmp/freeze-venv
+  /tmp/freeze-venv/bin/pip install -r requirements-latest.txt
+  /tmp/freeze-venv/bin/pip freeze > requirements.txt
+  rm -rf /tmp/freeze-venv
+  ```
 - Development-only tools belong in `requirements-dev.txt`.
 
 ## Datastore and backend conventions
@@ -49,7 +54,7 @@ Guidance for coding agents working in `radio-pad-registry`.
 
 ## Testing conventions
 
-- CI runs `bin/ci` and the default `pytest` suite.
+- CI runs `bin/ci`, which executes static checks followed by `pytest`.
 - Default `pytest` excludes performance tests via `-m 'not performance'`.
 - Run functional tests directly with:
   - `pytest tests/functional -m 'not performance'`
@@ -57,6 +62,14 @@ Guidance for coding agents working in `radio-pad-registry`.
   - `pytest tests/functional/test_performance.py -m performance`
   - add `--log-cli-level=INFO` to see timing output
 - Current performance tests are observational; they log timings and assert result shapes, but they do not enforce numeric thresholds.
+
+## Switchboard and broadcast
+
+- The switchboard is a WebSocket relay that connects players and remote controls in per-player channels keyed by `{account_id}/{player_id}`.
+- Pub-sub uses an in-tree broadcast module (`src/switchboard/broadcast.py`) — no external broker dependency.
+- The in-memory backend is sufficient for single-instance and for multi-instance deployments with **path-based sticky sessions** (all connections for a given `/{account_id}/{player_id}` path land on the same process).
+- If stateless horizontal scaling is needed later, add a backend (e.g. NATS) behind the existing `Broadcast` interface.
+- The deprecated `run_until_first_complete` from Starlette was replaced with `asyncio.TaskGroup` in the switchboard endpoint.
 
 ## Change preferences
 

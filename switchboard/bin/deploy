@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/switchboard"
-
-cd "$PROJECT_ROOT"
-flyctl deploy

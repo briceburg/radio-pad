@@ -1,8 +1,8 @@
-# radio-pad-registry
+# radio-pad registry
 
 registry.radiopad.dev - uniting players, remote-controls, and switchboards
 
-System architecture and the player-access/auth diagrams live in the main [`radio-pad`](https://github.com/briceburg/radio-pad) repo README.
+System architecture and the player-access/auth diagrams live in the [root README](../README.md#architecture).
 
 ## Usage
 
@@ -49,6 +49,11 @@ REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc
 REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL | JWKS/discovery cache TTL in seconds for bearer token verification. | `3600`
 REGISTRY_AUTHZ_PATH | local private authz data path for owner/admin rules. This can share a Fly volume with the public datastore as long as it uses a separate directory. | `tmp/authz`
 REGISTRY_AUTHZ_PREFIX | prefix to apply to local private authz files. | `registry-authz-v1`
+REGISTRY_PROFILES | Comma separated list of application roles to enable. Options are `api` and `switchboard`. | `api,switchboard`
+REGISTRY_API_PREFIX | API routing prefix. | `/api`
+REGISTRY_SWITCHBOARD_PREFIX | WebSocket routing prefix. | `/switchboard`
+REGISTRY_URL | Base URL of the registry API (used by switchboard for remote auth in split mode). | `http://localhost:8000`
+REGISTRY_CORS_ORIGINS | Comma-separated list of allowed CORS origins. | `capacitor://localhost,http://localhost:5173,http://localhost:5174,http://localhost,https://localhost`
 REGISTRY_SEED_DATA_PATH | root location of checked-in seed documents. Store seeds load from `store/` and authz seeds load from `auth/` beneath this root. | `seed-data`
 REGISTRY_BIND_HOST | host to bind to | `localhost`
 REGISTRY_BIND_PORT | port to bind to | `8000`
@@ -68,7 +73,7 @@ Select the backend via the `REGISTRY_BACKEND` environment variable.
 
 #### S3 Backend
 
-If using the S3 backend, it is assumed your environment provides the authentication necessary for _reading_ and _writing_ to the `REGISTRY_BACKEND_S3_BUCKET` bucket -- e.g. the evironment provides an appropriate AWS_ACCESS_KEY, [IAM Roles Anywhere](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html), or ec2/ecs-task metadata identity to the AWS SDK with these _minimal_ permissions:
+If using the S3 backend, it is assumed your environment provides the authentication necessary for _reading_ and _writing_ to the `REGISTRY_BACKEND_S3_BUCKET` bucket -- e.g. the environment provides an appropriate AWS_ACCESS_KEY, [IAM Roles Anywhere](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html), or ec2/ecs-task metadata identity to the AWS SDK with these _minimal_ permissions:
 
 
 ```json
@@ -102,13 +107,13 @@ The Git backend stores registry data in a normal git checkout and keeps the same
 - `accounts/<account>/presets/<preset>.json`
 - `presets/<preset>.json`
 
-For the dedicated data repository, the recommended layout is to keep those directories at the repository root and leave `REGISTRY_BACKEND_PREFIX` unset.
+The recommended layout for a dedicated data repository is to keep those directories at the repository root and leave `REGISTRY_BACKEND_PREFIX` unset.
 
 By default, the Git backend uses `tmp/data` as its checkout path, `git@github.com:briceburg/radio-pad-registry-data.git` as its bootstrap remote, and the GitHub noreply identity for `briceburg` for registry-managed commits.
 
 The intended authentication model is a write-enabled GitHub deploy key over SSH. To run without remote sync, set `REGISTRY_BACKEND_GIT_REMOTE_URL=` and place an existing checkout in `REGISTRY_BACKEND_PATH`.
 
-#### Fly.io deployment
+##### Fly.io deployment
 
 The checked-in `fly.toml` uses `tmp/data` as the local checkout. The backend also uses a repo-scoped file lock so processes sharing the same checkout serialize Git operations safely.
 
@@ -123,6 +128,20 @@ curl -i https://radio-pad-registry.fly.dev/healthz
 ```
 
 Use a volume for `REGISTRY_BACKEND_PATH` if startup clone latency becomes a problem.
+
+#### Switchboard (WebSockets)
+
+When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry mounts a WebSocket router that facilitates event-driven communication between the [radio-pad player](../player/) and connected [remote controls](../remote-control/).
+
+Pub-sub between connected clients uses an in-memory broadcast module (`src/switchboard/broadcast.py`). This is sufficient for single-instance deployments and for multi-instance deployments that use **path-based sticky sessions** (all connections for a given `/{account_id}/{player_id}` path land on the same process).
+
+The switchboard partitions connections by request path and expects clients to connect to:
+
+`wss://<switchboard_domain>/switchboard/<account_id>/<player_id>`
+
+Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
+
+All clients connected to the same `/{account_id}/{player_id}` channel receive each other's events via the in-process broadcast.
 
 ### Write authentication and authz seeding
 
@@ -156,11 +175,13 @@ These files are intended to stay human-friendly and easy to review. The checked-
 
 If you later want less public identity exposure, you can replace email entries with OIDC `subject` entries after first login.
 
-For the broader system view, including the switchboard/player control boundary, see the diagrams in the [`radio-pad` README](https://github.com/briceburg/radio-pad#architecture).
+For the broader system view, including the switchboard/player control boundary, see the diagrams in the [root README](../README.md#architecture).
 
 In production, the private authz store should use a separate local path such as `REGISTRY_AUTHZ_PATH=/data/authz`, even if the public datastore also uses local storage on the same Fly volume.
 
 ## Testing
+
+For compose-based development with all services, see the [root README](../README.md#development).
 
 To run the tests, first install the development dependencies:
 
