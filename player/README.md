@@ -7,7 +7,6 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 ### Host Dependencies
 
 - [mpv](https://mpv.io/)
-- [python-websockets](https://websockets.readthedocs.io/en/stable/)
 - [python-mpv-jsonipc](https://github.com/iwalton3/python-mpv-jsonipc)
 - [python-websockets](https://github.com/python-websockets/websockets)
 
@@ -43,23 +42,27 @@ name | description | default
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
 `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
-`RADIOPAD_REGISTRY_URL` | Player discovery URL. | `https://registry.radiopad.dev`
-`RADIOPAD_STATIONS_URL` | URL to load stations from. Must return a JSON list of stations. Discovered if not provided. | `None`
-`RADIOPAD_SWITCHBOARD_URL` | URL of switchboard. The switchboard enables remote-controls. Discovered if not provided. | `None`
+`RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev`
+`RADIOPAD_STATIONS_URL` | URL returning a station preset JSON object. Discovered from the registry if not set. | `None`
+`RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control syncing. Discovered from the registry if not set. | `None`
 
 ### Registry Discovery
 
-Player details such as the available stations and the switchboard used to communicate with remote controls are "discovered" (via API requests to the [radio-pad-registry](https://github.com/briceburg/radio-pad-registry)) using the value of the `RADIOPAD_PLAYER` environment variable. 
+The player discovers its station preset and switchboard URL from the [registry](../registry/) using the `RADIOPAD_PLAYER` environment variable.
 
-E.g. if the `RADIOPAD_PLAYER` environment variable is set to `briceburg/living-room`, the station list + switchboard for this player is looked up via a GET request to https://registry.radiopad.dev/v1/accounts/briceburg/players/living-room
+For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
+
+```
+https://registry.radiopad.dev/api/accounts/briceburg/players/living-room
+```
+
+The registry returns the `stations_url` (pointing to a station preset) and `switchboard_url` for this player. The station preset contains the named list of stations the player will offer.
 
 #### Editing Stations
 
-Use the registry API to modify stations or edit the seed data directly, e.g. by editing the [briceburg preset](https://github.com/briceburg/radio-pad-registry/blob/main/data/presets/briceburg.json) used by the briceburg/living-room player.
+Stations are defined in station presets stored in the registry. To modify them, use the registry API or edit the seed data directly — e.g. the [briceburg station preset](../registry/seed-data/store/presets/briceburg.json).
 
-If you prefer to skip station discovery and roll your own list, set the RADIOPAD_STATIONS_URL environment variable to a URL that responds with your desired stations. Stations are expressed as JSON.
-
-Example configuration:
+To bypass registry discovery entirely, set `RADIOPAD_STATIONS_URL` to any URL that returns a station preset JSON object:
 
 ```json
 {
@@ -84,6 +87,8 @@ options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
 ```
 
 ## Development
+
+For compose-based development with all services, see the [root README](../README.md#development).
 
 ### Contributing
 

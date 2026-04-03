@@ -102,12 +102,22 @@ def discover_config(player, registry_url, stations_url=None, switchboard_url=Non
     except ValueError:
         raise ConfigError("Player must be in 'account_id/player_id' format")
 
-    url = f"{registry_url.rstrip('/')}/v1/accounts/{account_id}/players/{player_id}"
+    url = f"{registry_url.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)
     logger.info("  To skip, set RADIOPAD_ENABLE_DISCOVERY=false")
     data = asyncio.run(fetch_json_url(url))
+
     if data:
         stations_url = stations_url or data.get("stations_url")
         switchboard_url = switchboard_url or data.get("switchboard_url")
+
+    # If the registry didn't provide URLs (e.g. they're omitted on the backend),
+    # infer them locally using the known registry endpoint as a base.
+    if not stations_url:
+        stations_url = f"{registry_url.rstrip('/')}/presets/{account_id}"
+
+    if not switchboard_url:
+        # Fallback assumes the switchboard is deployed at the same domain/port as the registry
+        switchboard_url = f"{registry_url.rstrip('/').replace('http', 'ws').replace('/api', '/switchboard')}/{account_id}/{player_id}"
 
     return stations_url, switchboard_url

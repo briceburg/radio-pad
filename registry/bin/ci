@@ -21,4 +21,9 @@ ruff format --check "${paths[@]}" || die "ruff format failed. run: ruff format $
 log "🧹 [ruff] Linting (no fixes)..."
 ruff check "${paths[@]}" || die "ruff lint failed. run: ruff check --fix ${paths[*]}"
 
+if [ -d "tests" ]; then
+  log "🧪 [pytest] Running tests..."
+  pytest || die "pytest failed."
+fi
+
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

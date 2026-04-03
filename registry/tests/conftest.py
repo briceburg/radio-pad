@@ -47,10 +47,11 @@ def _build_client(store: DataStore) -> TestClient:
     app = create_app()
 
     from api.types import get_store
+    from lib.constants import API_PREFIX
 
     app.dependency_overrides[get_store] = lambda: store
     app.state.store = store
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, raise_server_exceptions=False, base_url=f"http://testserver{API_PREFIX}/")
 
 
 @pytest.fixture(scope="session")

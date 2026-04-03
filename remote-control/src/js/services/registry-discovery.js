@@ -70,7 +70,7 @@ const withAuthFallback = async (fallback, promiseCallback) => {
 export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   if (!registryUrl) return [];
   const items = await fetchAllPages(
-    "/v1/accounts/",
+    "accounts/",
     registryUrl,
     auth,
     options.signal,
@@ -92,7 +92,7 @@ export async function discoverPlayers(
 
   return withAuthFallback([], async () => {
     const items = await fetchAllPages(
-      `/v1/accounts/${accountId}/players/`,
+      `accounts/${accountId}/players/`,
       registryUrl,
       auth,
       options.signal,
@@ -112,8 +112,8 @@ export async function discoverPresets(
 
   const presets = [];
   const paths = [
-    ...(accountId ? [`/v1/accounts/${accountId}/presets/`] : []),
-    `/v1/presets/`,
+    ...(accountId ? [`accounts/${accountId}/presets/`] : []),
+    `presets/`,
   ];
 
   await withAuthFallback([], async () => {
@@ -153,7 +153,7 @@ export async function discoverPlayer(
   if (!(registryUrl && accountId)) return null;
 
   return withAuthFallback(null, async () => {
-    const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
+    const url = `${registryUrl}accounts/${accountId}/players/${playerId}`;
     const response = await fetch(
       url,
       buildRequestOptions(auth, options.signal),

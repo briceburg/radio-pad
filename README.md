@@ -2,15 +2,13 @@
 
 A 🎵 radio station player 🎵 with real-time syncing controllers.
 
-The registry API and datastore implementation live in [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry).
-
 ![radio-pad-logo](./shared/assets/logo-dark.svg)
 
 ## Overview
 
 * The radio-pad [player](./player/) runs on a host (such as a Raspberry Pi) connected to a stereo/speakers.
-* Controllers, such as a USB-connected [macropad](./macropad-control/), request the station to play.
-* [Stations](./player/stations.json) are configurable.
+* Controllers — a USB-connected [macropad](./macropad-control/) or a [remote control](./remote-control/) app (web/mobile) — request the station to play.
+* Stations are managed as [station presets](./registry/seed-data/store/presets/) in the registry.
 
 ### Local control
 
@@ -24,26 +22,77 @@ The registry API and datastore implementation live in [`radio-pad-registry`](htt
 
 ### Remote control
 
-**radio-pad** is optionally controlled through a [switchboard](./switchboard/) of connected [clients](./remote-control/), such as mobile apps or web browsers.
+**radio-pad** is optionally controlled through the [registry's](./registry/) built-in switchboard and connected [remote controls](./remote-control/), such as mobile apps or web browsers.
 
-* Clients and the radio-pad player connect to the switchboard to request and broadcast station changes.
-* The switchboard can run on the local network or as an internet-available service.
-* WebSockets are used for real-time syncing of clients, such as updating the currently playing station.
+* Remote controls and the player connect to the switchboard via WebSockets to request and broadcast station changes in real time.
+* The registry is a [dual-mode service](#deployment-modes) (API + switchboard) that can also be split for independent scaling.
 
-## Getting started
+## Components
 
-There are four components that make up radio-pad. Each is broken out into a folder which _may_ become a git repository. Visit these folders for details on installation and usage:
-
-* The [player](./player/) runs on a host and defines [stations](./player/README.md#editing-stations).
-* The [macropad-control](./macropad-control/) connects to the host over USB.
-* The [switchboard](./switchboard/) is _optional_ and needed to support remote-control.
-* The [remote-control](./remote-control/) is used to create mobile and web clients for controlling the player.
+| Component | Description |
+|-----------|-------------|
+| [player](./player/) | Runs on a host and plays stations from a [station preset](./player/README.md#registry-discovery). |
+| [macropad-control](./macropad-control/) | USB-connected macropad controller. |
+| [registry](./registry/) | API + switchboard service. Manages accounts, players, station presets, and WebSocket routing. |
+| [remote-control](./remote-control/) | Web and mobile remote control for the player. |
 
 <p align="center" width="100%">
   <img src="./shared/assets/icon-fancy-bg.svg" />
 </p>
 
+## Development
+
+Docker Compose provides the local development environment. All services mount source for live reloading.
+
+```sh
+# Start all services (unified: registry serves API + switchboard)
+docker compose up
+
+# Or split mode (registry and switchboard as separate services)
+docker compose -f compose.split.yaml up
+```
+
+Ports default to ephemeral (see [.env](.env)). Override in `.env` to pin them:
+
+```
+RADIOPAD_REGISTRY_PORT=1980
+RADIOPAD_REMOTE_CONTROL_PORT=5173
+```
+
+View assigned ports:
+
+```sh
+docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
+```
+
+See each component README for standalone usage and additional configuration:
+[player](./player/README.md) · [registry](./registry/README.md) · [remote-control](./remote-control/README.md) · [macropad-control](./macropad-control/README.md)
+
+### Running integration tests
+
+Integration tests validate cross-service behavior (reachability, handshakes, message routing, seeded data).
+Individual project tests live within each component folder.
+
+```sh
+# Unified mode
+bin/ci
+
+# Split mode
+COMPOSE_FILE=compose.split.yaml bin/ci
+```
+
 ## Architecture
+
+### Deployment modes
+
+The registry is controlled by the `REGISTRY_PROFILES` environment variable:
+
+| Mode | `REGISTRY_PROFILES` | Description |
+|------|---------------------|-------------|
+| **Unified** | `api,switchboard` (default) | Single process serves the REST API and WebSocket switchboard. Simplest to deploy and operate. |
+| **Split** | `api` / `switchboard` separately | API and switchboard run as independent services. The switchboard validates tokens via HTTP call back to the API. Allows independent scaling of stateless API replicas vs. long-lived WebSocket connections. |
+
+`compose.yaml` runs unified mode. `compose.split.yaml` demonstrates the split topology and is also tested in CI.
 
 ### Core control flow
 
@@ -51,48 +100,47 @@ There are four components that make up radio-pad. Each is broken out into a fold
 flowchart TD
     Macropad["Macropad controller"]
     Player["Player device<br/>🎵🎵🎵"]
-    Switchboard["Switchboard"]
-    Remote["Remote-control app<br/>(mobile / web)"]
+    Registry["Registry<br/>(API + Switchboard)"]
+    Remote["Remote control<br/>(mobile / web)"]
 
     Macropad <-- USB --> Player
-    Player -- ws:station_playing --> Switchboard
-    Switchboard -- ws:station_request --> Player
-    Switchboard -- ws:station_playing --> Remote
-    Remote -- ws:station_request --> Switchboard
+    Player -- ws:station_playing --> Registry
+    Registry -- ws:station_request --> Player
+    Registry -- ws:station_playing --> Remote
+    Remote -- ws:station_request --> Registry
 
     style Player stroke:#f9f,stroke-width:3px
-    style Switchboard stroke:#bbf,stroke-width:3px
+    style Registry stroke:#bbf,stroke-width:3px
 ```
 
-This is the baseline runtime view: controllers talk to players directly over USB or indirectly through the switchboard.
+This is the baseline runtime view: controllers talk to players directly over USB or indirectly through the registry's switchboard.
 
 ### Registry and player access
 
 ```mermaid
 flowchart TD
     User["Signed-in user"]
-    Remote["Remote-control app"]
-    Registry["radio-pad-registry API"]
-    Switchboard["Switchboard"]
+    Remote["Remote control"]
+    Registry["Registry API"]
+    Switchboard["Registry Switchboard"]
     Player["Player device"]
 
     User -- "Google OIDC Auth" --> Remote
     Remote -- "[Bearer] Access registered players" --> Registry
     Registry -- "Return assigned players" --> Remote
     Remote -- "[?token=] Connect to Switchboard" --> Switchboard
-    Switchboard -- "[Bearer] Validate token on handshake" --> Registry
-    Registry -- "HTTP 200 OK (Validated)" --> Switchboard
+    Switchboard -- "Validate token (local or remote)" --> Registry
     Player -- "Connect as Player" --> Switchboard
     Switchboard -- "Route controls to Player" --> Player
 ```
 
-Player control stays strictly authenticated end-to-end:
+Player control is authenticated end-to-end:
 
-* The remote-control signs in to get an OIDC Bearer token.
-* Controllers request access to their registered resources using this token.
-* During WebSocket connection, controllers supply their OIDC validation token.
-* The switchboard makes a synchronous HTTP validation check back to the registry before upgrading the socket.
-* Unauthorized connections are outright rejected.
+* The remote control signs in to get an OIDC Bearer token.
+* It requests access to registered players using this token.
+* During WebSocket connection, the remote control supplies the token as a query parameter.
+* The switchboard validates the token locally (unified mode) or via HTTP call to the registry API (split mode).
+* Unauthorized connections are rejected.
 
 ### Contributing
 
@@ -101,8 +149,3 @@ Pull requests and bug reports are welcome! Please [open an issue](https://github
 ## Support
 
 For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
-
-### TODO
-
-* Use MIDI control sequences or usb-cdc instead of keypresses for radio control. This is necessary to support bi-directional communication, e.g. to notify macropad of station changes from remote controls.
-* Pass the list of stations to macropad (via USB connection) and controllers (via switchboard). We can thus handle live station updates, as well as defer startup until communication with the player has been established.

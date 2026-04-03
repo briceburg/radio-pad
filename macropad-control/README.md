@@ -1,6 +1,6 @@
 # radio-pad macropad-control
 
-Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-rp2040/overview) as a 🎵 radio station player 🎵.
+Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-rp2040/overview) as a 🎵 radio station controller 🎵.
 
 **radio-pad** lets you use an Adafruit Macropad as a controller for playing internet radio stations on your computer (such as a Raspberry Pi). Each Macropad button can be mapped to a different station, and the host computer will play the selected station using [mpv](https://mpv.io/).
 
@@ -34,9 +34,9 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/mount
    ```
 
-2. **Customize stations and button colors:**
+2. **Customize button colors and behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
-   - Edit [`../stations.json`](../stations.json) to change list of available stations.
+   - Stations are received from the connected [player](../player/), which loads them from a registry [station preset](../player/README.md#registry-discovery).
 3. **Sync your changes to the Macropad:**
 
    ```sh

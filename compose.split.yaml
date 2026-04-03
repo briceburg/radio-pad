@@ -1,0 +1,47 @@
+services:
+  registry:
+    extends:
+      file: compose.yaml
+      service: registry
+    environment:
+      REGISTRY_PROFILES: "api"
+      REGISTRY_API_PREFIX: ""
+
+  switchboard:
+    extends:
+      file: compose.yaml
+      service: registry
+    ports:
+      - "${RADIOPAD_SWITCHBOARD_PORT}:1980"
+    environment:
+      REGISTRY_PROFILES: "switchboard"
+      REGISTRY_BIND_PORT: "1980"
+      REGISTRY_SWITCHBOARD_PREFIX: ""
+      REGISTRY_URL: "http://registry:1980/"
+
+  player:
+    extends:
+      file: compose.yaml
+      service: player
+    environment:
+      RADIOPAD_REGISTRY_URL: "http://registry:1980/"
+      RADIOPAD_SWITCHBOARD_URL: "ws://switchboard:1980/briceburg/living-room"
+
+  remote-control:
+    extends:
+      file: compose.yaml
+      service: remote-control
+    environment:
+      VITE_REGISTRY_URL: "http://registry:1980/"
+      VITE_SWITCHBOARD_URL: "ws://switchboard:1980/"
+
+  integration-tests:
+    extends:
+      file: compose.yaml
+      service: integration-tests
+    depends_on:
+      switchboard:
+        condition: service_healthy
+    environment:
+      REGISTRY_URL: "http://registry:1980"
+      SWITCHBOARD_URL: "ws://switchboard:1980"

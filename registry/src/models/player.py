@@ -1,6 +1,4 @@
-from typing import Any
-
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from lib.types import Descriptor, Slug, WsUrl
 from lib.validators import trim_name
@@ -12,7 +10,7 @@ class PlayerBase(BaseModel):
     name: Descriptor = Field(..., json_schema_extra={"example": "Living Room"})
     stations_url: HttpUrl | None = Field(
         None,
-        json_schema_extra={"example": "https://registry.radiopad.dev/v1/presets/briceburg"},
+        json_schema_extra={"example": "https://registry.radiopad.dev/api/presets/briceburg"},
     )
     switchboard_url: WsUrl | None = Field(
         None,
@@ -45,13 +43,3 @@ class Player(PlayerBase):
 
     id: Slug = Field(..., json_schema_extra={"example": "living-room"})
     account_id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
-
-    @model_validator(mode="before")
-    @classmethod
-    def set_default_urls(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            if not data.get("stations_url"):
-                data["stations_url"] = "https://registry.radiopad.dev/v1/presets/briceburg"
-            if not data.get("switchboard_url"):
-                data["switchboard_url"] = f"wss://switchboard.radiopad.dev/{data.get('account_id')}/{data.get('id')}"
-        return data

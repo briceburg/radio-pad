@@ -21,6 +21,7 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 
 import lib.config as config
@@ -58,7 +59,15 @@ async def main(player):
         raise
 
 
+def handle_sigterm(signum, frame):
+    """Handle Docker stopping the container by gracefully propagating a KeyboardInterrupt."""
+    raise KeyboardInterrupt()
+
+
 if __name__ == "__main__":
+    # Map SIGTERM to KeyboardInterrupt so the player softly exits when docker compose downs
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
@@ -98,7 +107,7 @@ if __name__ == "__main__":
         logger.critical("Configuration error: %s", e)
         sys.exit(1)
     except (KeyboardInterrupt, EOFError):
-        # KeyboardInterrupt handles SIGINT (Ctrl+C) and SIGTERM
+        # KeyboardInterrupt handles SIGINT (Ctrl+C) and SIGTERM (via handle_sigterm)
         logger.info("Application terminated gracefully.")
     except Exception as e:
         logger.critical("Unexpected error: %s", e, exc_info=True)
