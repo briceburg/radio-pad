@@ -5,7 +5,9 @@ from pathlib import Path
 API_VERSION = "2026-04-30"
 
 # Active service profiles (comma-separated: "api", "switchboard", or both)
-PROFILES = os.getenv("REGISTRY_PROFILES", "api,switchboard").split(",")
+PROFILES = [
+    profile.strip() for profile in os.getenv("REGISTRY_PROFILES", "api,switchboard").split(",") if profile.strip()
+]
 
 # API and WebSocket routing prefixes
 API_PREFIX = os.getenv("REGISTRY_API_PREFIX", "/api")

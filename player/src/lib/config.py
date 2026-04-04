@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -7,6 +8,19 @@ from lib.exceptions import ConfigError
 from lib.interfaces import RadioPadPlayerConfig, RadioPadStation
 
 logger = logging.getLogger("CONFIG")
+
+
+def _infer_switchboard_url(registry_url: str, account_id: str, player_id: str) -> str:
+    parsed = urlsplit(registry_url)
+    scheme = "wss" if parsed.scheme == "https" else "ws"
+    api_path = parsed.path.rstrip("/")
+    if api_path.endswith("/api"):
+        switchboard_path = f"{api_path[:-4]}/switchboard"
+    else:
+        switchboard_path = f"{api_path}/switchboard"
+    return urlunsplit(
+        (scheme, parsed.netloc, f"{switchboard_path}/{account_id}/{player_id}", "", "")
+    )
 
 
 def http_client_headers(custom_headers=None):
@@ -118,6 +132,6 @@ def discover_config(player, registry_url, stations_url=None, switchboard_url=Non
 
     if not switchboard_url:
         # Fallback assumes the switchboard is deployed at the same domain/port as the registry
-        switchboard_url = f"{registry_url.rstrip('/').replace('http', 'ws').replace('/api', '/switchboard')}/{account_id}/{player_id}"
+        switchboard_url = _infer_switchboard_url(registry_url, account_id, player_id)
 
     return stations_url, switchboard_url

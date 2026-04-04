@@ -9,8 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 ENV PYTHONPATH=/app/src
 
-HEALTHCHECK --interval=2s --timeout=2s --start-period=5s --retries=5 \
-  CMD pgrep -f 'python3 src/player.py' > /dev/null || exit 1
+HEALTHCHECK --interval=2s --timeout=2s --start-period=8s --retries=5 \
+  CMD python3 src/healthcheck.py
 
 CMD ["python3", "src/player.py"]
 

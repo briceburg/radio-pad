@@ -19,6 +19,7 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 import websockets
 
@@ -31,10 +32,17 @@ MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
 
 
 class SwitchboardClient(RadioPadClient):
-    def __init__(self, player: RadioPadPlayer):
+    def __init__(
+        self,
+        player: RadioPadPlayer,
+        on_connect: Callable[[], None] | None = None,
+        on_disconnect: Callable[[], None] | None = None,
+    ):
         super().__init__(player)
         self.url = player.config.switchboard_url
         self.ws = None
+        self.on_connect = on_connect
+        self.on_disconnect = on_disconnect
 
         self.http_headers = http_client_headers(
             {"RadioPad-Stations-Url": player.config.stations_url}
@@ -60,12 +68,13 @@ class SwitchboardClient(RadioPadClient):
             try:
                 logger.info(f"connected to: {self.url}")
                 self.ws = ws
+                if self.on_connect:
+                    self.on_connect()
                 asyncio.create_task(self.broadcast("station_playing"))
                 async for msg in ws:
                     await self.handle_message(msg)
             except websockets.exceptions.ConnectionClosed:
                 # If the connection fails with a transient error, it is retried with exponential backoff. If it fails with a fatal error, the exception is raised, breaking out of the loop.
-                self.ws = None
                 continue
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning(f"failed to connect to {self.url}: {e}")
@@ -73,6 +82,10 @@ class SwitchboardClient(RadioPadClient):
                     "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
                 )
                 continue
+            finally:
+                self.ws = None
+                if self.on_disconnect:
+                    self.on_disconnect()
 
     async def _send(self, message):
         """Send a message to the macropad or switchboard."""

@@ -77,7 +77,7 @@ def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
     )
 
     with client:
-        response = client.get("/presets/briceburg")
+        response = client.get("presets/briceburg")
 
     assert response.status_code == 200
 
@@ -94,7 +94,7 @@ def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/presets/fresh",
+            "presets/fresh",
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
 
@@ -114,7 +114,7 @@ def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/presets/fresh",
+            "presets/fresh",
             headers={"Authorization": "Basic not-a-bearer-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -135,7 +135,7 @@ def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> 
 
     with client:
         response = client.put(
-            "/presets/fresh",
+            "presets/fresh",
             headers={"Authorization": "Bearer    "},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
