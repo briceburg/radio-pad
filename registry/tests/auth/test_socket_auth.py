@@ -1,6 +1,6 @@
 """Socket auth validation tests (validate_remote path)."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -9,88 +9,75 @@ from fastapi import WebSocketException
 from auth.socket_auth import validate_remote
 
 
-async def test_validate_remote_success() -> None:
+@pytest.fixture
+def mock_request() -> AsyncMock:
+    req = AsyncMock()
+    req.app.state.http_client = AsyncMock()
+    return req
+
+
+async def test_validate_remote_success(mock_request: AsyncMock) -> None:
     """200 response passes validation."""
-    mock_response = httpx.Response(200)
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+    mock_response = httpx.Response(200, request=httpx.Request("GET", "http://test"))
+    mock_request.app.state.http_client.get.return_value = mock_response
 
-        await validate_remote("acct", "player1", "valid-token")
-        mock_client.get.assert_called_once()
+    await validate_remote(mock_request, "acct", "player1", "valid-token")
+    mock_request.app.state.http_client.get.assert_called_once()
 
 
-async def test_validate_remote_unauthorized() -> None:
+async def test_validate_remote_unauthorized(mock_request: AsyncMock) -> None:
     """Non-200 response raises WS_1008_POLICY_VIOLATION."""
-    mock_response = httpx.Response(403)
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+    mock_response = httpx.Response(403, request=httpx.Request("GET", "http://test"))
+    mock_request.app.state.http_client.get.return_value = mock_response
 
-        with pytest.raises(WebSocketException) as exc_info:
-            await validate_remote("acct", "player1", "bad-token")
-        assert exc_info.value.code == 1008
+    with pytest.raises(WebSocketException) as exc:
+        await validate_remote(mock_request, "acct", "player1", "bad-token")
+
+    assert exc.value.code == 1008
+    assert "Unauthorized" in exc.value.reason
 
 
-async def test_validate_remote_network_error() -> None:
-    """Network error raises WS_1011_INTERNAL_ERROR."""
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.side_effect = httpx.ConnectError("connection refused")
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+async def test_validate_remote_http_error(mock_request: AsyncMock) -> None:
+    """Network connection errors raise WS_1011_INTERNAL_ERROR."""
+    mock_request.app.state.http_client.get.side_effect = httpx.ConnectError("Connection refused")
 
-        with pytest.raises(WebSocketException) as exc_info:
-            await validate_remote("acct", "player1", "token")
-        assert exc_info.value.code == 1011
+    with pytest.raises(WebSocketException) as exc:
+        await validate_remote(mock_request, "acct", "player1", "token")
+
+    assert exc.value.code == 1011
+    assert "internal error" in exc.value.reason
 
 
-async def test_validate_remote_timeout() -> None:
-    """Timeout raises WS_1011_INTERNAL_ERROR."""
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.side_effect = httpx.ReadTimeout("timeout")
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+async def test_validate_remote_timeout(mock_request: AsyncMock) -> None:
+    """Network timeouts raise WS_1011_INTERNAL_ERROR."""
+    mock_request.app.state.http_client.get.side_effect = httpx.TimeoutException("Timeout")
 
-        with pytest.raises(WebSocketException) as exc_info:
-            await validate_remote("acct", "player1", "token")
-        assert exc_info.value.code == 1011
+    with pytest.raises(WebSocketException) as exc:
+        await validate_remote(mock_request, "acct", "player1", "token")
+
+    assert exc.value.code == 1011
+    assert "internal error" in exc.value.reason
 
 
-async def test_validate_remote_sends_bearer_header() -> None:
-    """Token is sent as Bearer authorization header."""
-    mock_response = httpx.Response(200)
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+async def test_validate_remote_headers_token(mock_request: AsyncMock) -> None:
+    """Bearer token is included in Authorization header."""
+    mock_response = httpx.Response(200, request=httpx.Request("GET", "http://test"))
+    mock_request.app.state.http_client.get.return_value = mock_response
 
-        await validate_remote("acct", "player1", "my-token")
-        call_kwargs = mock_client.get.call_args
-        assert call_kwargs.kwargs["headers"]["Authorization"] == "Bearer my-token"
+    await validate_remote(mock_request, "acct", "player1", "my-token")
+
+    mock_request.app.state.http_client.get.assert_called_once()
+    _, kwargs = mock_request.app.state.http_client.get.call_args
+    assert kwargs.get("headers") == {"Authorization": "Bearer my-token"}
 
 
-async def test_validate_remote_no_token() -> None:
-    """No token sends no Authorization header."""
-    mock_response = httpx.Response(200)
-    with patch("auth.socket_auth.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
+async def test_validate_remote_headers_no_token(mock_request: AsyncMock) -> None:
+    """No token results in empty headers."""
+    mock_response = httpx.Response(200, request=httpx.Request("GET", "http://test"))
+    mock_request.app.state.http_client.get.return_value = mock_response
 
-        await validate_remote("acct", "player1", None)
-        call_kwargs = mock_client.get.call_args
-        assert "Authorization" not in call_kwargs.kwargs["headers"]
+    await validate_remote(mock_request, "acct", "player1", None)
+
+    mock_request.app.state.http_client.get.assert_called_once()
+    _, kwargs = mock_request.app.state.http_client.get.call_args
+    assert kwargs.get("headers") == {}

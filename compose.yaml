@@ -5,7 +5,6 @@ services:
       target: dev
     ports:
       - "${RADIOPAD_REGISTRY_PORT}:1980"
-    user: "${UID:-1000}:${GID:-1000}"
     environment:
       REGISTRY_PROFILES: "api,switchboard"
       REGISTRY_BIND_PORT: "1980"
@@ -22,7 +21,6 @@ services:
     environment:
       RADIOPAD_REGISTRY_URL: "http://registry:1980/api/"
       RADIOPAD_PLAYER: "briceburg/living-room"
-    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./player:/app
 
@@ -37,7 +35,6 @@ services:
       RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://registry:1980"
     ports:
       - "${RADIOPAD_REMOTE_CONTROL_PORT}:5173"
-    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./remote-control:/app
 
@@ -46,6 +43,7 @@ services:
       - tests
     build:
       context: ./tests/integration
+    command: ["pytest", "-v", "--tb=short", "-p", "no:cacheprovider"]
     depends_on:
       player:
         condition: service_healthy
@@ -55,3 +53,5 @@ services:
       REGISTRY_URL: "http://registry:1980/api"
       SWITCHBOARD_URL: "ws://registry:1980/switchboard"
       REMOTE_CONTROL_URL: "http://remote-control:5173"
+    volumes:
+      - ./tests/integration:/app

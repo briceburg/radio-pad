@@ -27,7 +27,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             app.state.auth = AuthServices.from_env()
 
     broadcast: Broadcast | None = None
+    http_client = None
     if "switchboard" in profiles:
+        import httpx
+
+        http_client = httpx.AsyncClient(timeout=5.0)
+        app.state.http_client = http_client
+
         broadcast = Broadcast()
         await broadcast.connect()
         app.state.broadcast = broadcast
@@ -36,6 +42,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     if broadcast:
         await broadcast.disconnect()
+    if http_client:
+        await http_client.aclose()
 
 
 class RegistryAPI(FastAPI):
