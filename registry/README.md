@@ -133,15 +133,19 @@ Use a volume for `REGISTRY_BACKEND_PATH` if startup clone latency becomes a prob
 
 When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry mounts a WebSocket router that facilitates event-driven communication between the [radio-pad player](../player/) and connected [remote controls](../remote-control/).
 
-Pub-sub between connected clients uses an in-memory broadcast module (`src/switchboard/broadcast.py`). This is sufficient for single-instance deployments and for multi-instance deployments that use **path-based sticky sessions** (all connections for a given `/{account_id}/{player_id}` path land on the same process).
+Pub-sub between connected clients uses an in-memory broadcast module (`src/switchboard/broadcast.py`). Because state is held in-memory, horizontal scaling of the switchboard requires ensuring that all clients connecting to the same player land on the same server instance.
 
-The switchboard partitions connections by request path and expects clients to connect to:
+There are two primary ways to scale the switchboard:
+1. **Path-based sticky sessions**: A front-end load balancer routes all traffic for a specific `/{account_id}/{player_id}` path to the same backend process.
+2. **Switchboard Sharding**: The registry API issues opaque `switchboard_url` properties in its player configurations. This allows the backend to distribute different players to distinct switchboard domains or clusters based on capacity (e.g., `wss://sb-east-1.radiopad.dev/switchboard/...`), rather than relying on a single monolithic endpoint.
+
+The switchboard partitions connections by request path and expects clients to connect to that opaque URL, which takes the form:
 
 `wss://<switchboard_domain>/switchboard/<account_id>/<player_id>`
 
 Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
-All clients connected to the same `/{account_id}/{player_id}` channel receive each other's events via the in-process broadcast.
+All clients connected to the same `/{account_id}/{player_id}` channel receive each other's events directly via the in-process broadcast.
 
 ### Write authentication and authz seeding
 

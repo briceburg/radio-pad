@@ -20,23 +20,19 @@ class AuthenticatedIdentity(BaseModel):
         return None
 
 
-class GlobalAdmins(BaseModel):
+class AccessList(BaseModel):
+    subjects: list[str] = Field(default_factory=list)
+    emails: list[str] = Field(default_factory=list)
+
+    def allows(self, identity: AuthenticatedIdentity) -> bool:
+        return identity.subject_key in self.subjects or identity.verified_email in {
+            email.casefold() for email in self.emails
+        }
+
+
+class GlobalAdmins(AccessList):
     id: str = Field(default="global-admins")
-    subjects: list[str] = Field(default_factory=list)
-    emails: list[str] = Field(default_factory=list)
-
-    def allows(self, identity: AuthenticatedIdentity) -> bool:
-        return identity.subject_key in self.subjects or identity.verified_email in {
-            email.casefold() for email in self.emails
-        }
 
 
-class AccountAccess(BaseModel):
+class AccountAccess(AccessList):
     id: str
-    subjects: list[str] = Field(default_factory=list)
-    emails: list[str] = Field(default_factory=list)
-
-    def allows(self, identity: AuthenticatedIdentity) -> bool:
-        return identity.subject_key in self.subjects or identity.verified_email in {
-            email.casefold() for email in self.emails
-        }

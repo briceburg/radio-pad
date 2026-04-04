@@ -13,7 +13,7 @@ async def validate_socket_client(
     if "api" in PROFILES:
         await validate_local(request, account_id, player_id, token)
     else:
-        await validate_remote(account_id, player_id, token)
+        await validate_remote(request, account_id, player_id, token)
 
 
 async def validate_local(request: Request | WebSocket, account_id: str, player_id: str, token: str | None) -> None:
@@ -31,16 +31,17 @@ async def validate_local(request: Request | WebSocket, account_id: str, player_i
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from e
 
 
-async def validate_remote(account_id: str, player_id: str, token: str | None) -> None:
+async def validate_remote(request: Request | WebSocket, account_id: str, player_id: str, token: str | None) -> None:
     url = f"{REGISTRY_URL.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     headers = {"Authorization": f"Bearer {token}"} if token else {}
 
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        try:
-            resp = await client.get(url, headers=headers)
-        except httpx.HTTPError as e:
-            logger.error(f"Remote socket validation failed: {e}")
-            raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from e
+    client: httpx.AsyncClient = request.app.state.http_client
 
-        if resp.status_code != 200:
-            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access via remote")
+    try:
+        resp = await client.get(url, headers=headers)
+    except httpx.HTTPError as e:
+        logger.error(f"Remote socket validation failed: {e}")
+        raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from e
+
+    if resp.status_code != 200:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access via remote")

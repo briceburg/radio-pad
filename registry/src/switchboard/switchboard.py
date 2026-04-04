@@ -1,8 +1,6 @@
 import asyncio
 import json
 import logging
-from collections.abc import Coroutine
-from contextlib import suppress
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketException
 
@@ -18,23 +16,50 @@ async def publish_event(broadcast: Broadcast, channel: str, event: str, data: ob
     await broadcast.publish(channel, json.dumps({"event": event, "data": data}))
 
 
-async def run_session_tasks(*coroutines: Coroutine[object, object, None]) -> None:
-    tasks: list[asyncio.Task[None]] = [asyncio.create_task(coro) for coro in coroutines]
+async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str, is_player: bool) -> None:
+    async def sender() -> None:
+        async with broadcast.subscribe(player_key) as subscriber:
+            async for event in subscriber:
+                try:
+                    await websocket.send_text(event.message)
+                except Exception:
+                    logger.debug("Send failed for %s: %s", player_key, event.message[:80])
+                    break
+
+    async def receiver() -> None:
+        while True:
+            msg = await websocket.receive_text()
+            try:
+                payload = json.loads(msg)
+                event = payload.get("event")
+                data = payload.get("data")
+                if not event:
+                    continue
+
+                match event:
+                    case "station_playing" if is_player:
+                        await publish_event(broadcast, player_key, "station_playing", data)
+                    case "station_request" if not is_player:
+                        await publish_event(broadcast, player_key, "station_request", data)
+                    case "ping":
+                        await websocket.send_json({"event": "pong"})
+            except json.JSONDecodeError:
+                continue
+
     try:
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        for task in pending:
-            task.cancel()
-        for task in pending:
-            with suppress(asyncio.CancelledError):
-                await task
-        for task in done:
-            exc = task.exception()
-            if exc is not None:
-                raise exc
-    finally:
-        for task in tasks:
-            if not task.done():
-                task.cancel()
+        t1 = asyncio.create_task(sender())
+        t2 = asyncio.create_task(receiver())
+        
+        done, pending = await asyncio.wait(
+            [t1, t2], return_when=asyncio.FIRST_COMPLETED
+        )
+        for t in pending:
+            t.cancel()
+            
+        for t in done:
+            t.result()
+    except* WebSocketDisconnect:
+        pass
 
 
 @router.websocket("/{account_id}/{player_id}")
@@ -81,42 +106,8 @@ async def websocket_endpoint(
     if is_player:
         await publish_event(broadcast, player_key, "stations_url", stations_url)
 
-    async def sender() -> None:
-        async with broadcast.subscribe(player_key) as subscriber:
-            async for event in subscriber:
-                try:
-                    await websocket.send_text(event.message)
-                except Exception:
-                    logger.debug("Send failed for %s: %s", player_key, event.message[:80])
-                    break
-
-    async def receiver() -> None:
-        try:
-            while True:
-                msg = await websocket.receive_text()
-                try:
-                    payload = json.loads(msg)
-                    event = payload.get("event")
-                    data = payload.get("data")
-                    if not event:
-                        continue
-
-                    match event:
-                        case "station_playing" if is_player:
-                            await publish_event(broadcast, player_key, "station_playing", data)
-                        case "station_request" if not is_player:
-                            await publish_event(broadcast, player_key, "station_request", data)
-                        case "ping":
-                            await websocket.send_json({"event": "pong"})
-                except json.JSONDecodeError:
-                    continue
-        except WebSocketDisconnect:
-            pass
-
     try:
-        await run_session_tasks(sender(), receiver())
-    except* WebSocketDisconnect:
-        pass
+        await _run_loop(websocket, broadcast, player_key, is_player=is_player)
     finally:
         if is_player:
             await publish_event(broadcast, player_key, "station_playing", None)
