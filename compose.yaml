@@ -31,8 +31,10 @@ services:
       context: ./remote-control
       target: dev
     environment:
-      VITE_REGISTRY_URL: "http://registry:1980/api/"
-      VITE_SWITCHBOARD_URL: "ws://registry:1980/switchboard/"
+      VITE_REGISTRY_URL: "/api/"
+      VITE_SWITCHBOARD_URL: "/switchboard"
+      RADIOPAD_REGISTRY_PROXY_TARGET: "http://registry:1980"
+      RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://registry:1980"
     ports:
       - "${RADIOPAD_REMOTE_CONTROL_PORT}:5173"
     user: "${UID:-1000}:${GID:-1000}"

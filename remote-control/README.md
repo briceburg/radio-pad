@@ -42,6 +42,8 @@ npm start
 
 Open `http://localhost:5173`. Sign in from `Settings` when you want to load managed players or test registry writes.
 
+For compose-based development, the root `.env` pins the remote-control port to `5173` so the same Google OAuth web client works with `docker compose up`. If you change that port, update the Google web client origin and redirect URI to match.
+
 For registry write testing on web, copy the API test token from `Settings` and use it with the [registry](../registry/) API.
 
 When you deploy the web app, add the deployed origin and redirect URI to the same Google web client, or create a separate production client.

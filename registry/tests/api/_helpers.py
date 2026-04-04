@@ -44,9 +44,13 @@ VALID_ACCOUNT_ITEM_SLUG_PAIRS = [
 ]
 
 
+def _request_path(path: str) -> str:
+    return path[1:] if path.startswith("/") else path
+
+
 def put_json(client: TestClient, path: str, body: JsonDoc | BaseModel, expected: int = 200) -> JsonDoc:
     payload = body if isinstance(body, dict) else body.model_dump(mode="json", exclude_none=True)
-    resp = client.put(path, json=payload)
+    resp = client.put(_request_path(path), json=payload)
     assert resp.status_code == expected, f"expected {expected} got {resp.status_code}: {resp.text}"
     if expected == 200:
         data: JsonDoc = resp.json()
@@ -57,7 +61,7 @@ def put_json(client: TestClient, path: str, body: JsonDoc | BaseModel, expected:
 def get_json(client: TestClient, path: str, expected: int = 200, params: PaginationParams | None = None) -> JsonDoc:
     # Pydantic models must be converted to dicts for query params
     params_dict = params.model_dump(exclude_none=True) if params else None
-    resp = client.get(path, params=params_dict)
+    resp = client.get(_request_path(path), params=params_dict)
     assert resp.status_code == expected, f"GET {path} expected {expected} got {resp.status_code}: {resp.text}"
     if expected == 200:
         data: JsonDoc = resp.json()
@@ -66,7 +70,7 @@ def get_json(client: TestClient, path: str, expected: int = 200, params: Paginat
 
 
 def get_response(client: TestClient, path: str, expected: int = 200) -> _ResponseLike:
-    resp = client.get(path)
+    resp = client.get(_request_path(path))
     assert resp.status_code == expected, f"GET {path} expected {expected} got {resp.status_code}: {resp.text}"
     return resp
 

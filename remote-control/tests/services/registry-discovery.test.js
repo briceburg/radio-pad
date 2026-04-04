@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { discoverAccounts, discoverPlayers } from "../../src/js/services/registry-discovery.js";
+import { discoverAccounts } from "../../src/js/services/registry-discovery.js";
 
 describe("Registry Discovery", () => {
   beforeEach(() => {
@@ -33,5 +33,22 @@ describe("Registry Discovery", () => {
       { value: "acct1", label: "Account One" },
       { value: "acct2", label: "Account Two" }
     ]);
+  });
+
+  it("discoverAccounts resolves relative registry paths against the browser origin", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [{ id: "acct1", name: "Account One" }],
+        links: {}
+      })
+    });
+
+    await discoverAccounts("/api/");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:3000/api/accounts/",
+      {},
+    );
   });
 });

@@ -37,6 +37,29 @@ function identity(value) {
   return value;
 }
 
+function withTrailingSlash(value) {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+
+function normalizeRegistryUrl(value) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) return null;
+  if (trimmed.startsWith("/")) {
+    return withTrailingSlash(trimmed);
+  }
+
+  const candidate = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    parsed.pathname = withTrailingSlash(parsed.pathname);
+    return parsed.toString();
+  } catch {
+    return candidate;
+  }
+}
+
 function clonePreference(pref) {
   return {
     ...pref,
@@ -75,15 +98,13 @@ const DEFAULT_PREFERENCES = {
     group: "radio-advanced",
     default:
       import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
-    normalize: (value) => {
-      const trimmed = typeof value === "string" ? value.trim() : "";
-      if (!trimmed) return null;
-      return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    },
+    normalize: normalizeRegistryUrl,
     validate: (value) => {
-      try {
-        new URL(value);
+      if (typeof value === "string" && value.startsWith("/")) {
         return true;
+      }
+      try {
+        return /^https?:$/.test(new URL(value).protocol);
       } catch {
         return false;
       }

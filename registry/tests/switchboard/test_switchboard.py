@@ -2,7 +2,8 @@
 
 Uses Starlette's TestClient which provides synchronous WebSocket testing.
 Tests that involve broadcast receive (sender loop) are limited because
-the async TaskGroup-based relay cannot run inside the sync TestClient context.
+the async relay runs in background tasks that do not fit neatly inside the sync
+TestClient context.
 Those flows are covered by the compose-based integration tests instead.
 """
 

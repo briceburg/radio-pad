@@ -2,7 +2,7 @@ FROM node:22-alpine AS base
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 FROM base AS dev
 HEALTHCHECK --interval=2s --timeout=2s --start-period=3s --retries=5 \

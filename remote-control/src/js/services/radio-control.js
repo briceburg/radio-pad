@@ -18,6 +18,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { Capacitor } from "@capacitor/core";
 
+function resolveSwitchboardPath(basePath, targetPath) {
+  const normalizedBasePath = basePath.replace(/\/$/, "");
+  return normalizedBasePath && !targetPath.startsWith(normalizedBasePath)
+    ? `${normalizedBasePath}${targetPath}`
+    : targetPath;
+}
+
 function resolvePlayerSwitchboardUrl(url) {
   const override = import.meta.env.VITE_SWITCHBOARD_URL?.trim();
   if (!(override && url) || Capacitor.isNativePlatform()) {
@@ -26,8 +33,11 @@ function resolvePlayerSwitchboardUrl(url) {
 
   try {
     const target = new URL(url);
-    const local = new URL(override);
-    local.pathname = `${local.pathname.replace(/\/$/, "")}${target.pathname}`;
+    const local = new URL(
+      override,
+      window.location.origin.replace(/^http/, "ws"),
+    );
+    local.pathname = resolveSwitchboardPath(local.pathname, target.pathname);
     local.search = target.search;
     local.hash = target.hash;
     return local.toString();
