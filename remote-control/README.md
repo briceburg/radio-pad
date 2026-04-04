@@ -4,10 +4,10 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 
 ## Overview
 
-* connects to [switchboard](../switchboard/) for real-time syncing with [players](https://github.com/briceburg/radio-pad/tree/main/player)
+* connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
   * remote controls publish station requests and listen for channel changes
   * players listen for station requests and publish channel changes and other state
-* loads available players and station data from [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry)
+* loads available players and station data from the [registry](../registry/)
   * sign in when you need to control managed players
 
 ## Usage
@@ -25,7 +25,7 @@ Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 
 Set `VITE_GOOGLE_REDIRECT_URL` only if the browser should return to a specific URL instead of the current page URL.
 
-For local switchboard testing, set `VITE_SWITCHBOARD_URL=ws://localhost:1980/`. See [switchboard](../switchboard/).
+For local switchboard testing, set `VITE_SWITCHBOARD_URL=ws://localhost:1980/switchboard/`.
 
 ### Web development
 
@@ -42,7 +42,9 @@ npm start
 
 Open `http://localhost:5173`. Sign in from `Settings` when you want to load managed players or test registry writes.
 
-For registry write testing on web, copy the API test token from `Settings` and use it with the [`radio-pad-registry`](https://github.com/briceburg/radio-pad-registry) API.
+For compose-based development, the root `.env` pins the remote-control port to `5173` so the same Google OAuth web client works with `docker compose up`. If you change that port, update the Google web client origin and redirect URI to match.
+
+For registry write testing on web, copy the API test token from `Settings` and use it with the [registry](../registry/) API.
 
 When you deploy the web app, add the deployed origin and redirect URI to the same Google web client, or create a separate production client.
 
@@ -108,6 +110,8 @@ npx cap sync ios
 Open the iOS project in Xcode and run it there.
 
 ## Development
+
+For compose-based development with all services, see the [root README](../README.md#development).
 
 ### Contributing
 

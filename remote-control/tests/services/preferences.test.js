@@ -28,7 +28,23 @@ describe("RadioPadPreferences", () => {
     
     // Automatically Prepends https if missing
     expect(result.status).toBe("applied");
-    expect(result.value).toBe("https://localhost:3000");
+    expect(result.value).toBe("https://localhost:3000/");
+  });
+
+  it("accepts same-origin relative registry paths", () => {
+    const prefs = new RadioPadPreferences();
+    const result = prefs.prepare("registryUrl", "/api");
+
+    expect(result.status).toBe("applied");
+    expect(result.value).toBe("/api/");
+  });
+
+  it("preserves query and hash while normalizing absolute URLs", () => {
+    const prefs = new RadioPadPreferences();
+    const result = prefs.prepare("registryUrl", "https://example.com/api?x=1#frag");
+
+    expect(result.status).toBe("applied");
+    expect(result.value).toBe("https://example.com/api/?x=1#frag");
   });
 
   it("fails validation for invalid preferences", () => {

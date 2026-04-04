@@ -21,12 +21,14 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 
 import lib.config as config
 from lib.client_macropad import MacropadClient
 from lib.client_switchboard import SwitchboardClient
 from lib.exceptions import ConfigError
+from lib.health import DEFAULT_HEALTH_PATH, clear_health, mark_healthy
 from lib.player_mpv import MpvPlayer
 
 logger = logging.getLogger(__name__)
@@ -45,8 +47,7 @@ async def cleanup(player):
 async def main(player):
     """Runs the main event loop for the radio-pad player."""
     try:
-        client_tasks = [client.run() for client in player.clients]
-        await asyncio.gather(*client_tasks)
+        await asyncio.gather(*(client.run() for client in player.clients))
 
     except asyncio.CancelledError:
         logger.info("exiting...")
@@ -58,7 +59,15 @@ async def main(player):
         raise
 
 
+def handle_sigterm(signum, frame):
+    """Handle Docker stopping the container by gracefully propagating a KeyboardInterrupt."""
+    raise KeyboardInterrupt()
+
+
 if __name__ == "__main__":
+    # Map SIGTERM to KeyboardInterrupt so the player softly exits when docker compose downs
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
@@ -66,6 +75,8 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
+    health_path = os.getenv("RADIOPAD_HEALTH_PATH", DEFAULT_HEALTH_PATH)
+    clear_health(health_path)
     player = None
     try:
         # Load configuration
@@ -89,7 +100,17 @@ if __name__ == "__main__":
             ),
         )
         player.register_client(MacropadClient(player))
-        player.register_client(SwitchboardClient(player))
+        if player.config.switchboard_url:
+            player.register_client(
+                SwitchboardClient(
+                    player,
+                    on_connect=lambda: mark_healthy(health_path),
+                    on_disconnect=lambda: clear_health(health_path),
+                )
+            )
+        else:
+            mark_healthy(health_path)
+            player.register_client(SwitchboardClient(player))
 
         # Run the main event loop
         asyncio.run(main(player))
@@ -98,8 +119,10 @@ if __name__ == "__main__":
         logger.critical("Configuration error: %s", e)
         sys.exit(1)
     except (KeyboardInterrupt, EOFError):
-        # KeyboardInterrupt handles SIGINT (Ctrl+C) and SIGTERM
+        # KeyboardInterrupt handles SIGINT (Ctrl+C) and SIGTERM (via handle_sigterm)
         logger.info("Application terminated gracefully.")
     except Exception as e:
         logger.critical("Unexpected error: %s", e, exc_info=True)
         sys.exit(1)
+    finally:
+        clear_health(health_path)

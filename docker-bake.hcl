@@ -1,10 +1,23 @@
 group "default" {
-    targets = ["switchboard"]
+    targets = ["registry", "player", "remote-control"]
 }
 
-target "switchboard" {
-    context    = "./switchboard/"
-    tags       = ["ghcr.io/briceburg/radio-pad-switchboard:latest"]
+target "registry" {
+    context    = "./registry/"
+    target     = "prod"
+    tags       = ["ghcr.io/briceburg/radio-pad-registry:latest"]
+}
+
+target "player" {
+    context    = "./player/"
+    target     = "prod"
+    tags       = ["ghcr.io/briceburg/radio-pad-player:latest"]
+}
+
+target "remote-control" {
+    context    = "./remote-control/"
+    target     = "prod"
+    tags       = ["ghcr.io/briceburg/radio-pad-remote-control:latest"]
 }
 
 #
@@ -12,13 +25,13 @@ target "switchboard" {
 #
 
 group "ci" {
-  targets = ["ci-switchboard"]
+  targets = ["ci-registry", "ci-player", "ci-remote-control"]
 }
 
 target "docker-metadata-action" {tags=[]}
 target "ci" {
   matrix = {
-    img = ["switchboard"]
+    img = ["registry", "player", "remote-control"]
   }
 
   name       = "ci-${img}"

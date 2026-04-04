@@ -26,7 +26,7 @@ def test_register_player_for_new_account(player_api: PlayerApi, client: TestClie
     assert_item_fields(data, name="Test Player")
 
     # Verify account was created
-    accounts_resp = client.get("/v1/accounts")
+    accounts_resp = client.get("accounts")
     assert accounts_resp.status_code == 200
     accounts = accounts_resp.json()
     assert "new-account" in [item["id"] for item in accounts["items"]]
@@ -78,7 +78,7 @@ def test_player_partial_update_preserves_existing_data(player_api: PlayerApi, in
 )
 def test_player_create_validation(client: TestClient, body: PlayerCreate | JsonDoc, expect_status: int) -> None:
     payload = body if isinstance(body, dict) else body.model_dump(mode="json")
-    resp = client.put("/v1/accounts/testuser1/players/param-player", json=payload)
+    resp = client.put("accounts/testuser1/players/param-player", json=payload)
     assert resp.status_code == expect_status
     if expect_status == 200:
         assert isinstance(body, PlayerCreate)
@@ -90,13 +90,13 @@ def test_player_create_validation(client: TestClient, body: PlayerCreate | JsonD
 def test_conflict_error_shape_and_status(client: TestClient) -> None:
     # Create a player
     r = client.put(
-        "/v1/accounts/testuser1/players/p1",
+        "accounts/testuser1/players/p1",
         json=PlayerCreate.model_validate({"name": "P"}).model_dump(exclude_none=True),
     )
     assert r.status_code == HTTPStatus.OK
 
     # Try a quick subsequent write. If a conflict occurs, validate error shape.
-    r2 = client.put("/v1/accounts/testuser1/players/p1", json={"name": "P2"})
+    r2 = client.put("accounts/testuser1/players/p1", json={"name": "P2"})
     if r2.status_code == HTTPStatus.CONFLICT:
         body = r2.json()
         assert body["code"] == "conflict"

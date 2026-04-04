@@ -13,7 +13,7 @@ class PlayerApi:
     def put(self, account_id: str, player_id: str, payload: PlayerCreate, expected_status: int = 200) -> JsonDoc:
         return put_json(
             self._client,
-            f"/v1/accounts/{account_id}/players/{player_id}",
+            f"/accounts/{account_id}/players/{player_id}",
             payload,
             expected=expected_status,
         )
@@ -21,14 +21,14 @@ class PlayerApi:
     def get(self, account_id: str, player_id: str, expected_status: int = 200) -> JsonDoc:
         return get_json(
             self._client,
-            f"/v1/accounts/{account_id}/players/{player_id}",
+            f"/accounts/{account_id}/players/{player_id}",
             expected=expected_status,
         )
 
     def list(self, account_id: str, expected_status: int = 200, params: PaginationParams | None = None) -> JsonDoc:
         return get_json(
             self._client,
-            f"/v1/accounts/{account_id}/players",
+            f"/accounts/{account_id}/players",
             expected=expected_status,
             params=params,
         )

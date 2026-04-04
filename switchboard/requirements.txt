@@ -1,2 +1,0 @@
-websockets==15.0.1
-httpx==0.28.1

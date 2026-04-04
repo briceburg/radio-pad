@@ -15,22 +15,25 @@ jobs:
         project:
           - macropad-control
           - player
-          - switchboard
+          - registry
     defaults:
       run:
         working-directory: ./${{ matrix.project }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || '' }}
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-          cache-dependency-path: ./${{ matrix.project }}/requirements-dev.txt
+          cache: 'pip'
+          cache-dependency-path: ./${{ matrix.project }}/requirements*.txt
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
-      - name: Run CI
+        run: |
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
+      - name: Run CI checks
         run: bin/ci
 
   node-ci:
@@ -44,15 +47,32 @@ jobs:
       run:
         working-directory: ./${{ matrix.project }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || '' }}
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: 'npm'
           cache-dependency-path: ./${{ matrix.project }}/package-lock.json
       - name: Install dependencies
         run: npm ci
       - name: Run CI
+        run: bin/ci
+
+  integration-ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose_file: compose.yaml
+          - compose_file: compose.split.yaml
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run compose integration tests
+        env:
+          COMPOSE_FILE: ${{ matrix.compose_file }}
+          CI_CLEANUP: "false"
         run: bin/ci

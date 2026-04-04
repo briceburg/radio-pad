@@ -39,6 +39,17 @@ describe("RadioControl", () => {
     expect(global.WebSocket).toHaveBeenCalledWith("ws://localhost:8080/player/foo?token=123");
   });
 
+  it("resolves same-origin switchboard overrides correctly in browser mode", async () => {
+    vi.stubEnv("VITE_SWITCHBOARD_URL", "/switchboard");
+    const rc = new RadioControl();
+
+    rc.connect("ws://remote-server:9000/switchboard/player/foo?token=123");
+
+    expect(global.WebSocket).toHaveBeenCalledWith(
+      "ws://localhost:3000/switchboard/player/foo?token=123",
+    );
+  });
+
   it("connect ignores override in native platform", async () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
     Capacitor.isNativePlatform.mockReturnValue(true);

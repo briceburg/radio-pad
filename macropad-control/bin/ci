@@ -24,4 +24,9 @@ log "🧽 [autoflake] Checking for unused imports and variables..."
 autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --recursive "${paths[@]}" || \
   die "autoflake failed. use 'autoflake -i --remove-all-unused-imports --remove-unused-variables ${paths[*]}' to fix."
 
+if [ -d "tests" ]; then
+  log "🧪 [pytest] Running tests..."
+  pytest || die "pytest failed."
+fi
+
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

@@ -1,0 +1,24 @@
+#!/bin/bash
+set -eo pipefail
+
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-radiopad-ci}"
+export COMPOSE_FILE="${COMPOSE_FILE:-compose.yaml}"
+project_name="$COMPOSE_PROJECT_NAME ($COMPOSE_FILE)"
+
+log(){ echo -e "$*" >&2; }
+die(){ log "\n[ERROR] $*"; exit 1; }
+
+cd "$(dirname "$0")/.." || die "Failed to change directory to project root."
+
+log "Running integration tests for $project_name ..."
+if docker compose run --rm --build integration-tests; then
+    log "\n✅ Integration tests passed for $project_name!"
+else
+    log "\n[ERROR] integration tests failed. See logs below:\n"
+    docker compose logs
+    die "\n❌ Integration tests failed for $project_name!"
+fi
+
+if [ "${CI_CLEANUP:-true}" = "true" ]; then
+    docker compose down --volumes --remove-orphans
+fi

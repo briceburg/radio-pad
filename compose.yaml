@@ -1,32 +1,57 @@
 services:
+  registry:
+    build:
+      context: ./registry
+      target: dev
+    ports:
+      - "${RADIOPAD_REGISTRY_PORT}:1980"
+    environment:
+      REGISTRY_PROFILES: "api,switchboard"
+      REGISTRY_BIND_PORT: "1980"
+    volumes:
+      - ./registry:/app
+
   player:
     build:
       context: ./player
+      target: dev
+    depends_on:
+      registry:
+        condition: service_healthy
     environment:
-      PULSE_SERVER: "unix:/run/user/${UID:-1000}/pulse/native"
-      RADIOPAD_SWITCHBOARD_URL: "ws://switchboard:1980/"
-    tty: true
-    user: "${UID:-1000}:${GID:-1000}"
+      RADIOPAD_REGISTRY_URL: "http://registry:1980/api/"
+      RADIOPAD_PLAYER: "briceburg/living-room"
     volumes:
       - ./player:/app
-      - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
-
-  switchboard:
-    build:
-      context: ./switchboard
-    ports:
-      - "1980:1980"
-    user: "${UID:-1000}:${GID:-1000}"
-    volumes:
-      - ./switchboard:/app
 
   remote-control:
     build:
       context: ./remote-control
+      target: dev
     environment:
-      VITE_SWITCHBOARD_URL: "ws://switchboard:1980/"
+      VITE_REGISTRY_URL: "/api/"
+      VITE_SWITCHBOARD_URL: "/switchboard"
+      RADIOPAD_REGISTRY_PROXY_TARGET: "http://registry:1980"
+      RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://registry:1980"
     ports:
-      - "5173:5173"
-    user: "${UID:-1000}:${GID:-1000}"
+      - "${RADIOPAD_REMOTE_CONTROL_PORT}:5173"
     volumes:
       - ./remote-control:/app
+
+  integration-tests:
+    profiles:
+      - tests
+    build:
+      context: ./tests/integration
+    command: ["pytest", "-v", "--tb=short", "-p", "no:cacheprovider"]
+    depends_on:
+      player:
+        condition: service_healthy
+      remote-control:
+        condition: service_healthy
+    environment:
+      REGISTRY_URL: "http://registry:1980/api"
+      SWITCHBOARD_URL: "ws://registry:1980/switchboard"
+      REMOTE_CONTROL_URL: "http://remote-control:5173"
+    volumes:
+      - ./tests/integration:/app

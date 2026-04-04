@@ -5,6 +5,7 @@ import httpx
 import pytest
 from starlette.testclient import TestClient
 
+from lib.constants import API_PREFIX
 from registry import create_app
 from tests.functional.conftest import FunctionalTestBed
 
@@ -13,19 +14,19 @@ from tests.functional.conftest import FunctionalTestBed
 def test_seeded_resources_are_loaded(functional_client: httpx.Client) -> None:
     """Verify default seed data for accounts, players, and global presets loads on startup."""
     # Accounts
-    accounts_resp = functional_client.get("/v1/accounts")
+    accounts_resp = functional_client.get("accounts")
     assert accounts_resp.status_code == 200
     accounts = accounts_resp.json()
     assert "briceburg" in [item["id"] for item in accounts["items"]]
 
     # Players
-    players_resp = functional_client.get("/v1/accounts/briceburg/players")
+    players_resp = functional_client.get("accounts/briceburg/players")
     assert players_resp.status_code == 200
     players = players_resp.json()
     assert "living-room" in [item["id"] for item in players["items"]]
 
     # Global Presets
-    presets_resp = functional_client.get("/v1/presets")
+    presets_resp = functional_client.get("presets")
     assert presets_resp.status_code == 200
     presets = presets_resp.json()
     assert "briceburg" in [item["id"] for item in presets["items"]]
@@ -41,8 +42,8 @@ def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None
 
     # Create the app to trigger the initial seed
     app = create_app()
-    with TestClient(app) as client:
-        accounts = client.get("/v1/accounts").json()
+    with TestClient(app, base_url=f"http://testserver{API_PREFIX}/") as client:
+        accounts = client.get("accounts").json()
         assert any(a["id"] == "acct-seeded" for a in accounts["items"])
 
         # Tamper with the data to ensure it is not overwritten on next startup
@@ -51,8 +52,8 @@ def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None
 
     # Re-create the app and client to trigger lifespan startup again
     app2 = create_app()
-    with TestClient(app2) as client2:
-        resp = client2.get("/v1/accounts/acct-seeded")
+    with TestClient(app2, base_url=f"http://testserver{API_PREFIX}/") as client2:
+        resp = client2.get("accounts/acct-seeded")
         assert resp.json()["name"] == "TAMPERED"
 
 

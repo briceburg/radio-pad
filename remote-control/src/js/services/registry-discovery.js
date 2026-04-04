@@ -18,6 +18,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { RegistryRequestError } from "../utils/errors.js";
 
+function resolveRegistryBaseUrl(registryUrl) {
+  return new URL(registryUrl, window.location.origin).toString();
+}
+
 function buildRequestOptions(auth, signal) {
   const token = auth?.getRegistryBearerToken?.();
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -35,7 +39,8 @@ async function fetchAllPages(
   signal = null,
 ) {
   const items = [];
-  let url = new URL(startPath, registryUrl).toString();
+  const registryBaseUrl = resolveRegistryBaseUrl(registryUrl);
+  let url = new URL(startPath, registryBaseUrl).toString();
   const options = buildRequestOptions(auth, signal);
 
   while (url) {
@@ -47,7 +52,7 @@ async function fetchAllPages(
     if (Array.isArray(data.items)) items.push(...data.items);
 
     const next = data && data.links ? data.links.next : null;
-    url = next ? new URL(next, registryUrl).toString() : null;
+    url = next ? new URL(next, registryBaseUrl).toString() : null;
   }
 
   return items;
@@ -70,7 +75,7 @@ const withAuthFallback = async (fallback, promiseCallback) => {
 export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   if (!registryUrl) return [];
   const items = await fetchAllPages(
-    "/v1/accounts/",
+    "accounts/",
     registryUrl,
     auth,
     options.signal,
@@ -92,7 +97,7 @@ export async function discoverPlayers(
 
   return withAuthFallback([], async () => {
     const items = await fetchAllPages(
-      `/v1/accounts/${accountId}/players/`,
+      `accounts/${accountId}/players/`,
       registryUrl,
       auth,
       options.signal,
@@ -109,11 +114,12 @@ export async function discoverPresets(
 ) {
   const registryUrl = await prefs.get("registryUrl");
   if (!registryUrl) return [];
+  const registryBaseUrl = resolveRegistryBaseUrl(registryUrl);
 
   const presets = [];
   const paths = [
-    ...(accountId ? [`/v1/accounts/${accountId}/presets/`] : []),
-    `/v1/presets/`,
+    ...(accountId ? [`accounts/${accountId}/presets/`] : []),
+    `presets/`,
   ];
 
   await withAuthFallback([], async () => {
@@ -126,7 +132,7 @@ export async function discoverPresets(
       );
       presets.push(
         ...items.map((i) => ({
-          value: `${registryUrl}${path}${i.id}`,
+          value: new URL(`${path}${i.id}`, registryBaseUrl).toString(),
           label: i.name || i.id,
         })),
       );
@@ -153,7 +159,10 @@ export async function discoverPlayer(
   if (!(registryUrl && accountId)) return null;
 
   return withAuthFallback(null, async () => {
-    const url = `${registryUrl}/v1/accounts/${accountId}/players/${playerId}`;
+    const url = new URL(
+      `accounts/${accountId}/players/${playerId}`,
+      resolveRegistryBaseUrl(registryUrl),
+    ).toString();
     const response = await fetch(
       url,
       buildRequestOptions(auth, options.signal),

@@ -8,6 +8,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from datastore.types import JsonDoc
+from lib.constants import API_PREFIX
 from registry import create_app
 
 pytest.importorskip("moto")
@@ -61,7 +62,7 @@ def functional_client(
     # REGISTRY_SEED_DATA_PATH is NOT set, so the default `seed-data/store/` is used.
 
     app = create_app()
-    with TestClient(app) as client:
+    with TestClient(app, base_url=f"http://testserver{API_PREFIX}/") as client:
         yield client
 
 
