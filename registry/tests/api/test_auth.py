@@ -159,7 +159,7 @@ def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/presets/fresh",
+            "presets/fresh",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -186,7 +186,7 @@ def test_admin_can_write_global_preset(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/presets/fresh",
+            "presets/fresh",
             headers={"Authorization": "Bearer admin-token"},
             json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
         )
@@ -213,7 +213,7 @@ def test_account_owner_can_update_owned_account(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/accounts/testuser1",
+            "accounts/testuser1",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Updated User 1"},
         )
@@ -240,7 +240,7 @@ def test_account_owner_cannot_update_other_account(tmp_path: Path) -> None:
 
     with client:
         response = client.put(
-            "/accounts/testuser2",
+            "accounts/testuser2",
             headers={"Authorization": "Bearer owner-token"},
             json={"name": "Updated User 2"},
         )

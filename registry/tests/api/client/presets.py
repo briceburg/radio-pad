@@ -13,7 +13,7 @@ class PresetApi:
     def put_global(self, preset_id: str, payload: GlobalStationPresetCreate, expected_status: int = 200) -> JsonDoc:
         return put_json(
             self._client,
-            f"/presets/{preset_id}",
+            f"presets/{preset_id}",
             payload,
             expected=expected_status,
         )
@@ -21,14 +21,14 @@ class PresetApi:
     def get_global(self, preset_id: str, expected_status: int = 200) -> JsonDoc:
         return get_json(
             self._client,
-            f"/presets/{preset_id}",
+            f"presets/{preset_id}",
             expected=expected_status,
         )
 
     def list_global(self, expected_status: int = 200, params: PaginationParams | None = None) -> JsonDoc:
         return get_json(
             self._client,
-            "/presets",
+            "presets",
             expected=expected_status,
             params=params,
         )
@@ -38,7 +38,7 @@ class PresetApi:
     ) -> JsonDoc:
         return put_json(
             self._client,
-            f"/accounts/{account_id}/presets/{preset_id}",
+            f"accounts/{account_id}/presets/{preset_id}",
             payload,
             expected=expected_status,
         )
@@ -46,7 +46,7 @@ class PresetApi:
     def get_account(self, account_id: str, preset_id: str, expected_status: int = 200) -> JsonDoc:
         return get_json(
             self._client,
-            f"/accounts/{account_id}/presets/{preset_id}",
+            f"accounts/{account_id}/presets/{preset_id}",
             expected=expected_status,
         )
 
@@ -55,7 +55,7 @@ class PresetApi:
     ) -> JsonDoc:
         return get_json(
             self._client,
-            f"/accounts/{account_id}/presets",
+            f"accounts/{account_id}/presets",
             expected=expected_status,
             params=params,
         )

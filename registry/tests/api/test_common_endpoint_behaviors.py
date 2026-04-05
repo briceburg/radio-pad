@@ -37,10 +37,10 @@ def _assert_not_found(
 @pytest.mark.parametrize(
     "path_template,payload",
     [
-        ("/accounts/{value}", {"name": "Bad"}),
-        ("/accounts/testuser1/players/{value}", {"name": "Bad"}),
-        ("/presets/{value}", {"name": "Bad", "stations": []}),
-        ("/accounts/testuser/presets/{value}", {"name": "Bad", "stations": []}),
+        ("accounts/{value}", {"name": "Bad"}),
+        ("accounts/testuser1/players/{value}", {"name": "Bad"}),
+        ("presets/{value}", {"name": "Bad", "stations": []}),
+        ("accounts/testuser/presets/{value}", {"name": "Bad", "stations": []}),
     ],
     ids=["account-id", "player-id", "global-preset-id", "account-preset-id"],
 )
@@ -58,8 +58,8 @@ def test_invalid_object_ids_are_rejected(
 @pytest.mark.parametrize(
     "path_template,payload",
     [
-        ("/accounts/{value}/players/playerx", {"name": "Bad"}),
-        ("/accounts/{value}/presets/presetx", {"name": "Bad", "stations": []}),
+        ("accounts/{value}/players/playerx", {"name": "Bad"}),
+        ("accounts/{value}/presets/presetx", {"name": "Bad", "stations": []}),
     ],
     ids=["player-account-id", "account-preset-account-id"],
 )
@@ -76,7 +76,7 @@ def test_invalid_account_ids_are_rejected(
 
 @pytest.mark.parametrize("preset_id", VALID_SLUG_EDGE_CASES)
 def test_global_preset_valid_slug_edge_cases(client: TestClient, preset_id: str) -> None:
-    data = _put_ok(client, f"/presets/{preset_id}", {"name": "Edge", "stations": []})
+    data = _put_ok(client, f"presets/{preset_id}", {"name": "Edge", "stations": []})
     assert_item_fields(data, id=preset_id)
 
 
@@ -84,8 +84,8 @@ def test_global_preset_valid_slug_edge_cases(client: TestClient, preset_id: str)
 @pytest.mark.parametrize(
     "path_template,payload",
     [
-        ("/accounts/{account_id}/players/{object_id}", {"name": "Edge"}),
-        ("/accounts/{account_id}/presets/{object_id}", {"name": "Edge", "stations": []}),
+        ("accounts/{account_id}/players/{object_id}", {"name": "Edge"}),
+        ("accounts/{account_id}/presets/{object_id}", {"name": "Edge", "stations": []}),
     ],
     ids=["player", "account-preset"],
 )
@@ -103,14 +103,14 @@ def test_account_scoped_valid_slug_edge_cases(
 @pytest.mark.parametrize(
     "path,expected_details",
     [
-        ("/accounts/missing-account", {"account_id": "missing-account"}),
+        ("accounts/missing-account", {"account_id": "missing-account"}),
         (
-            "/accounts/testuser1/players/missing-player",
+            "accounts/testuser1/players/missing-player",
             {"account_id": "testuser1", "player_id": "missing-player"},
         ),
-        ("/presets/missing-preset", {"preset_id": "missing-preset"}),
+        ("presets/missing-preset", {"preset_id": "missing-preset"}),
         (
-            "/accounts/testuser/presets/missing-preset",
+            "accounts/testuser/presets/missing-preset",
             {"account_id": "testuser", "preset_id": "missing-preset"},
         ),
     ],
@@ -127,7 +127,7 @@ def test_partial_update_preserves_existing_fields(client: TestClient, resource: 
     expected: JsonDoc
 
     if resource == "player":
-        create_path = fetch_path = "/accounts/testuser1/players/player1"
+        create_path = fetch_path = "accounts/testuser1/players/player1"
         initial = {
             "name": "Original",
             "stations_url": "https://example.com/custom.json",
@@ -140,7 +140,7 @@ def test_partial_update_preserves_existing_fields(client: TestClient, resource: 
             "switchboard_url": "wss://switch.example.com/custom",
         }
     elif resource == "global-preset":
-        create_path = fetch_path = "/presets/partial"
+        create_path = fetch_path = "presets/partial"
         initial = {
             "name": "Original",
             "category": "Music",
@@ -150,7 +150,7 @@ def test_partial_update_preserves_existing_fields(client: TestClient, resource: 
         update = {"name": "Renamed", "stations": []}
         expected = {"name": "Renamed", "category": "Music", "description": "Desc"}
     else:
-        create_path = fetch_path = "/accounts/testuser/presets/partial"
+        create_path = fetch_path = "accounts/testuser/presets/partial"
         initial = {
             "name": "Original",
             "category": "Music",
@@ -173,18 +173,18 @@ def test_partial_update_preserves_existing_fields(client: TestClient, resource: 
 @pytest.mark.parametrize("resource", ["accounts", "players", "global-presets"])
 def test_pagination_behavior_is_consistent(client: TestClient, resource: str) -> None:
     if resource == "accounts":
-        list_path = "/accounts"
+        list_path = "accounts"
         single_page_ids = ["testuser1", "testuser2"]
         first_page_ids = ["testuser1"]
         second_page_ids = ["testuser2"]
     elif resource == "players":
-        list_path = "/accounts/testuser1/players"
+        list_path = "accounts/testuser1/players"
         single_page_ids = ["player1", "player2"]
         first_page_ids = ["player1"]
         second_page_ids = ["player2"]
     else:
-        list_path = "/presets"
-        _put_ok(client, "/presets/second-preset", {"name": "Second", "stations": []})
+        list_path = "presets"
+        _put_ok(client, "presets/second-preset", {"name": "Second", "stations": []})
         single_page_ids = ["briceburg", "second-preset"]
         first_page_ids = ["briceburg"]
         second_page_ids = ["second-preset"]

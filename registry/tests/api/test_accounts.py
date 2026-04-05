@@ -33,7 +33,7 @@ def test_update_account(account_api: AccountApi) -> None:
 
 def test_account_partial_update_no_unintended_field_loss(client: TestClient) -> None:
     """Accounts only have name now; omitting future required fields should 422 (guard)."""
-    resp = client.put("/accounts/another-account", json={})
+    resp = client.put("accounts/another-account", json={})
     assert resp.status_code == 422
 
 
@@ -47,6 +47,6 @@ def test_account_partial_update_no_unintended_field_loss(client: TestClient) -> 
     ],
 )
 def test_pagination_invalid_values_rejected(client: TestClient, raw_page: int, raw_per: int) -> None:
-    resp = client.get(f"/accounts?page={raw_page}&per_page={raw_per}")
+    resp = client.get(f"accounts?page={raw_page}&per_page={raw_per}")
     assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert resp.json()["detail"]

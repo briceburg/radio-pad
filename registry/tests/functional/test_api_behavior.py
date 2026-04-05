@@ -24,7 +24,7 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
 
     # Use httpx to make a real HTTP request to the running server
     response = functional_client.put(
-        f"/accounts/testuser1/presets/{preset_id}",
+        f"accounts/testuser1/presets/{preset_id}",
         json=preset_data,
     )
 
