@@ -27,7 +27,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 ## Environment conventions
 
-- `vite.config.ts` uses `root: './src'`, so keep `envDir: '..'` so `.env` resolves from `remote-control/`.
+- `vite.config.mjs` uses `root: './src'`, so keep `envDir: '..'` so `.env` resolves from `remote-control/`.
 - `remote-control/.env` is local-only and should stay gitignored.
 - `remote-control/.env.example` is the checked-in template.
 - `VITE_SWITCHBOARD_URL` is a web-only override for switchboard testing.

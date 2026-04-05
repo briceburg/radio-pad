@@ -7,7 +7,7 @@ Guidance for coding agents working in `radio-pad/registry`.
 - FastAPI + Pydantic service for storing and serving radio-pad registry data.
 - Data is stored as JSON documents through typed datastore layers built on backend `ObjectStore` implementations.
 - The project is in active development. Prefer clean replacements over compatibility shims for older clients or older internal code.
-- The companion system repo is `radio-pad` (`https://github.com/briceburg/radio-pad`), which holds the player, switchboard, remote-control work and the higher-level architecture/auth diagrams.
+- The registry is a component of the `radio-pad` monorepo, providing the core API and real-time switchboard relay for connected players and remote controls.
 
 ## Runtime and tooling
 
@@ -50,7 +50,7 @@ Guidance for coding agents working in `radio-pad/registry`.
   - `global-admins.json`
   - `accounts/<account>.json`
 - Reuse the shared `seed_from_path(...)` helper for both public content and authz seed loading so seeding behavior stays consistent across local, S3, and Git backends.
-- When changing auth or control semantics here, check whether the corresponding architecture/docs in the `radio-pad` repo should be updated too.
+- When changing auth or control semantics, ensure any root architecture diagrams or related components (player, remote-control) are updated too.
 
 ## Testing conventions
 
@@ -69,7 +69,7 @@ Guidance for coding agents working in `radio-pad/registry`.
 - Pub-sub uses an in-tree broadcast module (`src/switchboard/broadcast.py`) — no external broker dependency.
 - The in-memory backend is sufficient for single-instance and for multi-instance deployments with **path-based sticky sessions** (all connections for a given `/{account_id}/{player_id}` path land on the same process).
 - If stateless horizontal scaling is needed later, add a backend (e.g. NATS) behind the existing `Broadcast` interface.
-- The deprecated `run_until_first_complete` from Starlette was replaced with `asyncio.TaskGroup` in the switchboard endpoint.
+- The deprecated `run_until_first_complete` from Starlette was replaced with `asyncio.wait(..., return_when=asyncio.FIRST_COMPLETED)` in the switchboard endpoint to properly propagate and catch single `WebSocketDisconnect` exceptions.
 
 ## Change preferences
 
