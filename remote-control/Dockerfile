@@ -7,7 +7,6 @@ RUN npm ci
 FROM base AS dev
 HEALTHCHECK --interval=2s --timeout=2s --start-period=3s --retries=5 \
   CMD wget --spider -q http://127.0.0.1:5173/ || exit 1
-USER node
 CMD ["npm", "run", "start", "--", "--host", "0.0.0.0"]
 
 FROM base AS builder

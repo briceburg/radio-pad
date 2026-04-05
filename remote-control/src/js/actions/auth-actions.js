@@ -31,22 +31,23 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
 
   patchStore(authStore, auth.getState());
 
+  async function safeAction(fn, errorMsg) {
+    try {
+      return await fn();
+    } catch (error) {
+      toastDanger(errorMsg, error);
+    }
+  }
+
   return {
-    async signIn() {
-      try {
-        await auth.signIn();
-      } catch (error) {
-        toastDanger("⚠️ Failed starting sign-in.", error);
-      }
-    },
+    signIn: () =>
+      safeAction(() => auth.signIn(), "⚠️ Failed starting sign-in."),
 
     async signOut() {
-      try {
+      await safeAction(async () => {
         await auth.signOut();
         toastSuccess("Signed out.");
-      } catch (error) {
-        toastDanger("⚠️ Failed signing out.", error);
-      }
+      }, "⚠️ Failed signing out.");
     },
 
     async copyToken() {
@@ -55,13 +56,10 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
         toastWarning("No API test token is available.");
         return;
       }
-
-      try {
+      await safeAction(async () => {
         await navigator.clipboard.writeText(token);
         toastSuccess("Copied API test token.");
-      } catch (error) {
-        toastDanger("⚠️ Failed copying API test token.", error);
-      }
+      }, "⚠️ Failed copying API test token.");
     },
   };
 }

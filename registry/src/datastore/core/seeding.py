@@ -47,7 +47,7 @@ def seedable[Entity: ModelWithId, Create: BaseModel](
 
 def seed_from_path(seed_path: Path, stores: list[SeedableStore], *, label: str) -> None:
     if not seed_path.is_dir():
-        logger.error(f"{label} seed path does not exist: {seed_path}")
+        logger.error("%s seed path does not exist: %s", label, seed_path)
         return
 
     for seed_file in seed_path.rglob("*.json"):
@@ -60,13 +60,13 @@ def seed_from_path(seed_path: Path, stores: list[SeedableStore], *, label: str) 
             object_id = params.pop("id")
             path_params = params or None
             if store.exists(object_id, path_params=path_params):
-                logger.debug(f"Skipping existing {label} object: {relative_path}")
+                logger.debug("Skipping existing %s object: %s", label, relative_path)
                 break
 
             with seed_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
             store.seed({"id": object_id, **params, **data}, path_params=path_params)
-            logger.info(f"Seeded {label} {relative_path}")
+            logger.info("Seeded %s %s", label, relative_path)
             break
 
 

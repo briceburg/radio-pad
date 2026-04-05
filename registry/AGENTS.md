@@ -65,11 +65,11 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 ## Switchboard and broadcast
 
-- The switchboard is a WebSocket relay that connects players and remote controls in per-player channels keyed by `{account_id}/{player_id}`.
-- Pub-sub uses an in-tree broadcast module (`src/switchboard/broadcast.py`) — no external broker dependency.
-- The in-memory backend is sufficient for single-instance and for multi-instance deployments with **path-based sticky sessions** (all connections for a given `/{account_id}/{player_id}` path land on the same process).
-- If stateless horizontal scaling is needed later, add a backend (e.g. NATS) behind the existing `Broadcast` interface.
-- The deprecated `run_until_first_complete` from Starlette was replaced with `asyncio.wait(..., return_when=asyncio.FIRST_COMPLETED)` in the switchboard endpoint to properly propagate and catch single `WebSocketDisconnect` exceptions.
+- WebSocket relay connecting players and remote controls in per-player channels keyed by `{account_id}/{player_id}`.
+- Pub-sub uses an in-tree broadcast module (`src/switchboard/broadcast.py`) — no external broker.
+- The in-memory backend works for single-instance and multi-instance with **path-based sticky sessions**.
+- If stateless horizontal scaling is needed later, add a backend (e.g. NATS) behind the `Broadcast` interface.
+- The switchboard endpoint uses `asyncio.TaskGroup` with `except*` for concurrent send/receive — tasks auto-cancel when one exits.
 
 ## Change preferences
 

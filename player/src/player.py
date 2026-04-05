@@ -80,15 +80,17 @@ if __name__ == "__main__":
     player = None
     try:
         # Load configuration
-        player_config = config.make(
-            player=os.getenv("RADIOPAD_PLAYER", "briceburg/living-room"),
-            registry_url=os.getenv(
-                "RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev"
-            ),
-            stations_url=os.getenv("RADIOPAD_STATIONS_URL", None),
-            switchboard_url=os.getenv("RADIOPAD_SWITCHBOARD_URL", None),
-            enable_discovery=os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower()
-            == "true",
+        player_config = asyncio.run(
+            config.make(
+                player=os.getenv("RADIOPAD_PLAYER", "briceburg/living-room"),
+                registry_url=os.getenv(
+                    "RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev/api"
+                ),
+                stations_url=os.getenv("RADIOPAD_STATIONS_URL", None),
+                switchboard_url=os.getenv("RADIOPAD_SWITCHBOARD_URL", None),
+                enable_discovery=os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower()
+                == "true",
+            )
         )
 
         # Initialize player and clients

@@ -18,7 +18,7 @@ class AuthzStore:
         if backend is None:
             data_path = Path(os.environ.get("REGISTRY_AUTHZ_PATH", str(BASE_DIR / "tmp" / "authz")))
             prefix = os.environ.get("REGISTRY_AUTHZ_PREFIX", "registry-authz-v1")
-            logger.info(f"AuthzStore backend: local path={data_path}")
+            logger.info("AuthzStore backend: local path=%s", data_path)
             backend = LocalBackend(base_path=str(data_path), prefix=prefix)
 
         self.backend = backend

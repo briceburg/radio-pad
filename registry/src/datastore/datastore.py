@@ -26,7 +26,7 @@ class DataStore:
             self.prefix = getattr(backend, "prefix", "")
         else:
             backend_choice = os.environ.get("REGISTRY_BACKEND", "local").lower()
-            logger.info(f"DataStore backend: {backend_choice}")
+            logger.info("DataStore backend: %s", backend_choice)
             default_prefix = "" if backend_choice == "git" else "registry-v1"
             self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", default_prefix)
             data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))

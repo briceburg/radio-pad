@@ -52,7 +52,7 @@ REGISTRY_AUTHZ_PREFIX | prefix to apply to local private authz files. | `registr
 REGISTRY_PROFILES | Comma separated list of application roles to enable. Options are `api` and `switchboard`. | `api,switchboard`
 REGISTRY_API_PREFIX | API routing prefix. | `/api`
 REGISTRY_SWITCHBOARD_PREFIX | WebSocket routing prefix. | `/switchboard`
-REGISTRY_URL | Base URL of the registry API (used by switchboard for remote auth in split mode). | `http://localhost:8000`
+REGISTRY_URL | Base URL of the registry API, including the API prefix (used by switchboard for remote auth in split mode). | `http://localhost:8000/api`
 REGISTRY_CORS_ORIGINS | Comma-separated list of allowed CORS origins. | `capacitor://localhost,http://localhost:5173,http://localhost:5174,http://localhost,https://localhost`
 REGISTRY_SEED_DATA_PATH | root location of checked-in seed documents. Store seeds load from `store/` and authz seeds load from `auth/` beneath this root. | `seed-data`
 REGISTRY_BIND_HOST | host to bind to | `localhost`

@@ -24,7 +24,7 @@ class AuthServices:
         if config is None:
             logger.warning("Registry auth disabled: OIDC client_ids/issuer not configured")
             return cls(authenticate_user=None, authz_store=None)
-        logger.info(f"Registry auth enabled: issuer={config.issuer}, client_ids={config.client_ids}")
+        logger.info("Registry auth enabled: issuer=%s, client_ids=%s", config.issuer, config.client_ids)
         authz_store = AuthzStore()
         authz_store.seed()
         return cls(authenticate_user=config.build_auth_dependency(), authz_store=authz_store)
@@ -106,12 +106,12 @@ def require_account_manager(
     if services.authz_store.can_manage_account(account_id, identity):
         return identity
 
-    logger.warning(f"403 Forbidden for {account_id}. Identity: {identity.model_dump()}")
+    logger.warning("403 Forbidden for %s. Identity: %s", account_id, identity.model_dump())
     access = services.authz_store.get_account_access(account_id)
     if access:
-        logger.warning(f"Account access allows emails: {access.emails}, subjects: {access.subjects}")
+        logger.warning("Account access allows emails: %s, subjects: %s", access.emails, access.subjects)
     else:
-        logger.warning(f"No account access seeded for {account_id}")
+        logger.warning("No account access seeded for %s", account_id)
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

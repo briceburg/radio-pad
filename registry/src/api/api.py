@@ -53,17 +53,17 @@ class RegistryAPI(FastAPI):
             swagger_ui_parameters={"defaultModelsExpandDepth": 0},
             redirect_slashes=True,
         )
+        self._register_routes()
+        self._register_exception_handlers()
+        self._register_middleware()
 
-        from datastore.exceptions import ConcurrencyError
-        from lib.constants import CORS_ORIGINS as cors_origins
+    def _register_routes(self) -> None:
         from lib.constants import PROFILES as profiles
-
-        from .exceptions import NotFoundError
-        from .responses import ERROR_404
 
         if "api" in profiles:
             from lib.constants import API_PREFIX
 
+            from .responses import ERROR_404
             from .routes import accounts, players, presets_account, presets_global
 
             router = APIRouter(responses=ERROR_404)
@@ -77,8 +77,20 @@ class RegistryAPI(FastAPI):
             from lib.constants import SWITCHBOARD_PREFIX
             from switchboard import switchboard as switchboard_routes
 
-            # Assuming clients connect to /switchboard/{account_id}/{player_id}
             self.include_router(switchboard_routes.router, prefix=SWITCHBOARD_PREFIX)
+
+        @self.get("/", include_in_schema=False)
+        async def root() -> RedirectResponse:
+            return RedirectResponse("/docs")
+
+        @self.get("/healthz", include_in_schema=False, status_code=204)
+        async def healthz() -> Response:
+            return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+    def _register_exception_handlers(self) -> None:
+        from datastore.exceptions import ConcurrencyError
+
+        from .exceptions import NotFoundError
 
         @self.exception_handler(NotFoundError)
         async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
@@ -90,18 +102,11 @@ class RegistryAPI(FastAPI):
             err = ErrorDetail(code="conflict", message=str(exc), details=None)
             return JSONResponse(status_code=409, content=err.model_dump())
 
-        @self.get("/", include_in_schema=False)
-        async def root() -> RedirectResponse:
-            return RedirectResponse("/docs")
-
-        @self.get("/healthz", include_in_schema=False, status_code=204)
-        async def healthz() -> Response:
-            # 204 No Content, explicit no-store to avoid caching
-            return Response(status_code=204, headers={"Cache-Control": "no-store"})
-
+    def _register_middleware(self) -> None:
         from collections.abc import Awaitable, Callable
 
         from lib.constants import API_VERSION
+        from lib.constants import CORS_ORIGINS as cors_origins
 
         @self.middleware("http")
         async def add_api_version_header(
