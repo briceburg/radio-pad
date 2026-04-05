@@ -37,6 +37,7 @@ services:
       - "${RADIOPAD_REMOTE_CONTROL_PORT}:5173"
     volumes:
       - ./remote-control:/app
+      - /app/node_modules
 
   integration-tests:
     profiles:
