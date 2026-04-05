@@ -19,7 +19,7 @@ npm install
 cp .env.example .env
 ```
 
-The registry URL defaults to `https://registry.radiopad.dev`. Override it only if you are targeting a different registry or local registry instance.
+The registry URL defaults to `https://registry.radiopad.dev/api/`. Override it only if you are targeting a different registry or local registry instance.
 
 Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 

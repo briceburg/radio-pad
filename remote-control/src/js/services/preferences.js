@@ -97,7 +97,7 @@ const DEFAULT_PREFERENCES = {
     placeholder: "Enter registry URL",
     group: "radio-advanced",
     default:
-      import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev",
+      import.meta.env.VITE_REGISTRY_URL || "https://registry.radiopad.dev/api/",
     normalize: normalizeRegistryUrl,
     validate: (value) => {
       if (typeof value === "string" && value.startsWith("/")) {

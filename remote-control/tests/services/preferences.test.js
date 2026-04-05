@@ -11,7 +11,7 @@ vi.mock("@capacitor/preferences", () => ({
 }));
 
 // Mock import.meta.env
-vi.stubEnv('VITE_REGISTRY_URL', 'https://registry.radiopad.dev');
+vi.stubEnv('VITE_REGISTRY_URL', 'https://registry.radiopad.dev/api/');
 
 describe("RadioPadPreferences", () => {
   it("initializes with default URL preference", async () => {

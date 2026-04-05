@@ -100,10 +100,10 @@ class TestAccountPresets:
 @pytest.mark.parametrize(
     "url_template,body",
     [
-        ("/presets/{preset_id}", {"stations": []}),  # missing name
-        ("/presets/{preset_id}", {"name": "No Stations"}),  # missing stations
-        ("/accounts/testuser/presets/{preset_id}", {"stations": []}),
-        ("/accounts/testuser/presets/{preset_id}", {"name": "No Stations"}),
+        ("presets/{preset_id}", {"stations": []}),  # missing name
+        ("presets/{preset_id}", {"name": "No Stations"}),  # missing stations
+        ("accounts/testuser/presets/{preset_id}", {"stations": []}),
+        ("accounts/testuser/presets/{preset_id}", {"name": "No Stations"}),
     ],
 )
 def test_preset_create_validation_failures(
@@ -124,7 +124,7 @@ def test_preset_rejects_duplicate_station_names(client: TestClient) -> None:
             {"name": "same", "url": "https://b.example/stream"},
         ],
     }
-    resp = client.put("/presets/dup-names", json=payload)
+    resp = client.put("presets/dup-names", json=payload)
     assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     body = resp.json()
     assert any("Duplicate station name" in (err.get("msg") or str(err)) for err in body.get("detail", []))
@@ -138,7 +138,7 @@ def test_preset_rejects_duplicate_station_urls(client: TestClient) -> None:
             {"name": "B", "url": "https://same.example/stream"},
         ],
     }
-    resp = client.put("/presets/dup-urls", json=payload)
+    resp = client.put("presets/dup-urls", json=payload)
     assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     body = resp.json()
     assert any("Duplicate station URL" in (err.get("msg") or str(err)) for err in body.get("detail", []))

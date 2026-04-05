@@ -20,7 +20,7 @@ Guidance for coding agents working in `radio-pad/player`.
 
 - The player identifies itself to the switchboard with a `User-Agent: RadioPad/...` header and a `RadioPad-Stations-Url` header.
 - Station presets are fetched from the registry API via the URL configured at startup.
-- The player is a WebSocket client, not a server — it has no HTTP endpoints of its own (healthcheck uses `pgrep`).
+- The player is a WebSocket client, not a server — it has no HTTP endpoints of its own (the container healthcheck runs `python3 src/healthcheck.py`, which checks a readiness file).
 
 ## Change preferences
 

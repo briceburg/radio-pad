@@ -56,7 +56,7 @@ async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str,
 
         for t in done:
             t.result()
-    except* WebSocketDisconnect:
+    except WebSocketDisconnect:
         pass
 
 

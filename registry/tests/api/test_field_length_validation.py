@@ -80,11 +80,11 @@ class TestFieldLengthValidation:
 
     def test_slug_id_length_constraint_via_api(self, client: TestClient) -> None:
         valid_id = "a" * (MAX_DESCRIPTOR_LENGTH - 1) + "1"
-        resp = client.put(f"/accounts/{valid_id}", json={"name": "Test"})
+        resp = client.put(f"accounts/{valid_id}", json={"name": "Test"})
         assert resp.status_code == 200
 
         invalid_id = "a" * MAX_DESCRIPTOR_LENGTH + "1"
-        resp = client.put(f"/accounts/{invalid_id}", json={"name": "Test"})
+        resp = client.put(f"accounts/{invalid_id}", json={"name": "Test"})
         assert resp.status_code == 422
         assert "detail" in resp.json()
 
