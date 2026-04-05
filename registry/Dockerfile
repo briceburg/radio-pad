@@ -5,6 +5,7 @@ RUN apk add --no-cache openssh-client \
   && chown -R nobody:nobody /venv
 
 ENV \
+  HOME=/tmp \
   PATH="/venv/bin:$PATH" \
   PYTHONPATH=/app/src \
   PYTHONPYCACHEPREFIX=/tmp/pycache \

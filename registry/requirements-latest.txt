@@ -2,5 +2,6 @@ boto3
 dulwich
 fastapi
 fastapi-oidc
+httpx
 pydantic
 uvicorn[standard]

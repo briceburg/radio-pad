@@ -1,0 +1,64 @@
+# Prod-image smoke tests — builds all services with target: prod and waits
+# for healthchecks. Run locally or in CI via:
+#   COMPOSE_FILE=compose.prod-smoke.yaml bin/ci
+
+services:
+  registry:
+    build:
+      context: ./registry
+      target: prod
+    environment:
+      REGISTRY_PROFILES: "api,switchboard"
+
+  registry-git:
+    build:
+      context: ./registry
+      target: prod
+    environment:
+      REGISTRY_BACKEND: "git"
+      REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY: "dummy"
+    command: >-
+      sh -c '
+        bin/docker/entrypoint.sh python3 -c "
+        import os, pathlib
+        home = os.environ.get(\"HOME\", \"\")
+        assert home == \"/tmp\", f\"HOME={home}, expected /tmp\"
+        key = pathlib.Path(os.environ[\"REGISTRY_BACKEND_GIT_SSH_KEY_PATH\"])
+        assert key.exists(), f\"SSH key not written: {key}\"
+        kh = pathlib.Path(home, \".ssh\", \"known_hosts\")
+        assert kh.exists(), f\"known_hosts not found: {kh}\"
+        assert \"github.com\" in kh.read_text(), \"github.com not in known_hosts\"
+        print(\"registry-git smoke: ok\")
+        "
+      '
+
+  player:
+    build:
+      context: ./player
+      target: prod
+    depends_on:
+      registry:
+        condition: service_healthy
+    environment:
+      RADIOPAD_REGISTRY_URL: "http://registry:8000/api/"
+      RADIOPAD_PLAYER: "smoke/test"
+
+  remote-control:
+    build:
+      context: ./remote-control
+      target: prod
+
+  integration-tests:
+    profiles:
+      - tests
+    image: busybox:latest
+    depends_on:
+      registry:
+        condition: service_healthy
+      registry-git:
+        condition: service_completed_successfully
+      player:
+        condition: service_healthy
+      remote-control:
+        condition: service_healthy
+    command: ["echo", "All prod services healthy"]
