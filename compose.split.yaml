@@ -22,7 +22,6 @@ services:
       file: compose.yaml
       service: player
     environment:
-      RADIOPAD_REGISTRY_URL: "http://registry:1980/api/"
       RADIOPAD_SWITCHBOARD_URL: "ws://switchboard:1980/switchboard/briceburg/living-room"
 
   remote-control:
@@ -30,9 +29,6 @@ services:
       file: compose.yaml
       service: remote-control
     environment:
-      VITE_REGISTRY_URL: "/api/"
-      VITE_SWITCHBOARD_URL: "/switchboard"
-      RADIOPAD_REGISTRY_PROXY_TARGET: "http://registry:1980"
       RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://switchboard:1980"
 
   integration-tests:

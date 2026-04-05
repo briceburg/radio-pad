@@ -47,16 +47,10 @@ async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str,
                 continue
 
     try:
-        t1 = asyncio.create_task(sender())
-        t2 = asyncio.create_task(receiver())
-
-        done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
-        for t in pending:
-            t.cancel()
-
-        for t in done:
-            t.result()
-    except WebSocketDisconnect:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(sender())
+            tg.create_task(receiver())
+    except* WebSocketDisconnect:
         pass
 
 
@@ -80,7 +74,7 @@ async def websocket_endpoint(
         try:
             await validate_socket_client(websocket, account_id, player_id, token)
         except WebSocketException as e:
-            logger.warning(f"Socket auth failed for {player_key}: {e}")
+            logger.warning("Socket auth failed for %s: %s", player_key, e)
             await websocket.close(code=e.code, reason=e.reason)
             return
         except Exception:

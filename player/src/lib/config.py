@@ -58,7 +58,7 @@ async def fetch_json_url(url, timeout=12, retries=3):
     return None
 
 
-def make(
+async def make(
     player,
     registry_url,
     stations_url=None,
@@ -70,7 +70,7 @@ def make(
     If enable_discovery is True, attempt to discover missing configuration from the registry.
     """
     if enable_discovery:
-        stations_url, switchboard_url = discover_config(
+        stations_url, switchboard_url = await discover_config(
             player, registry_url, stations_url, switchboard_url
         )
 
@@ -79,10 +79,10 @@ def make(
             "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER."
         )
 
-    logger.info(f"Using stations_url: {stations_url}")
-    logger.info(f"Using switchboard_url: {switchboard_url}")
+    logger.info("Using stations_url: %s", stations_url)
+    logger.info("Using switchboard_url: %s", switchboard_url)
 
-    station_data = asyncio.run(fetch_json_url(stations_url))
+    station_data = await fetch_json_url(stations_url)
     if not station_data:
         raise ConfigError("Failed fetching stations")
     if (
@@ -104,7 +104,9 @@ def make(
     )
 
 
-def discover_config(player, registry_url, stations_url=None, switchboard_url=None):
+async def discover_config(
+    player, registry_url, stations_url=None, switchboard_url=None
+):
     """Discover missing player configuration from the registry."""
 
     if stations_url and switchboard_url:
@@ -119,7 +121,7 @@ def discover_config(player, registry_url, stations_url=None, switchboard_url=Non
     url = f"{registry_url.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)
     logger.info("  To skip, set RADIOPAD_ENABLE_DISCOVERY=false")
-    data = asyncio.run(fetch_json_url(url))
+    data = await fetch_json_url(url)
 
     if data:
         stations_url = stations_url or data.get("stations_url")

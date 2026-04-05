@@ -14,7 +14,7 @@ API_PREFIX = os.getenv("REGISTRY_API_PREFIX", "/api")
 SWITCHBOARD_PREFIX = os.getenv("REGISTRY_SWITCHBOARD_PREFIX", "/switchboard")
 
 # Base URL of the registry API (used by switchboard for remote auth in split mode)
-REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8000")
+REGISTRY_URL = os.getenv("REGISTRY_URL", f"http://localhost:8000{API_PREFIX}")
 
 # The absolute path to the project root directory
 BASE_DIR = Path(__file__).parent.parent.parent

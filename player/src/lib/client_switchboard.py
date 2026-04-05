@@ -43,6 +43,7 @@ class SwitchboardClient(RadioPadClient):
         self.ws = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
+        self._connected = False
 
         self.http_headers = http_client_headers(
             {"RadioPad-Stations-Url": player.config.stations_url}
@@ -66,8 +67,9 @@ class SwitchboardClient(RadioPadClient):
             self.url, additional_headers=self.http_headers
         ):
             try:
-                logger.info(f"connected to: {self.url}")
+                logger.info("connected to: %s", self.url)
                 self.ws = ws
+                self._connected = True
                 if self.on_connect:
                     self.on_connect()
                 asyncio.create_task(self.broadcast("station_playing"))
@@ -77,15 +79,17 @@ class SwitchboardClient(RadioPadClient):
                 # If the connection fails with a transient error, it is retried with exponential backoff. If it fails with a fatal error, the exception is raised, breaking out of the loop.
                 continue
             except (ConnectionRefusedError, OSError) as e:
-                logger.warning(f"failed to connect to {self.url}: {e}")
+                logger.warning("failed to connect to %s: %s", self.url, e)
                 logger.warning(
                     "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
                 )
                 continue
             finally:
                 self.ws = None
-                if self.on_disconnect:
-                    self.on_disconnect()
+                if self._connected:
+                    self._connected = False
+                    if self.on_disconnect:
+                        self.on_disconnect()
 
     async def _send(self, message):
         """Send a message to the macropad or switchboard."""
@@ -94,4 +98,5 @@ class SwitchboardClient(RadioPadClient):
 
     async def close(self):
         if self.ws:
+            self._connected = False
             await self.ws.close()

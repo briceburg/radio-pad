@@ -27,7 +27,7 @@ async def validate_local(request: Request | WebSocket, account_id: str, player_i
         identity = current_identity(services, creds)
         require_account_manager(account_id, identity, services)
     except Exception as e:
-        logger.warning(f"Local socket validation failed for {account_id}/{player_id}: {e!s}")
+        logger.warning("Local socket validation failed for %s/%s: %s", account_id, player_id, e)
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from e
 
 
@@ -40,7 +40,7 @@ async def validate_remote(request: Request | WebSocket, account_id: str, player_
     try:
         resp = await client.get(url, headers=headers)
     except httpx.HTTPError as e:
-        logger.error(f"Remote socket validation failed: {e}")
+        logger.error("Remote socket validation failed: %s", e)
         raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from e
 
     if resp.status_code != 200:

@@ -43,7 +43,7 @@ name | description | default
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
 `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready`
 `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
-`RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev`
+`RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api`
 `RADIOPAD_STATIONS_URL` | URL returning a station preset JSON object. Discovered from the registry if not set. | `None`
 `RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control syncing. Discovered from the registry if not set. | `None`
 

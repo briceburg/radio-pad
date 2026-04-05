@@ -37,26 +37,22 @@ function identity(value) {
   return value;
 }
 
-function withTrailingSlash(value) {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-
 function normalizeRegistryUrl(value) {
   const trimmed = typeof value === "string" ? value.trim() : "";
   if (!trimmed) return null;
-  if (trimmed.startsWith("/")) {
-    return withTrailingSlash(trimmed);
-  }
 
-  const candidate = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
+  const ensureTrailingSlash = (s) => (s.endsWith("/") ? s : `${s}/`);
+
+  if (trimmed.startsWith("/")) return ensureTrailingSlash(trimmed);
+
   try {
-    const parsed = new URL(candidate);
-    parsed.pathname = withTrailingSlash(parsed.pathname);
+    const parsed = new URL(
+      /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`,
+    );
+    parsed.pathname = ensureTrailingSlash(parsed.pathname);
     return parsed.toString();
   } catch {
-    return candidate;
+    return trimmed;
   }
 }
 
