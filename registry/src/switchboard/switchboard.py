@@ -13,12 +13,14 @@ PLAYER_USER_AGENT_PREFIX = "RadioPad/"
 
 
 async def publish_event(broadcast: Broadcast, channel: str, event: str, data: object) -> None:
-    await broadcast.publish(channel, json.dumps({"event": event, "data": data}))
+    message = json.dumps({"event": event, "data": data})
+    broadcast.set_state(channel, message)
+    await broadcast.publish(channel, message)
 
 
 async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str, is_player: bool) -> None:
     async def sender() -> None:
-        async with broadcast.subscribe(player_key) as subscriber:
+        async with broadcast.subscribe(player_key, replay=not is_player) as subscriber:
             async for event in subscriber:
                 try:
                     await websocket.send_text(event.message)
@@ -102,4 +104,5 @@ async def websocket_endpoint(
         await _run_loop(websocket, broadcast, player_key, is_player=is_player)
     finally:
         if is_player:
+            broadcast.clear_state(player_key)
             await publish_event(broadcast, player_key, "station_playing", None)
