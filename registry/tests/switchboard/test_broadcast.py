@@ -70,3 +70,39 @@ async def test_subscriber_iteration(broadcast: Broadcast) -> None:
     await asyncio.wait_for(task, timeout=1)
 
     assert collected == ["one", "two"]
+
+
+# -- state replay --
+
+
+async def test_set_state_replayed_on_subscribe(broadcast: Broadcast) -> None:
+    broadcast.set_state("ch", '{"event": "stations_url", "data": "http://x"}')
+    broadcast.set_state("ch", '{"event": "station_playing", "data": "KEXP"}')
+
+    async with broadcast.subscribe("ch", replay=True) as sub:
+        e1 = await asyncio.wait_for(sub.__anext__(), timeout=1)
+        e2 = await asyncio.wait_for(sub.__anext__(), timeout=1)
+
+    assert e1.message == '{"event": "stations_url", "data": "http://x"}'
+    assert e2.message == '{"event": "station_playing", "data": "KEXP"}'
+
+
+async def test_no_replay_without_flag(broadcast: Broadcast) -> None:
+    broadcast.set_state("ch", '{"event": "station_playing", "data": "KEXP"}')
+
+    async with broadcast.subscribe("ch") as sub:
+        assert sub._queue.empty()
+
+
+async def test_clear_state_removes_retained(broadcast: Broadcast) -> None:
+    broadcast.set_state("ch", '{"event": "station_playing", "data": "KEXP"}')
+    broadcast.clear_state("ch")
+
+    async with broadcast.subscribe("ch", replay=True) as sub:
+        assert sub._queue.empty()
+
+
+async def test_disconnect_clears_state(broadcast: Broadcast) -> None:
+    broadcast.set_state("ch", '{"event": "station_playing", "data": "KEXP"}')
+    await broadcast.disconnect()
+    assert broadcast._channel_state == {}

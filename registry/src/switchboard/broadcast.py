@@ -66,6 +66,7 @@ class Broadcast:
 
     def __init__(self) -> None:
         self._channels: dict[str, set[asyncio.Queue[Event | None]]] = {}
+        self._channel_state: dict[str, list[str]] = {}
 
     async def connect(self) -> None:
         """Prepare the broadcast (no-op for in-memory backend)."""
@@ -76,16 +77,36 @@ class Broadcast:
             for q in queues:
                 q.put_nowait(None)
         self._channels.clear()
+        self._channel_state.clear()
 
     async def publish(self, channel: str, message: str) -> None:
         """Send *message* to every subscriber on *channel*."""
         for q in list(self._channels.get(channel, ())):
             await q.put(Event(channel=channel, message=message))
 
+    def set_state(self, channel: str, message: str) -> None:
+        """Record *message* as retained state for *channel*."""
+        self._channel_state.setdefault(channel, []).append(message)
+
+    def clear_state(self, channel: str) -> None:
+        """Remove all retained state for *channel*."""
+        self._channel_state.pop(channel, None)
+
+    async def replay_state(self, channel: str, queue: asyncio.Queue[Event | None]) -> None:
+        """Enqueue retained state messages for *channel* into *queue*."""
+        for message in self._channel_state.get(channel, ()):
+            await queue.put(Event(channel=channel, message=message))
+
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncIterator[Subscriber]:
-        """Yield a :class:`Subscriber` that receives events on *channel*."""
+    async def subscribe(self, channel: str, *, replay: bool = False) -> AsyncIterator[Subscriber]:
+        """Yield a :class:`Subscriber` that receives events on *channel*.
+
+        If *replay* is ``True``, any retained state messages for the channel
+        are enqueued before live messages start flowing.
+        """
         queue: asyncio.Queue[Event | None] = asyncio.Queue()
+        if replay:
+            await self.replay_state(channel, queue)
         self._channels.setdefault(channel, set()).add(queue)
         try:
             yield Subscriber(queue)

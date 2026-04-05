@@ -1,5 +1,5 @@
 *
 !/*.json
 !/*.ts
-!/.env
+!/*.mjs
 !/src
