@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-function trimEnv(name: string) {
+function trimEnv(name) {
   return process.env[name]?.trim();
 }
 
