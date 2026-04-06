@@ -20,6 +20,7 @@
 import asyncio
 import logging
 from collections.abc import Callable
+from typing import Awaitable
 
 import websockets
 
@@ -37,7 +38,7 @@ class SwitchboardClient(RadioPadClient):
         player: RadioPadPlayer,
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[], None] | None = None,
-        status_reporter: Callable[[str | None], object] | None = None,
+        status_reporter: Callable[[str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
         self.url = player.config.switchboard_url

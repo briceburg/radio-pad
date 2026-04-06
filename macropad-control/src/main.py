@@ -39,13 +39,13 @@ display.set_title("Connect to Player")
 display.set_status("")
 
 
-def refresh_status():
-    if not player.connected:
+def refresh_status(connected, status_message, station_state_ready):
+    if not connected:
         display.set_status("", False)
         return
 
-    status = upstream_status
-    if not status and not had_stations:
+    status = status_message
+    if not status and not station_state_ready:
         status = "Loading stations..."
     display.set_status(status, False)
 
@@ -55,7 +55,7 @@ while True:
     if player.connected:
         if not was_connected:
             display.set_title("Player connected", False)
-            refresh_status()
+            refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
             was_connected = True
         if not had_stations:
@@ -89,16 +89,13 @@ while True:
             ]
             keys.set_stations(station_list)
             had_stations = True
-            refresh_status()
+            refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
         elif event_name == "station_playing":
             keys.set_playing_station(data)
         elif event_name == "player_status":
-            if isinstance(data, dict):
-                upstream_status = data.get("summary") or ""
-            else:
-                upstream_status = data or ""
-            refresh_status()
+            upstream_status = data.get("summary", "") if data else ""
+            refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
 
     # --- Encoder Rotation ---
