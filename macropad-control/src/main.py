@@ -61,7 +61,7 @@ while True:
         if not had_stations:
             player.request_stations()
     else:
-        needs_refresh = had_stations or was_connected or bool(upstream_status)
+        should_reset_display = had_stations or was_connected or bool(upstream_status)
         if had_stations:
             keys.set_stations([])
             had_stations = False
@@ -69,7 +69,7 @@ while True:
             player.flush_buffer()
         was_connected = False
         upstream_status = ""
-        if needs_refresh:
+        if should_reset_display:
             display.set_title("Connect to Player", False)
             display.set_status("", False)
             display.refresh()
