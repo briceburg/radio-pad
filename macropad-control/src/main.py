@@ -54,7 +54,7 @@ while True:
     # --- Player Connection ---
     if player.connected:
         if not was_connected:
-            display.set_title("Player connected", False)
+            display.set_title("Connected to Player", False)
             refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
             was_connected = True

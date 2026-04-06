@@ -29,7 +29,6 @@ from lib.interfaces import RadioPadClient, RadioPadPlayer
 logger = logging.getLogger("MACROPAD")
 
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
-STATUS_UNSET = object()
 
 
 class MacropadClient(RadioPadClient):
@@ -103,7 +102,7 @@ class MacropadClient(RadioPadClient):
         except asyncio.TimeoutError:
             pass  # Ignore timeout
 
-        await self.publish_status()
+        await self.resend_status()
 
         # Listen for new messages
         await self._listen()
@@ -134,10 +133,11 @@ class MacropadClient(RadioPadClient):
             except Exception as e:
                 logger.error("Failed to send: %s", e)
 
-    async def publish_status(self, summary=STATUS_UNSET):
-        if summary is not STATUS_UNSET:
-            self._status = summary
+    async def publish_status(self, summary):
+        self._status = summary
+        await self.resend_status()
 
+    async def resend_status(self):
         data = {"summary": self._status} if self._status else None
         await self._send(json.dumps({"event": "player_status", "data": data}))
 
