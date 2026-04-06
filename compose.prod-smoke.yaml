@@ -17,18 +17,9 @@ services:
     environment:
       REGISTRY_BACKEND: "git"
       REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY: "dummy"
-    command: >-
-      sh -c '
-        bin/docker/entrypoint.sh python3 -c "
-        import os, pathlib
-        key = pathlib.Path(os.environ[\"REGISTRY_BACKEND_GIT_SSH_KEY_PATH\"])
-        assert key.exists(), f\"SSH key not written: {key}\"
-        cmd = os.environ.get(\"GIT_SSH_COMMAND\", \"\")
-        assert str(key) in cmd, f\"GIT_SSH_COMMAND missing key: {cmd}\"
-        assert \"StrictHostKeyChecking\" in cmd, f\"GIT_SSH_COMMAND missing host check: {cmd}\"
-        print(\"registry-git smoke: ok\")
-        "
-      '
+    volumes:
+      - ./tests/smoke_registry_git.py:/tmp/smoke_registry_git.py:ro
+    command: ["bin/docker/entrypoint.sh", "python3", "/tmp/smoke_registry_git.py"]
 
   player:
     build:
@@ -39,7 +30,7 @@ services:
         condition: service_healthy
     environment:
       RADIOPAD_REGISTRY_URL: "http://registry:8000/api/"
-      RADIOPAD_PLAYER: "smoke/test"
+      RADIOPAD_PLAYER: "briceburg/living-room"
 
   remote-control:
     build:
@@ -49,7 +40,7 @@ services:
   integration-tests:
     profiles:
       - tests
-    image: busybox:latest
+    image: busybox:1
     depends_on:
       registry:
         condition: service_healthy
