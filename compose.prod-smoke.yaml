@@ -21,13 +21,11 @@ services:
       sh -c '
         bin/docker/entrypoint.sh python3 -c "
         import os, pathlib
-        home = os.environ.get(\"HOME\", \"\")
-        assert home == \"/tmp\", f\"HOME={home}, expected /tmp\"
         key = pathlib.Path(os.environ[\"REGISTRY_BACKEND_GIT_SSH_KEY_PATH\"])
         assert key.exists(), f\"SSH key not written: {key}\"
-        kh = pathlib.Path(home, \".ssh\", \"known_hosts\")
-        assert kh.exists(), f\"known_hosts not found: {kh}\"
-        assert \"github.com\" in kh.read_text(), \"github.com not in known_hosts\"
+        cmd = os.environ.get(\"GIT_SSH_COMMAND\", \"\")
+        assert str(key) in cmd, f\"GIT_SSH_COMMAND missing key: {cmd}\"
+        assert \"StrictHostKeyChecking\" in cmd, f\"GIT_SSH_COMMAND missing host check: {cmd}\"
         print(\"registry-git smoke: ok\")
         "
       '

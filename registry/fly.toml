@@ -4,7 +4,7 @@
 #
 
 app = 'radio-pad-registry'
-primary_region = 'den'
+primary_region = 'ord'
 
 [build]
 

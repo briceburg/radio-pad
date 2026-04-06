@@ -31,7 +31,6 @@ async def get_player(
     account_id: AccountId,
     player_id: PlayerId,
     ds: DS,
-    _identity: object = Depends(require_account_manager),
 ) -> Player:
     return get_or_404(
         ds.players.get(player_id, path_params={"account_id": account_id}),
@@ -46,6 +45,5 @@ async def list_players(
     account_id: AccountId,
     ds: DS,
     paging: PageParams,
-    _identity: object = Depends(require_account_manager),
 ) -> PaginatedList[PlayerSummary]:
     return get_paginated(ds.players, PlayerSummary, paging, path_params={"account_id": account_id})

@@ -2,17 +2,13 @@
 set -e
 
 if [ "${REGISTRY_BACKEND:-}" = "git" ] && [ -n "${REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY:-}" ]; then
-    SSH_DIR="/tmp/.ssh"
-    mkdir -p "$SSH_DIR"
-
-    KEY_PATH="${REGISTRY_BACKEND_GIT_SSH_KEY_PATH:-$SSH_DIR/radio_pad_registry_data}"
+    KEY_PATH="${REGISTRY_BACKEND_GIT_SSH_KEY_PATH:-/tmp/.ssh_deploy_key}"
     umask 077
+    mkdir -p "$(dirname "$KEY_PATH")"
     printf '%s\n' "$REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" > "$KEY_PATH"
     chmod 600 "$KEY_PATH"
     export REGISTRY_BACKEND_GIT_SSH_KEY_PATH="$KEY_PATH"
-
-    ssh-keyscan github.com > "$SSH_DIR/known_hosts"
-    chmod 644 "$SSH_DIR/known_hosts"
+    export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o StrictHostKeyChecking=accept-new"
 fi
 
 CPU_COUNT=$(bin/docker/get_cpus.sh)
