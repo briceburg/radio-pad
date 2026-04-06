@@ -17,8 +17,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import json
 import asyncio
+import json
 import logging
 
 import serial.tools.list_ports
