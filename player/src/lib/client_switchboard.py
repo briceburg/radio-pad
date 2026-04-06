@@ -72,6 +72,7 @@ class SwitchboardClient(RadioPadClient):
                 self._connected = True
                 if self.on_connect:
                     self.on_connect()
+                await self.broadcast("status", data="Switchboard connected")
                 asyncio.create_task(self.broadcast("station_playing"))
                 async for msg in ws:
                     await self.handle_message(msg)
@@ -88,6 +89,7 @@ class SwitchboardClient(RadioPadClient):
                 self.ws = None
                 if self._connected:
                     self._connected = False
+                    await self.broadcast("status", data="Switchboard offline")
                     if self.on_disconnect:
                         self.on_disconnect()
 

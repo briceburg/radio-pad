@@ -79,10 +79,12 @@ class MpvPlayer(RadioPadPlayer):
                 self.station = station
             else:
                 logger.error("failed to start mpv process.")
+                await self.broadcast_status("Playback failed")
             self.mpv_sock = None
             await self._establish_ipc_socket()
         except Exception as e:
             logger.error("error starting station: %s", e, exc_info=True)
+            await self.broadcast_status("Playback error")
 
     async def stop(self):
         """Stop playback of the current station."""

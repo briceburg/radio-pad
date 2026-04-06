@@ -81,6 +81,15 @@ class RadioPadPlayer(abc.ABC):
         """Register a client with this player."""
         self._clients.append(client)
 
+    async def broadcast_status(self, message: str):
+        """Broadcast a status message to all connected clients."""
+        payload = json.dumps({"event": "status", "data": message})
+        for client in self._clients:
+            try:
+                await client._send(payload)
+            except Exception as e:
+                logger.error("Status broadcast error for %s: %s", client, e)
+
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
         """Play a radio station."""
@@ -109,7 +118,7 @@ class RadioPadClient(abc.ABC):
         self.register_event("volume", self._handle_volume)
         self.register_event("station_request", self._handle_station_request)
         # Ignored events
-        for ignored in ("station_playing", "client_count", "stations_url"):
+        for ignored in ("station_playing", "client_count", "stations_url", "status"):
             self.register_event(ignored, self._handle_ignored)
 
     @property

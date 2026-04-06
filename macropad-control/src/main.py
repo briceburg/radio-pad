@@ -66,6 +66,8 @@ while True:
             had_stations = True
         elif event_name == "station_playing":
             keys.set_playing_station(data)
+        elif event_name == "status":
+            display.set_title(str(data))
 
     # --- Encoder Rotation ---
     position = macropad.encoder
