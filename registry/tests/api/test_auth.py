@@ -77,9 +77,11 @@ def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
     )
 
     with client:
-        response = client.get("presets/briceburg")
-
-    assert response.status_code == 200
+        # All read endpoints must remain public even when auth is enabled
+        assert client.get("presets/briceburg").status_code == 200
+        assert client.get("accounts/testuser1").status_code == 200
+        assert client.get("accounts/testuser1/players/player1").status_code == 200
+        assert client.get("accounts/testuser1/players").status_code == 200
 
 
 def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
