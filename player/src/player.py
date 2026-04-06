@@ -25,7 +25,7 @@ import signal
 import sys
 
 import lib.config as config
-from lib.client_macropad import MacropadClient
+from lib.client_macropad import MacropadClient, notify_status
 from lib.client_switchboard import SwitchboardClient
 from lib.exceptions import ConfigError
 from lib.health import DEFAULT_HEALTH_PATH, clear_health, mark_healthy
@@ -79,6 +79,7 @@ if __name__ == "__main__":
     clear_health(health_path)
     player = None
     try:
+        notify_status("Starting player...")
         # Load configuration
         player_config = asyncio.run(
             config.make(
@@ -90,6 +91,7 @@ if __name__ == "__main__":
                 switchboard_url=os.getenv("RADIOPAD_SWITCHBOARD_URL", None),
                 enable_discovery=os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower()
                 == "true",
+                on_status=notify_status,
             )
         )
 
@@ -102,12 +104,23 @@ if __name__ == "__main__":
             ),
         )
         player.register_client(MacropadClient(player))
+        def handle_disconnect():
+            clear_health(health_path)
+            notify_status("Registry offline")
+
+        def handle_connect():
+            mark_healthy(health_path)
+            if player.station:
+                notify_status(player.station.name)
+            else:
+                notify_status("Registry connected")
+
         if player.config.switchboard_url:
             player.register_client(
                 SwitchboardClient(
                     player,
-                    on_connect=lambda: mark_healthy(health_path),
-                    on_disconnect=lambda: clear_health(health_path),
+                    on_connect=handle_connect,
+                    on_disconnect=handle_disconnect,
                 )
             )
         else:

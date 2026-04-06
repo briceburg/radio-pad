@@ -33,18 +33,18 @@ last_position = macropad.encoder
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
 had_stations = False
 
-display.set_title("Connect to Player")
+display.set_title("Waiting on Host...")
 
 while True:
     # --- Player Connection ---
     if player.connected and not had_stations:
-        display.set_title("Player connected!")
+        display.set_title("Host Connected!")
         display.refresh()
         player.request_stations()
     elif not player.connected:
         if had_stations:
             keys.set_stations([])
-            display.set_title("Player disconnected!")
+            display.set_title("Host Disconnected!")
             player.flush_buffer()
             had_stations = False
 
@@ -66,6 +66,8 @@ while True:
             had_stations = True
         elif event_name == "station_playing":
             keys.set_playing_station(data)
+        elif event_name == "status":
+            display.set_title(str(data))
 
     # --- Encoder Rotation ---
     position = macropad.encoder

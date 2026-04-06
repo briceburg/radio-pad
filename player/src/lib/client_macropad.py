@@ -30,6 +30,25 @@ logger = logging.getLogger("MACROPAD")
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
 
 
+def notify_status(message: str):
+    """Send a status message synchronously to the Macropad if connected."""
+    import json
+    import serial
+
+    macropad_ports = [
+        port.device
+        for port in serial.tools.list_ports.comports()
+        if port.interface and port.interface.startswith(DATA_INTERFACE_NAME)
+    ]
+    if macropad_ports:
+        try:
+            with serial.Serial(macropad_ports[0], baudrate=115200, timeout=0.1) as ser:
+                msg = json.dumps({"event": "status", "data": message})
+                ser.write((msg + "\n").encode())
+        except Exception as e:
+            logger.warning("Failed to notify macropad status: %s", e)
+
+
 class MacropadClient(RadioPadClient):
     def __init__(self, player: RadioPadPlayer):
         super().__init__(player)

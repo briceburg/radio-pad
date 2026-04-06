@@ -33,13 +33,15 @@ def http_client_headers(custom_headers=None):
     return {**defaults, **custom_headers}
 
 
-async def fetch_json_url(url, timeout=12, retries=3):
+async def fetch_json_url(url, timeout=12, retries=3, on_status=None):
     """Fetch JSON from URL with retries"""
     headers = http_client_headers({"Accept": "application/json"})
     async with httpx.AsyncClient(
         timeout=timeout, headers=headers, follow_redirects=True
     ) as client:
         for attempt in range(retries):
+            if on_status and attempt == 0:
+                on_status("Fetching registry...")
             try:
                 response = await client.get(url)
                 if response.status_code == 200:
@@ -54,6 +56,8 @@ async def fetch_json_url(url, timeout=12, retries=3):
                 logger.warning("Attempt %s failed for %s: %s", attempt + 1, url, e)
             if attempt < retries - 1:
                 logger.info("Retrying in %s seconds...", 2**attempt)
+                if on_status:
+                    on_status(f"Net error, retry {attempt + 1}")
                 await asyncio.sleep(2**attempt)
     return None
 
@@ -64,14 +68,17 @@ async def make(
     stations_url=None,
     switchboard_url=None,
     enable_discovery=True,
+    on_status=None,
 ):
     """
     Create a RadioPadPlayerConfig object with the provided parameters.
     If enable_discovery is True, attempt to discover missing configuration from the registry.
     """
     if enable_discovery:
+        if on_status:
+            on_status("Discovering player...")
         stations_url, switchboard_url = await discover_config(
-            player, registry_url, stations_url, switchboard_url
+            player, registry_url, stations_url, switchboard_url, on_status=on_status
         )
 
     if not stations_url:
@@ -82,7 +89,9 @@ async def make(
     logger.info("Using stations_url: %s", stations_url)
     logger.info("Using switchboard_url: %s", switchboard_url)
 
-    station_data = await fetch_json_url(stations_url)
+    if on_status:
+        on_status("Fetching stations...")
+    station_data = await fetch_json_url(stations_url, on_status=on_status)
     if not station_data:
         raise ConfigError("Failed fetching stations")
     if (
@@ -105,7 +114,7 @@ async def make(
 
 
 async def discover_config(
-    player, registry_url, stations_url=None, switchboard_url=None
+    player, registry_url, stations_url=None, switchboard_url=None, on_status=None
 ):
     """Discover missing player configuration from the registry."""
 
@@ -121,7 +130,7 @@ async def discover_config(
     url = f"{registry_url.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)
     logger.info("  To skip, set RADIOPAD_ENABLE_DISCOVERY=false")
-    data = await fetch_json_url(url)
+    data = await fetch_json_url(url, on_status=on_status)
 
     if data:
         stations_url = stations_url or data.get("stations_url")
