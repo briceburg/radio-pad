@@ -39,13 +39,13 @@ display.set_title("Connect to Player")
 display.set_status("")
 
 
-def refresh_status(connected, status_message, station_state_ready):
+def refresh_status(connected, status_message, has_loaded_stations):
     if not connected:
         display.set_status("", False)
         return
 
     status = status_message
-    if not status and not station_state_ready:
+    if not status and not has_loaded_stations:
         status = "Loading stations..."
     display.set_status(status, False)
 
@@ -94,7 +94,7 @@ while True:
         elif event_name == "station_playing":
             keys.set_playing_station(data)
         elif event_name == "player_status":
-            upstream_status = data.get("summary", "") if data else ""
+            upstream_status = data.get("summary") if data else ""
             refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
 
