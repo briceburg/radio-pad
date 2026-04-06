@@ -58,12 +58,28 @@ class MacropadDisplay:
         )
         self._group.append(self._title_text)
 
+        self._status_text = label.Label(
+            terminalio.FONT,
+            text="",
+            color=0xFFFFFF,
+            anchored_position=(self.macropad.display.width // 2, 18),
+            anchor_point=(0.5, 0.5),
+        )
+        self._group.append(self._status_text)
+
         self.macropad.display.root_group = self._group
 
     def set_title(self, text, refresh=True):
         if self._title_text.text == text:
             return
         self._title_text.text = text
+        if refresh:
+            self.refresh()
+
+    def set_status(self, text, refresh=True):
+        if self._status_text.text == text:
+            return
+        self._status_text.text = text
         if refresh:
             self.refresh()
 

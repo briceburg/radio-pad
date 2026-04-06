@@ -18,6 +18,7 @@
 
 
 import asyncio
+import json
 import logging
 
 import serial.tools.list_ports
@@ -35,6 +36,7 @@ class MacropadClient(RadioPadClient):
         super().__init__(player)
         self.writer = None
         self.reader = None
+        self._status = None
 
         # Override station_list handler
         self.register_event("station_list", self._handle_station_list)
@@ -100,6 +102,8 @@ class MacropadClient(RadioPadClient):
         except asyncio.TimeoutError:
             pass  # Ignore timeout
 
+        await self.resend_status()
+
         # Listen for new messages
         await self._listen()
 
@@ -128,6 +132,17 @@ class MacropadClient(RadioPadClient):
                 await self.writer.drain()
             except Exception as e:
                 logger.error("Failed to send: %s", e)
+
+    async def publish_status(self, summary):
+        self._status = summary
+        await self.resend_status()
+
+    async def resend_status(self):
+        if not self.writer:
+            return
+        await self._send(
+            json.dumps({"event": "player_status", "data": {"summary": self._status}})
+        )
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]

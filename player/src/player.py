@@ -101,13 +101,15 @@ if __name__ == "__main__":
                 "RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"
             ),
         )
-        player.register_client(MacropadClient(player))
+        macropad_client = MacropadClient(player)
+        player.register_client(macropad_client)
         if player.config.switchboard_url:
             player.register_client(
                 SwitchboardClient(
                     player,
                     on_connect=lambda: mark_healthy(health_path),
                     on_disconnect=lambda: clear_health(health_path),
+                    status_reporter=macropad_client.publish_status,
                 )
             )
         else:

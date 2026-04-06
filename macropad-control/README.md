@@ -19,6 +19,8 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
   Pressing the encoder (the knob) will stop the currently playing radio station.
 - **Encoder Position (Knob Turn):**  
   Turning the encoder knob adjusts the playback volume up or down. If playback is stopped, and there are more than 12 stations, turning the encoder knob will switch station pages.
+- **Status Line:**  
+  The line under the title shows player status, such as loading stations or upstream connection issues.
 
 ## Usage
 
