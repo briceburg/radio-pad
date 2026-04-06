@@ -32,22 +32,45 @@ player = MacropadPlayer()
 last_position = macropad.encoder
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
 had_stations = False
+was_connected = False
+upstream_status = ""
 
 display.set_title("Connect to Player")
+display.set_status("")
+
+
+def refresh_status():
+    if not player.connected:
+        display.set_status("", False)
+        return
+
+    status = upstream_status
+    if not status and not had_stations:
+        status = "Loading stations..."
+    display.set_status(status, False)
+
 
 while True:
     # --- Player Connection ---
-    if player.connected and not had_stations:
-        display.set_title("Player connected!")
-        display.refresh()
-        player.request_stations()
-    elif not player.connected:
+    if player.connected:
+        if not was_connected:
+            display.set_title("Player connected", False)
+            refresh_status()
+            display.refresh()
+            was_connected = True
+        if not had_stations:
+            player.request_stations()
+    else:
         if had_stations:
             keys.set_stations([])
-            display.set_title("Player disconnected!")
-            player.flush_buffer()
             had_stations = False
-
+        if was_connected or upstream_status:
+            player.flush_buffer()
+        was_connected = False
+        upstream_status = ""
+        display.set_title("Connect to Player", False)
+        display.set_status("", False)
+        display.refresh()
         time.sleep(0.01)
         continue
 
@@ -64,8 +87,17 @@ while True:
             ]
             keys.set_stations(station_list)
             had_stations = True
+            refresh_status()
+            display.refresh()
         elif event_name == "station_playing":
             keys.set_playing_station(data)
+        elif event_name == "player_status":
+            if isinstance(data, dict):
+                upstream_status = data.get("summary") or ""
+            else:
+                upstream_status = data or ""
+            refresh_status()
+            display.refresh()
 
     # --- Encoder Rotation ---
     position = macropad.encoder

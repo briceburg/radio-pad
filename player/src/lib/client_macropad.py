@@ -17,6 +17,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
+import json
 import asyncio
 import logging
 
@@ -35,6 +36,7 @@ class MacropadClient(RadioPadClient):
         super().__init__(player)
         self.writer = None
         self.reader = None
+        self._status = None
 
         # Override station_list handler
         self.register_event("station_list", self._handle_station_list)
@@ -100,6 +102,8 @@ class MacropadClient(RadioPadClient):
         except asyncio.TimeoutError:
             pass  # Ignore timeout
 
+        await self.publish_status()
+
         # Listen for new messages
         await self._listen()
 
@@ -128,6 +132,12 @@ class MacropadClient(RadioPadClient):
                 await self.writer.drain()
             except Exception as e:
                 logger.error("Failed to send: %s", e)
+
+    async def publish_status(self, summary=None):
+        self._status = summary
+        await self._send(
+            json.dumps({"event": "player_status", "data": {"summary": summary}})
+        )
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]
