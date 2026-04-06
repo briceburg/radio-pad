@@ -94,7 +94,11 @@ while True:
         elif event_name == "station_playing":
             keys.set_playing_station(data)
         elif event_name == "player_status":
-            upstream_status = data.get("summary") if isinstance(data, dict) else ""
+            if data is not None and not isinstance(data, dict):
+                print(f"Unexpected player_status payload: {data}")
+                upstream_status = ""
+            else:
+                upstream_status = data.get("summary") if data else ""
             refresh_status(player.connected, upstream_status, had_stations)
             display.refresh()
 

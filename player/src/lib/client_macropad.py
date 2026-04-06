@@ -140,8 +140,9 @@ class MacropadClient(RadioPadClient):
     async def resend_status(self):
         if not self.writer:
             return
-        data = {"summary": self._status} if self._status else None
-        await self._send(json.dumps({"event": "player_status", "data": data}))
+        await self._send(
+            json.dumps({"event": "player_status", "data": {"summary": self._status}})
+        )
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]
