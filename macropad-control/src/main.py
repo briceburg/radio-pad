@@ -24,87 +24,198 @@ from lib.macropad_display import MacropadDisplay
 from lib.macropad_keys import DEFAULT_COLOR, PRESSED_COLOR, MacropadKeys
 from lib.macropad_player import MacropadPlayer
 
-macropad = MacroPad()
-display = MacropadDisplay(macropad)
-keys = MacropadKeys(macropad, display)
-player = MacropadPlayer()
+LOOP_SLEEP_SECONDS = 0.01
+STATUS_SCOPES = ("upstream", "playback")
 
-last_position = macropad.encoder
-last_encoder_switch = macropad.encoder_switch_debounced.pressed
-had_stations = False
 
-display.set_title("Connect to Player")
+class MacropadApp:
+    def __init__(self):
+        self.macropad = MacroPad()
+        self.display = MacropadDisplay(self.macropad)
+        self.keys = MacropadKeys(self.macropad, self.display)
+        self.player = MacropadPlayer()
 
-while True:
-    # --- Player Connection ---
-    if player.connected and not had_stations:
-        display.set_title("Player connected!")
-        display.refresh()
-        player.request_stations()
-    elif not player.connected:
-        if had_stations:
-            keys.set_stations([])
-            display.set_title("Player disconnected!")
-            player.flush_buffer()
-            had_stations = False
+        self.last_position = self.macropad.encoder
+        self.last_encoder_switch = self.macropad.encoder_switch_debounced.pressed
+        self.had_stations = False
+        self.was_connected = False
+        self.status_by_scope = {scope: "" for scope in STATUS_SCOPES}
 
-        time.sleep(0.01)
-        continue
+    def run(self):
+        while True:
+            self.tick()
+            time.sleep(LOOP_SLEEP_SECONDS)
 
-    # --- Player Events ---
-    event = player.read_event()
-    if event:
-        print(f"Received event: {event}")
+    def tick(self):
+        event = self.player.read_event()
+
+        if not self.player.session_connected:
+            self._handle_disconnected_state(event)
+            self.keys.tick()
+            return
+
+        if not self.was_connected:
+            self._refresh_visual_state()
+            self.was_connected = True
+
+        if not self.had_stations:
+            self.player.request_stations()
+
+        self._handle_player_event(event)
+        self._handle_encoder_rotation()
+        self._handle_encoder_press()
+        self._handle_key_events()
+        self.keys.tick()
+
+    def _handle_disconnected_state(self, event):
+        self._handle_player_event(event)
+
+        if self.player.session_connected:
+            self._refresh_visual_state()
+            self.was_connected = True
+            return
+
+        if self.had_stations:
+            self.keys.set_stations([])
+            self.keys.set_playing_station(None)
+            self.had_stations = False
+
+        if self.was_connected or any(self.status_by_scope.values()):
+            self.player.flush_buffer()
+            self.player.reset_session()
+
+        self.was_connected = False
+        self._clear_statuses()
+        self._refresh_visual_state()
+
+        if self.player.connected:
+            self.player.request_stations()
+
+    def _handle_player_event(self, event):
+        if not event:
+            return
+
         event_name = event.get("event")
         data = event.get("data")
 
         if event_name == "station_list":
-            station_list = [
-                {"name": station, "color": DEFAULT_COLOR} for station in data
-            ]
-            keys.set_stations(station_list)
-            had_stations = True
-        elif event_name == "station_playing":
-            keys.set_playing_station(data)
+            self._set_station_list(data)
+            return
 
-    # --- Encoder Rotation ---
-    position = macropad.encoder
-    if position != last_position:
-        if keys.playing_station_index is not None:
-            direction = "up" if position > last_position else "down"
-            player.send_command("volume", direction)
+        if event_name == "station_playing":
+            self.keys.set_playing_station(data)
+            return
+
+        if event_name == "player_status":
+            self._update_status(data)
+            self._refresh_visual_state()
+            return
+
+        if event_name != "player_heartbeat":
+            print(f"Received event: {event}")
+
+    def _set_station_list(self, stations):
+        station_list = [{"name": station, "color": DEFAULT_COLOR} for station in stations]
+        self.keys.set_stations(station_list)
+        self.had_stations = True
+        self._refresh_visual_state()
+
+    def _handle_encoder_rotation(self):
+        position = self.macropad.encoder
+        if position == self.last_position:
+            return
+
+        if self.keys.playing_station_index is not None:
+            direction = "up" if position > self.last_position else "down"
+            self.player.send_command("volume", direction)
         else:
-            num_pages = len(keys.pages)
-            if position > last_position:
-                keys.switch_page((keys.current_page_index + 1) % num_pages)
-            else:
-                keys.switch_page((keys.current_page_index - 1 + num_pages) % num_pages)
-        last_position = position
+            page_count = len(self.keys.pages)
+            direction = 1 if position > self.last_position else -1
+            next_page = (self.keys.current_page_index + direction) % page_count
+            self.keys.switch_page(next_page)
 
-    # --- Encoder Press ---
-    macropad.encoder_switch_debounced.update()
-    pressed = macropad.encoder_switch_debounced.pressed
-    if pressed and not last_encoder_switch:
-        if keys.playing_station_index is not None:
-            player.send_command("station_request", None)
-            keys.flash_keys()
-    last_encoder_switch = pressed
+        self.last_position = position
 
-    # --- Key Events ---
-    last_pressed_station = None
-    while True:
-        # Drain keypad event queue so simultaneous presses resolve to the "last" press.
-        key_event = macropad.keys.events.get()
-        if not key_event:
-            break
-        if not key_event.pressed:
-            continue
+    def _handle_encoder_press(self):
+        self.macropad.encoder_switch_debounced.update()
+        pressed = self.macropad.encoder_switch_debounced.pressed
+        if pressed and not self.last_encoder_switch:
+            if self.keys.playing_station_index is not None:
+                self.player.send_command("station_request", None)
+                self.keys.flash_keys()
+        self.last_encoder_switch = pressed
 
-        key_number = key_event.key_number
-        station_name = keys.get_station_name(key_number)
+    def _handle_key_events(self):
+        station_name = self._drain_pressed_station_name()
         if station_name:
-            keys.set_key_color(key_number, PRESSED_COLOR)
-            last_pressed_station = station_name
+            self.player.send_command("station_request", station_name)
 
-    if last_pressed_station:
-        player.send_command("station_request", last_pressed_station)
+    def _drain_pressed_station_name(self):
+        last_pressed_station = None
+        while True:
+            key_event = self.macropad.keys.events.get()
+            if not key_event:
+                return last_pressed_station
+            if not key_event.pressed:
+                continue
+
+            key_number = key_event.key_number
+            station_name = self.keys.get_station_name(key_number)
+            if station_name:
+                self.keys.set_key_color(key_number, PRESSED_COLOR)
+                last_pressed_station = station_name
+
+    def _update_status(self, status_event):
+        if not isinstance(status_event, dict):
+            print(f"Unexpected player_status payload: {status_event}")
+            return
+
+        scope = status_event.get("scope")
+        summary = status_event.get("summary")
+
+        if scope not in self.status_by_scope:
+            print(f"Unexpected player_status scope: {scope}")
+            return
+
+        if isinstance(summary, str):
+            self.status_by_scope[scope] = summary
+            return
+
+        if summary is not None:
+            print(f"Unexpected player_status summary: {summary}")
+        self.status_by_scope[scope] = ""
+
+    def _clear_statuses(self):
+        for scope in self.status_by_scope:
+            self.status_by_scope[scope] = ""
+
+    def _refresh_visual_state(self):
+        self.keys.set_waiting_animation(self._waiting_mode())
+        self.keys.set_upstream_warning(
+            self.had_stations and bool(self.status_by_scope["upstream"])
+        )
+        self.keys.set_title_override(self._title_override())
+
+    def _waiting_mode(self):
+        if not self.player.session_connected:
+            return "disconnected"
+        if not self.had_stations:
+            return "loading"
+        return None
+
+    def _title_override(self):
+        if not self.player.session_connected:
+            return "Waiting for Player"
+
+        for scope in ("playback", "upstream"):
+            status = self.status_by_scope[scope]
+            if status:
+                return status
+
+        if not self.had_stations:
+            return "Loading stations"
+
+        return None
+
+
+MacropadApp().run()

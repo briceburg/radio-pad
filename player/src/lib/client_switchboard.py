@@ -19,7 +19,8 @@
 
 import asyncio
 import logging
-from collections.abc import Callable
+import random
+from collections.abc import Awaitable, Callable
 
 import websockets
 
@@ -29,6 +30,26 @@ from lib.interfaces import RadioPadClient, RadioPadPlayer
 logger = logging.getLogger("SWITCHBOARD")
 
 MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
+SWITCHBOARD_CONNECT_TIMEOUT_SECONDS = 5
+SWITCHBOARD_RETRY_INITIAL_DELAY_SECONDS = 1
+SWITCHBOARD_RETRY_FACTOR = 1.5
+SWITCHBOARD_RETRY_JITTER_SECONDS = 1
+SWITCHBOARD_RETRY_MAX_DELAY_SECONDS = 8
+
+
+def next_retry_delay(
+    retry_delay: float,
+    *,
+    factor: float = SWITCHBOARD_RETRY_FACTOR,
+    jitter_seconds: float = SWITCHBOARD_RETRY_JITTER_SECONDS,
+    max_delay_seconds: float = SWITCHBOARD_RETRY_MAX_DELAY_SECONDS,
+) -> tuple[float, float]:
+    sleep_seconds = min(
+        retry_delay + (random.random() * jitter_seconds),
+        max_delay_seconds,
+    )
+    next_delay = min(retry_delay * factor, max_delay_seconds)
+    return sleep_seconds, next_delay
 
 
 class SwitchboardClient(RadioPadClient):
@@ -37,12 +58,14 @@ class SwitchboardClient(RadioPadClient):
         player: RadioPadPlayer,
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[], None] | None = None,
+        status_reporter: Callable[[str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
         self.url = player.config.switchboard_url
         self.ws = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
+        self.status_reporter = status_reporter
         self._connected = False
 
         self.http_headers = http_client_headers(
@@ -54,47 +77,68 @@ class SwitchboardClient(RadioPadClient):
             logger.info("skipping switchboard connection, url not provided.")
             return
 
+        retry_delay = SWITCHBOARD_RETRY_INITIAL_DELAY_SECONDS
         while True:
             try:
                 await self._connect_and_listen()
+                retry_delay = SWITCHBOARD_RETRY_INITIAL_DELAY_SECONDS
+            except asyncio.CancelledError:
+                raise
+            except (ConnectionRefusedError, TimeoutError, OSError) as e:
+                logger.warning("failed to connect to %s: %s", self.url, e)
+                logger.warning(
+                    "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
+                )
+                await self._report_status(self._status_summary(e))
+            except websockets.exceptions.WebSocketException as e:
+                logger.warning("switchboard websocket error: %s", e)
+                await self._report_status(self._status_summary(e))
             except Exception as e:
                 logger.error("Unexpected error: %s", e, exc_info=True)
-            logger.info("reconnecting to switchboard in 5s...")
-            await asyncio.sleep(5)
+
+            sleep_seconds, retry_delay = next_retry_delay(retry_delay)
+            logger.info("reconnecting to switchboard in %.1fs...", sleep_seconds)
+            await asyncio.sleep(sleep_seconds)
 
     async def _connect_and_listen(self):
-        async for ws in websockets.connect(
-            self.url, additional_headers=self.http_headers
-        ):
-            try:
+        try:
+            async with websockets.connect(
+                self.url,
+                additional_headers=self.http_headers,
+                open_timeout=SWITCHBOARD_CONNECT_TIMEOUT_SECONDS,
+            ) as ws:
                 logger.info("connected to: %s", self.url)
                 self.ws = ws
                 self._connected = True
                 if self.on_connect:
                     self.on_connect()
+                await self._report_status(None)
                 asyncio.create_task(self.broadcast("station_playing"))
                 async for msg in ws:
                     await self.handle_message(msg)
-            except websockets.exceptions.ConnectionClosed:
-                # If the connection fails with a transient error, it is retried with exponential backoff. If it fails with a fatal error, the exception is raised, breaking out of the loop.
-                continue
-            except (ConnectionRefusedError, OSError) as e:
-                logger.warning("failed to connect to %s: %s", self.url, e)
-                logger.warning(
-                    "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
-                )
-                continue
-            finally:
-                self.ws = None
-                if self._connected:
-                    self._connected = False
-                    if self.on_disconnect:
-                        self.on_disconnect()
+        finally:
+            self.ws = None
+            if self._connected:
+                self._connected = False
+                await self._report_status("Switchboard down")
+                if self.on_disconnect:
+                    self.on_disconnect()
 
     async def _send(self, message):
         """Send a message to the macropad or switchboard."""
         if self.ws:
             await self.ws.send(message)
+
+    async def _report_status(self, summary):
+        if self.status_reporter:
+            await self.status_reporter(summary)
+
+    def _status_summary(self, error: Exception) -> str:
+        if isinstance(error, ConnectionRefusedError):
+            return "Switchboard down"
+        if isinstance(error, TimeoutError):
+            return "Network timeout"
+        return "Network issue"
 
     async def close(self):
         if self.ws:

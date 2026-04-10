@@ -19,6 +19,12 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
   Pressing the encoder (the knob) will stop the currently playing radio station.
 - **Encoder Position (Knob Turn):**  
   Turning the encoder knob adjusts the playback volume up or down. If playback is stopped, and there are more than 12 stations, turning the encoder knob will switch station pages.
+- **Title Bar Status:**  
+  The title bar normally shows the current page or playing station, but it temporarily switches to player health details such as station loading, switchboard outages, and playback failures.
+- **Waiting / Loading Keys:**  
+  When the macropad is waiting for the player, the key LEDs show a soft grey breathing placeholder animation. Once the player is connected and stations are loading, the placeholder animation shifts to amber.
+- **Upstream Warning Keys:**  
+  When the player is connected but the switchboard is down, the title warns about the outage and idle station keys shift to a muted amber warning color while the active station stays highlighted.
 
 ## Usage
 
@@ -34,6 +40,12 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/mount
    ```
 
+   If you just want to inspect what the repo can currently see, run:
+
+   ```sh
+   bin/status
+   ```
+
 2. **Customize button colors and behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
    - Stations are received from the connected [player](../player/), which loads them from a registry [station preset](../player/README.md#registry-discovery).
@@ -43,6 +55,8 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/refresh
    ```
 
+   `bin/refresh` will automatically run `bin/mount` if the CIRCUITPY volume is not mounted yet.
+
 4. **Debug via the USB serial console**
 
 Attaching to the console allows you to read stdout/stderr, for instance to view exceptions or debug messages.
@@ -51,7 +65,16 @@ Attaching to the console allows you to read stdout/stderr, for instance to view 
   bin/console
   ```
 
-  > this command requires that the executing user has access to /dev/ttyACM* devices, which are owned by the `uucp` group in archlinux.
+  The player uses the CircuitPython `CDC2` port for commands and events, while `bin/console` targets the primary CircuitPython console port.
+
+  > serial access requires that the executing user has access to `/dev/ttyACM*` devices, which are owned by the `uucp` group in archlinux.
+
+### WSL Notes
+
+In WSL2, the macropad needs to be attached into Linux with USB/IP before the storage and `/dev/ttyACM*` devices appear. Once attached, this project expects:
+
+- player data port: `/dev/ttyACM1` (`CircuitPython CDC2`)
+- console port: `/dev/ttyACM0` (`CircuitPython CDC`)
 
 ## Development
 

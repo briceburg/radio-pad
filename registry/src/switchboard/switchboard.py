@@ -12,6 +12,14 @@ logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
 
 
+def controller_auth_required(websocket: WebSocket) -> bool:
+    services = getattr(websocket.app.state, "auth", None)
+    if services is not None:
+        return bool(getattr(services, "enabled", False))
+
+    return False
+
+
 async def publish_event(broadcast: Broadcast, channel: str, event: str, data: object) -> None:
     message = json.dumps({"event": event, "data": data})
     broadcast.set_state(channel, message)
@@ -70,7 +78,7 @@ async def websocket_endpoint(
 
     # Authenticate controllers
     if not is_player:
-        if not token:
+        if controller_auth_required(websocket) and not token:
             await websocket.close(code=4001, reason="Authentication token required")
             return
         try:

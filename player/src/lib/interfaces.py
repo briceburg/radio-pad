@@ -83,7 +83,7 @@ class RadioPadPlayer(abc.ABC):
 
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
-        """Play a radio station."""
+        """Play a radio station and return True when playback starts."""
 
     @abc.abstractmethod
     async def stop(self):
@@ -166,9 +166,11 @@ class RadioPadClient(abc.ABC):
                 (s for s in self.player.config.stations if s.name == data), None
             )
             if station:
-                await self.player.play(station)
+                if not await self.player.play(station):
+                    return
             else:
                 logger.warning("Station '%s' not found in RADIO_STATIONS.", data)
+                return
         else:
             await self.player.stop()
         await self.broadcast("station_playing")

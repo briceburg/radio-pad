@@ -42,6 +42,7 @@ name | description | default
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
 `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready`
+`RADIOPAD_MACROPAD_PORT` | Explicit serial device path for the macropad USB data port. Useful in containers where auto-discovery metadata is missing. | `None`
 `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
 `RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api`
 `RADIOPAD_STATIONS_URL` | URL returning a station preset JSON object. Discovered from the registry if not set. | `None`
@@ -90,6 +91,25 @@ options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
 ## Development
 
 For compose-based development with all services, see the [root README](../README.md#development).
+
+For containerized testing with a real macropad attached, determine the device path first:
+
+```sh
+python -m serial.tools.list_ports -v
+
+# or from the repo root:
+macropad-control/bin/status
+
+# or, on a typical Linux host:
+ls -l /dev/ttyACM* /dev/ttyUSB*
+```
+
+Then pass the device through to the player service and set an explicit port:
+
+```sh
+RADIOPAD_MACROPAD_PORT=/dev/ttyACM1 \
+docker compose -f compose.yaml -f compose.macropad.yaml up player
+```
 
 ### Contributing
 

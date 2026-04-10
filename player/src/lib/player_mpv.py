@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import subprocess
+from collections.abc import Awaitable, Callable
 
 from python_mpv_jsonipc import MPV
 
@@ -35,10 +36,12 @@ class MpvPlayer(RadioPadPlayer):
         config: RadioPadPlayerConfig,
         audio_channels: str = "stereo",
         socket_path: str = "/tmp/radio-pad-mpv.sock",
+        status_reporter: Callable[[str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(config)
         self.audio_channels = audio_channels
         self.socket_path = socket_path
+        self.status_reporter = status_reporter
         self.mpv_process = None
         self.mpv_sock = None
         self.mpv_volume = None
@@ -77,16 +80,24 @@ class MpvPlayer(RadioPadPlayer):
             if self.mpv_process and self.mpv_process.poll() is None:
                 logger.info("mpv process started with PID %s", self.mpv_process.pid)
                 self.station = station
+                await self._report_status(None)
             else:
                 logger.error("failed to start mpv process.")
+                await self._report_status("Playback failed")
+                return False
             self.mpv_sock = None
             await self._establish_ipc_socket()
+            return True
         except Exception as e:
+            await self.stop()
             logger.error("error starting station: %s", e, exc_info=True)
+            await self._report_status("Playback error")
+            return False
 
     async def stop(self):
         """Stop playback of the current station."""
         self.station = None
+        await self._report_status(None)
         if self.mpv_sock:
             try:
                 self.mpv_sock.stop()
@@ -147,3 +158,7 @@ class MpvPlayer(RadioPadPlayer):
                     await asyncio.sleep(0.2)
             logger.error("failed to establish mpv IPC socket.")
             return
+
+    async def _report_status(self, summary):
+        if self.status_reporter:
+            await self.status_reporter(summary)

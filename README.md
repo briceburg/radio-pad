@@ -81,6 +81,36 @@ bin/ci
 COMPOSE_FILE=compose.split.yaml bin/ci
 ```
 
+### Local macropad testing
+
+If you change the macropad firmware in [`macropad-control`](./macropad-control/), sync it to the device first:
+
+```sh
+cd macropad-control
+bin/refresh
+```
+
+The default compose files do not expose host USB serial devices to the `player` container. For manual end-to-end testing with a real macropad attached, layer in the local override and point it at the device path:
+
+Determine the port first:
+
+```sh
+/home/nesta/git/radio-pad/player/venv/bin/python -m serial.tools.list_ports -v
+
+# or from macropad-control:
+macropad-control/bin/status
+
+# or, on a typical Linux host:
+ls -l /dev/ttyACM* /dev/ttyUSB*
+```
+
+If those commands show no ports, the macropad is not visible to this Linux environment yet. In WSL2 that usually means the USB device has not been attached/passed through, so unplugging and replugging alone is usually not enough.
+
+```sh
+RADIOPAD_MACROPAD_PORT=/dev/ttyACM1 \
+docker compose -f compose.yaml -f compose.macropad.yaml up
+```
+
 ## Architecture
 
 ### Deployment modes
