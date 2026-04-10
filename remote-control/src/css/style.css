@@ -17,3 +17,8 @@ ion-row.station-placeholder ion-skeleton-text {
   height: 2em;
   width: 100%;
 }
+
+ion-row.station-placeholder-warning ion-skeleton-text {
+  --background: var(--ion-color-warning-shade);
+  --background-rgb: var(--ion-color-warning-rgb);
+}

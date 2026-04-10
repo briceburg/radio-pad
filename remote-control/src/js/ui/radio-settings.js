@@ -20,8 +20,13 @@ import { html } from "lit";
 import { RadioElement } from "./radio-element.js";
 import { keyed } from "lit/directives/keyed.js";
 import { StoreController } from "@nanostores/lit";
-import { preferencesStore, settingsUiStore } from "../store.js";
+import { preferencesStore, registryStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
+import {
+  getRegistryPendingDetail,
+  getRegistryPendingTitle,
+  isRegistryPending,
+} from "./registry-status.js";
 
 const ACCOUNT_GROUP_KEY = "radio-account";
 
@@ -57,8 +62,33 @@ export function getVisiblePreferences(preferences = []) {
   });
 }
 
+export function renderRegistryStatus(registryState) {
+  if (!isRegistryPending(registryState)) {
+    return "";
+  }
+  const title = getRegistryPendingTitle(registryState);
+
+  return html`
+    <ion-item lines="none" class="settings-status-item">
+      <ion-icon
+        slot="start"
+        name="cloud-offline-outline"
+        color="warning"
+      ></ion-icon>
+      <ion-label>
+        <ion-text color="warning">
+          <h3>${title}</h3>
+        </ion-text>
+        <p>${getRegistryPendingDetail()}</p>
+      </ion-label>
+      <ion-spinner slot="end" name="crescent"></ion-spinner>
+    </ion-item>
+  `;
+}
+
 export class RadioSettings extends RadioElement {
   prefsController = new StoreController(this, preferencesStore);
+  registryController = new StoreController(this, registryStore);
   uiController = new StoreController(this, settingsUiStore);
 
   _onChange() {
@@ -157,6 +187,7 @@ export class RadioSettings extends RadioElement {
 
   render() {
     const preferences = this.prefsController.value.definitions || {};
+    const registryState = this.registryController.value;
     const saveStateRaw = this.uiController.value.saveState;
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
@@ -164,6 +195,7 @@ export class RadioSettings extends RadioElement {
     const prefByGroup = groupPreferencesByGroup(preferences);
 
     return html`
+      ${renderRegistryStatus(registryState)}
       <ion-list id="settings-list">
         ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) =>
           this.renderPreferenceGroup(

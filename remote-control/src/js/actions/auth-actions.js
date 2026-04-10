@@ -20,8 +20,14 @@ import { authStore, patchStore } from "../store.js";
 import { toastDanger, toastSuccess, toastWarning } from "../notifications.js";
 
 export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
+  let hasSeenInitialState = false;
+
   auth.addEventListener("statechange", async (event) => {
     patchStore(authStore, event.detail);
+    if (!hasSeenInitialState) {
+      hasSeenInitialState = true;
+      return;
+    }
     await refreshAccountsForCurrentRegistry("auth_accounts");
   });
   auth.addEventListener("error", async (event) => {
@@ -40,14 +46,13 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
   }
 
   return {
-    signIn: () =>
-      safeAction(() => auth.signIn(), "⚠️ Failed starting sign-in."),
+    signIn: () => safeAction(() => auth.signIn(), "Failed starting sign-in."),
 
     async signOut() {
       await safeAction(async () => {
         await auth.signOut();
         toastSuccess("Signed out.");
-      }, "⚠️ Failed signing out.");
+      }, "Failed signing out.");
     },
 
     async copyToken() {
@@ -59,7 +64,7 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
       await safeAction(async () => {
         await navigator.clipboard.writeText(token);
         toastSuccess("Copied API test token.");
-      }, "⚠️ Failed copying API test token.");
+      }, "Failed copying API test token.");
     },
   };
 }

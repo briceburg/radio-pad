@@ -17,6 +17,19 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { Capacitor } from "@capacitor/core";
+import {
+  advanceRetryState,
+  createRetryState,
+  resetRetryState,
+} from "../utils/retry.js";
+
+const CONTROL_CONNECT_TIMEOUT_MS = 4000;
+const CONTROL_RETRY_OPTIONS = {
+  initialDelayMs: 500,
+  factor: 1.5,
+  jitterMs: 500,
+  maxDelayMs: 8000,
+};
 
 function resolveSwitchboardPath(basePath, targetPath) {
   const normalizedBasePath = basePath.replace(/\/$/, "");
@@ -47,12 +60,32 @@ function resolvePlayerSwitchboardUrl(url) {
   }
 }
 
+function resolvePlayerStationsUrl(url) {
+  if (!(url && !Capacitor.isNativePlatform())) {
+    return url;
+  }
+
+  try {
+    const target = new URL(url);
+    const local = new URL(window.location.origin);
+    const apiPath = local.pathname.replace(/\/$/, "");
+
+    local.pathname = target.pathname.replace(/^\/api/, apiPath || "/api");
+    local.search = target.search;
+    local.hash = target.hash;
+    return local.toString();
+  } catch (error) {
+    console.warn("Invalid stations URL received from player.", error);
+    return url;
+  }
+}
+
 export class RadioControl extends EventTarget {
   constructor() {
     super();
     this.ws = null;
     this.reconnectTimer = null;
-    this.reconnectDelay = 1000;
+    this.retryState = createRetryState(CONTROL_RETRY_OPTIONS);
     this._lastUrl = null;
     this._lastToken = null;
   }
@@ -134,11 +167,11 @@ export class RadioControl extends EventTarget {
       if (ws.readyState !== WebSocket.OPEN) {
         ws.close();
       }
-    }, 10000);
+    }, CONTROL_CONNECT_TIMEOUT_MS);
 
     ws.onopen = () => {
       clearTimeout(this.connectTimer);
-      this.reconnectDelay = 1000;
+      resetRetryState(this.retryState);
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
       }
@@ -169,7 +202,9 @@ export class RadioControl extends EventTarget {
             break;
           case "stations_url":
             this.dispatchEvent(
-              new CustomEvent("stationsurl", { detail: data }),
+              new CustomEvent("stationsurl", {
+                detail: resolvePlayerStationsUrl(data),
+              }),
             );
             break;
         }
@@ -190,16 +225,12 @@ export class RadioControl extends EventTarget {
     // Only schedule a reconnect if we still have an active URL and haven't explicitly disconnected
     if (!this._lastUrl) return;
 
+    const { delayMs } = advanceRetryState(this.retryState);
+
     this.reconnectTimer = setTimeout(() => {
       if (this._lastUrl) {
         this._connectWebSocket(this._lastUrl, this._lastToken);
-        // Exponential backoff with a bit of random jitter (up to 1s) to avoid server stampedes
-        const jitter = Math.random() * 1000;
-        this.reconnectDelay = Math.min(
-          this.reconnectDelay * 1.5 + jitter,
-          30000,
-        );
       }
-    }, this.reconnectDelay);
+    }, delayMs);
   }
 }

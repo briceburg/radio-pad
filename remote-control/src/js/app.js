@@ -47,7 +47,8 @@ async function bootstrap() {
   const settingsActions = createSettingsActions({
     prefs,
     auth,
-    onPlayerSelected: (player) => controlActions.selectPlayer(player),
+    onPlayerSelected: (player, options) =>
+      controlActions.selectPlayer(player, options),
     onPresetSelected: (presetId) => controlActions.selectPreset(presetId),
   });
   const authActions = createAuthActions({
@@ -88,5 +89,5 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
   console.error("Failed bootstrapping remote control app", error);
-  toastDanger("⚠️ Failed starting remote control.", error);
+  toastDanger("Failed starting remote control.", error);
 });
