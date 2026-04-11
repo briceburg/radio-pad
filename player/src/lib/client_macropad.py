@@ -20,6 +20,7 @@
 import asyncio
 import json
 import logging
+import os
 
 import serial.tools.list_ports
 import serial_asyncio
@@ -63,18 +64,28 @@ class MacropadClient(RadioPadClient):
             logger.info("reconnecting in 3s...")
             await asyncio.sleep(3)
 
-    async def _connect(self):
-        macropad_ports = [
+    def _candidate_ports(self):
+        configured_port = os.getenv("RADIOPAD_MACROPAD_PORT")
+        if configured_port:
+            return [configured_port]
+
+        return [
             port.device
             for port in serial.tools.list_ports.comports()
             if port.interface and port.interface.startswith(DATA_INTERFACE_NAME)
         ]
 
+    async def _connect(self):
+        macropad_ports = self._candidate_ports()
+
         if not macropad_ports:
             logger.warning("no data ports found, is it plugged in?")
             return None, None
 
-        logger.info("found ports: %s", macropad_ports)
+        if os.getenv("RADIOPAD_MACROPAD_PORT"):
+            logger.info("using configured macropad port: %s", macropad_ports[0])
+        else:
+            logger.info("found ports: %s", macropad_ports)
         for macropad_port in macropad_ports:
             logger.info("attempting to connect to %s", macropad_port)
             try:

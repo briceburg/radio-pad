@@ -8,8 +8,21 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 
 ## How It Works
 
-- The Macropad sends coded keypresses to a host.
-- The host runs a [listener script](../player/) that detects these keypresses and starts/stops playback of the corresponding radio stream(s).
+- The Macropad communicates with a host [player](../player/) over USB serial (CircuitPython CDC2).
+- The player sends station lists, heartbeats, and status events; the macropad renders them on its display and NeoPixel keys.
+- Pressing a key sends a station request to the player.
+
+### Visual States
+
+| State | Display Title | NeoPixel Keys |
+|-------|--------------|---------------|
+| Waiting for Player | "Waiting for Player" | Grey breathing animation |
+| Loading stations | "Loading stations" | Amber breathing animation |
+| Healthy | Station/page name | Blue (default) / Green (playing) |
+| Upstream degraded | Status text (e.g. "Switchboard lost") | Amber keys |
+| Playback issue | Status text (e.g. "Playback failed") | Normal colors |
+
+The macropad detects a lost player session by tracking heartbeats — if no message arrives within 5 seconds, it reverts to the "Waiting for Player" state.
 
 ## Macropad Controls
 
@@ -34,6 +47,12 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/mount
    ```
 
+   To inspect detected devices without mounting, run:
+
+   ```sh
+   bin/status
+   ```
+
 2. **Customize button colors and behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
    - Stations are received from the connected [player](../player/), which loads them from a registry [station preset](../player/README.md#registry-discovery).
@@ -43,6 +62,8 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/refresh
    ```
 
+   `bin/refresh` will automatically run `bin/mount` if the CIRCUITPY volume is not mounted yet.
+
 4. **Debug via the USB serial console**
 
 Attaching to the console allows you to read stdout/stderr, for instance to view exceptions or debug messages.
@@ -51,7 +72,16 @@ Attaching to the console allows you to read stdout/stderr, for instance to view 
   bin/console
   ```
 
-  > this command requires that the executing user has access to /dev/ttyACM* devices, which are owned by the `uucp` group in archlinux.
+  The player uses the CircuitPython `CDC2` port for commands and events, while `bin/console` targets the primary CircuitPython console port.
+
+  > Serial access requires that the executing user has access to `/dev/ttyACM*` devices, which are owned by the `uucp` group in archlinux.
+
+### WSL Notes
+
+In WSL2, the macropad needs to be attached into Linux with USB/IP before the storage and `/dev/ttyACM*` devices appear. Once attached, this project expects:
+
+- player data port: `/dev/ttyACM1` (`CircuitPython CDC2`)
+- console port: `/dev/ttyACM0` (`CircuitPython CDC`)
 
 ## Development
 

@@ -23,11 +23,16 @@ from adafruit_display_text import label
 
 from .macropad_keys import MACROPAD_KEY_COUNT
 
+TITLE_MAX_CHARS = 18
+STATION_LABEL_MAX_CHARS = 6
+TITLE_TRUNCATION_SUFFIX = ">"
+
 
 class MacropadDisplay:
     def __init__(self, macropad):
         self.macropad = macropad
         self.macropad.display.auto_refresh = False
+        self._max_text_length = TITLE_MAX_CHARS
         self._group = displayio.Group()
 
         for group_index in range(MACROPAD_KEY_COUNT):
@@ -60,7 +65,32 @@ class MacropadDisplay:
 
         self.macropad.display.root_group = self._group
 
+    def _normalize_text(self, text):
+        if not isinstance(text, str):
+            text = "" if text is None else str(text)
+
+        if len(text) <= self._max_text_length:
+            return text
+
+        if self._max_text_length <= len(TITLE_TRUNCATION_SUFFIX):
+            return text[: self._max_text_length]
+
+        return (
+            text[: self._max_text_length - len(TITLE_TRUNCATION_SUFFIX)]
+            + TITLE_TRUNCATION_SUFFIX
+        )
+
+    def normalize_station_label(self, text):
+        if not isinstance(text, str):
+            text = "" if text is None else str(text)
+
+        if len(text) <= STATION_LABEL_MAX_CHARS:
+            return text
+
+        return text[:STATION_LABEL_MAX_CHARS]
+
     def set_title(self, text, refresh=True):
+        text = self._normalize_text(text)
         if self._title_text.text == text:
             return
         self._title_text.text = text
@@ -69,7 +99,7 @@ class MacropadDisplay:
 
     def set_group_text(self, group_index, text):
         if 0 <= group_index < MACROPAD_KEY_COUNT:
-            self._group[group_index].text = text
+            self._group[group_index].text = self.normalize_station_label(text)
 
     def highlight_group(self, group_index):
         if 0 <= group_index < MACROPAD_KEY_COUNT:

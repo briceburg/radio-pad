@@ -1,10 +1,28 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-my_id=$(id -u)
-disk="/dev/disk/by-label/CIRCUITPY"
-target="/mnt/CIRCUITPY"
-[ -d "$target" ] || sudo mkdir -p "$target"
-sudo umount "$target" || true
-sudo mount "$disk" "$target" -o uid="$my_id" -o rw
-echo "[ok] mounted disk to /mnt/CIRCUITPY under uid $my_id"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./libmacropad
+source "$SCRIPT_DIR/libmacropad"
+
+my_id="$(id -u)"
+target="$(macropad_mount_target)"
+disk="$(find_circuitpy_block_device)" || {
+  echo "No CIRCUITPY block device found. Is the macropad storage exposed to this Linux environment?" >&2
+  exit 1
+}
+
+if [ "$EUID" -eq 0 ]; then
+  SUDO=()
+else
+  SUDO=(sudo)
+fi
+
+[ -d "$target" ] || "${SUDO[@]}" mkdir -p "$target"
+
+if mountpoint -q "$target" 2>/dev/null; then
+  "${SUDO[@]}" umount "$target"
+fi
+
+"${SUDO[@]}" mount "$disk" "$target" -o uid="$my_id",rw
+echo "[ok] mounted $disk to $target under uid $my_id"

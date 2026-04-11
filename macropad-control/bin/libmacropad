@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+macropad_mount_target() {
+  echo "${RADIOPAD_MACROPAD_MOUNT:-/mnt/CIRCUITPY}"
+}
+
+find_circuitpy_block_device() {
+  if [ -n "${RADIOPAD_MACROPAD_DISK:-}" ]; then
+    echo "$RADIOPAD_MACROPAD_DISK"
+    return 0
+  fi
+
+  if [ -e /dev/disk/by-label/CIRCUITPY ]; then
+    readlink -f /dev/disk/by-label/CIRCUITPY
+    return 0
+  fi
+
+  if command -v lsblk >/dev/null 2>&1; then
+    local disk
+    disk="$(lsblk -pnro PATH,LABEL | awk '$2=="CIRCUITPY"{print $1; exit}')"
+    if [ -n "$disk" ]; then
+      echo "$disk"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+find_macropad_port_by_prefix() {
+  local prefix="$1"
+  local interface_file
+
+  for interface_file in /sys/class/tty/ttyACM*/device/interface /sys/class/tty/ttyUSB*/device/interface; do
+    [ -e "$interface_file" ] || continue
+
+    if grep -q "^${prefix}" "$interface_file"; then
+      basename "$(dirname "$(dirname "$interface_file")")"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+find_macropad_data_port() {
+  if [ -n "${RADIOPAD_MACROPAD_PORT:-}" ]; then
+    echo "$RADIOPAD_MACROPAD_PORT"
+    return 0
+  fi
+
+  local tty_name
+  tty_name="$(find_macropad_port_by_prefix "CircuitPython CDC2")" || return 1
+  echo "/dev/${tty_name}"
+}
+
+find_macropad_console_port() {
+  if [ -n "${RADIOPAD_MACROPAD_CONSOLE_PORT:-}" ]; then
+    echo "$RADIOPAD_MACROPAD_CONSOLE_PORT"
+    return 0
+  fi
+
+  local tty_name
+  tty_name="$(find_macropad_port_by_prefix "CircuitPython CDC control")" || return 1
+  echo "/dev/${tty_name}"
+}
