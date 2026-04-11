@@ -22,8 +22,22 @@ import {
   discoverPlayers,
   discoverPresets,
 } from "../services/registry-discovery.js";
-import { preferencesStore, settingsUiStore } from "../store.js";
-import { toastDanger, toastRegistryFailure } from "../notifications.js";
+import {
+  patchStore,
+  preferencesStore,
+  registryStore,
+  settingsUiStore,
+} from "../store.js";
+import {
+  dismissRegistryUnavailableToast,
+  toastDanger,
+  toastRegistryUnavailable,
+} from "../notifications.js";
+import {
+  advanceRetryState,
+  createRetryState,
+  resetRetryState,
+} from "../utils/retry.js";
 
 export function createSettingsActions({
   prefs,
@@ -31,41 +45,65 @@ export function createSettingsActions({
   onPlayerSelected,
   onPresetSelected,
 }) {
+  const setRegistryPhase = (phase, errorText = "", extra = {}) => {
+    patchStore(registryStore, { phase, errorText, ...extra });
+  };
+  const retryState = createRetryState();
+
   let lastPlayerId = null;
   let lastPresetId = null;
   let hasSyncedOnce = false;
+  let retryTimer = null;
+
+  const clearRetryTimer = () => {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  };
+
+  const scheduleRetry = (failureReason, options) => {
+    clearRetryTimer();
+    const { attempt, delayMs } = advanceRetryState(retryState);
+    setRegistryPhase("retrying", "Registry unavailable", {
+      retryAttempt: attempt,
+      retryDelayMs: delayMs,
+    });
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void sync(failureReason, options);
+    }, delayMs);
+  };
 
   let syncPromise = null;
   async function sync(failureReason = "accounts", options = {}) {
     if (syncPromise) return syncPromise;
+    clearRetryTimer();
+    const previousPhase = registryStore.get().phase;
     syncPromise = (async () => {
       try {
         const url = await prefs.get("registryUrl");
-        if (!url) return;
-
-        let accounts = [];
-        try {
-          accounts = await discoverAccounts(url, auth, options);
-        } catch (err) {
-          console.warn("Failed to discover accounts", err);
+        if (!url) {
+          resetRetryState(retryState);
+          await dismissRegistryUnavailableToast();
+          setRegistryPhase("idle", "", { retryAttempt: 0, retryDelayMs: 0 });
+          return;
         }
+
+        setRegistryPhase("loading", "", {
+          retryAttempt: retryState.attempt,
+          retryDelayMs: 0,
+        });
+
+        const accounts = await discoverAccounts(url, auth, options);
         await prefs.setOptions("accountId", accounts);
 
         const accountId = (await prefs.get("accountId")) || null;
 
-        // Discover APIs natively handle null accountId safely
-        let players = [],
-          presets = [];
-        try {
-          const results = await Promise.allSettled([
-            discoverPlayers(accountId, prefs, auth, options),
-            discoverPresets(accountId, prefs, auth, options),
-          ]);
-          players = results[0].status === "fulfilled" ? results[0].value : [];
-          presets = results[1].status === "fulfilled" ? results[1].value : [];
-        } catch (err) {
-          console.warn("Error resolving players or presets", err);
-        }
+        const [players, presets] = await Promise.all([
+          discoverPlayers(accountId, prefs, auth, options),
+          discoverPresets(accountId, prefs, auth, options),
+        ]);
 
         await prefs.setOptions("playerId", players);
         await prefs.setOptions("presetId", presets);
@@ -88,6 +126,14 @@ export function createSettingsActions({
             );
             await onPlayerSelected(player || null);
             lastPlayerId = player ? resolvedPlayerId : null;
+          } else if (previousPhase !== "ready") {
+            const player = await discoverPlayer(
+              resolvedPlayerId,
+              prefs,
+              auth,
+              options,
+            );
+            await onPlayerSelected(player || null, { reconnectOnly: true });
           }
         } else if (lastPlayerId !== null || !hasSyncedOnce) {
           await onPlayerSelected(null);
@@ -99,13 +145,20 @@ export function createSettingsActions({
           await onPresetSelected(presetId || null);
           lastPresetId = presetId;
         }
+        clearRetryTimer();
+        resetRetryState(retryState);
+        setRegistryPhase("ready", "", { retryAttempt: 0, retryDelayMs: 0 });
+        await dismissRegistryUnavailableToast();
         hasSyncedOnce = true;
       } catch (error) {
         if (error.name !== "AbortError") {
-          toastRegistryFailure(failureReason, error, options);
+          if (retryState.attempt === 0) {
+            toastRegistryUnavailable(error);
+          }
+          scheduleRetry(failureReason, options);
         }
       } finally {
-        if (!hasSyncedOnce) {
+        if (!hasSyncedOnce && registryStore.get().phase === "idle") {
           await onPlayerSelected(null);
           await onPresetSelected(null);
           hasSyncedOnce = true;
@@ -119,13 +172,12 @@ export function createSettingsActions({
 
   return {
     async initialize() {
+      setRegistryPhase("loading", "", { retryAttempt: 0, retryDelayMs: 0 });
       await prefs.init();
       preferencesStore.set({ definitions: prefs.getSnapshot() });
 
       const isOauthCallback = await auth.init();
-      if (!auth.signedIn) {
-        await sync();
-      }
+      await sync();
       return isOauthCallback;
     },
 
@@ -141,7 +193,7 @@ export function createSettingsActions({
           (r) => r.status === "invalid",
         );
         const label = prefs.getSnapshot()[invalid.key]?.label || invalid.key;
-        toastDanger(`⚠️ Failed saving settings. Invalid ${label}.`);
+        toastDanger(`Failed saving settings. Invalid ${label}.`);
         return { status, results };
       }
 

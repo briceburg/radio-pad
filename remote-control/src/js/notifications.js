@@ -26,6 +26,7 @@ function showToast(summary, options = {}) {
     format: options.format || "default",
     severity: options.severity || "warning",
     persistent: options.persistent ?? true,
+    dismissible: options.dismissible ?? true,
   }));
 }
 
@@ -46,16 +47,14 @@ export function toastWarning(summary, error = null) {
 }
 
 function registrySummary(summary, { fromSettingsSave = false } = {}) {
-  return fromSettingsSave
-    ? `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`
-    : summary;
+  return fromSettingsSave ? `Saved settings. ${summary}` : summary;
 }
 
 const REGISTRY_FAILURE_MESSAGES = {
-  accounts: "⚠️ Failed refreshing accounts.",
-  auth_accounts: "⚠️ Failed refreshing accounts after auth change.",
-  account_choices: "⚠️ Failed refreshing account players/presets.",
-  player: "⚠️ Failed refreshing player info.",
+  accounts: "Failed refreshing accounts.",
+  auth_accounts: "Failed refreshing accounts after auth change.",
+  account_choices: "Failed refreshing account players/presets.",
+  player: "Failed refreshing player info.",
 };
 
 function registryFailureMessage(reason = "accounts") {
@@ -71,6 +70,26 @@ export function toastRegistryFailure(reason, error, options = {}) {
     persistent: true,
     severity: "warning",
   });
+}
+
+export function toastRegistryUnavailable(error = null) {
+  showToast("Registry unavailable.", {
+    error,
+    format: "registry-status",
+    persistent: true,
+    severity: "warning",
+  });
+}
+
+export async function dismissRegistryUnavailableToast() {
+  if (toastStore.get().format !== "registry-status") {
+    return;
+  }
+
+  const toast = document.querySelector("#global-toast");
+  if (toast) {
+    await toast.dismiss();
+  }
 }
 
 export function toastSuccess(summary) {
@@ -101,13 +120,23 @@ async function presentToast(notification) {
   const message = detailText
     ? `${notification.summary} ${detailText}`.trim()
     : notification.summary;
+  const icon =
+    notification.format === "registry-status"
+      ? "cloud-offline-outline"
+      : notification.severity === "success"
+        ? "checkmark-circle-outline"
+        : notification.severity === "danger"
+          ? "alert-circle-outline"
+          : "warning-outline";
 
   toast.message = message;
+  toast.icon = icon;
   toast.duration = notification.persistent ? 0 : config.duration;
   toast.color = config.color;
-  toast.buttons = notification.persistent
-    ? [{ text: "Dismiss", role: "cancel" }]
-    : [];
+  toast.buttons =
+    notification.persistent && notification.dismissible !== false
+      ? [{ text: "Dismiss", role: "cancel" }]
+      : [];
   toast.position = config.position;
   await toast.present();
 }
