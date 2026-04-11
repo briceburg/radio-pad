@@ -41,11 +41,28 @@ def test_player_requires_stations_url_header(switchboard_client: TestClient) -> 
             pass
 
 
-def test_controller_rejected_without_token(switchboard_client: TestClient) -> None:
-    """Controller without a token is closed with 4001."""
-    with pytest.raises(WebSocketDisconnect):
-        with switchboard_client.websocket_connect("switchboard/acct/player1") as ws:
-            ws.receive_text()
+def test_controller_connects_without_token_when_auth_disabled(switchboard_client: TestClient) -> None:
+    """Controller can connect anonymously when auth is disabled."""
+    with switchboard_client.websocket_connect("switchboard/acct/player1") as ws:
+        ws.send_json({"event": "ping"})
+        resp = ws.receive_json()
+        assert resp["event"] == "pong"
+
+
+def test_controller_rejected_without_token_when_auth_enabled() -> None:
+    """Controller without a token is closed with 4001 when auth is enabled."""
+    app = create_app()
+
+    # Simulate auth being enabled by setting a mock AuthServices with enabled=True
+    class _FakeAuth:
+        enabled = True
+
+    app.state.auth = _FakeAuth()
+
+    with TestClient(app) as client:
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect("switchboard/acct/player1") as ws:
+                ws.receive_text()
 
 
 def test_player_connects_with_valid_headers(switchboard_client: TestClient) -> None:
