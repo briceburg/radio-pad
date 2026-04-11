@@ -81,6 +81,28 @@ bin/ci
 COMPOSE_FILE=compose.split.yaml bin/ci
 ```
 
+### Local macropad testing
+
+If you change the macropad firmware in [`macropad-control`](./macropad-control/), sync it to the device first:
+
+```sh
+cd macropad-control
+bin/refresh
+```
+
+The default compose files do not expose host USB serial devices to the `player` container. For end-to-end testing with a real macropad attached, layer in the macropad overlay:
+
+```sh
+# determine the macropad serial port
+macropad-control/bin/status
+
+# start with macropad overlay
+RADIOPAD_MACROPAD_PORT=/dev/ttyACM1 \
+docker compose -f compose.yaml -f compose.macropad.yaml up
+```
+
+If `bin/status` shows no ports, the macropad is not visible to this Linux environment. In WSL2, the USB device must be attached via USB/IP first.
+
 ## Architecture
 
 ### Deployment modes

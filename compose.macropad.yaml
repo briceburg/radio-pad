@@ -1,0 +1,7 @@
+services:
+  player:
+    user: root
+    environment:
+      RADIOPAD_MACROPAD_PORT: "${RADIOPAD_MACROPAD_PORT:-/dev/ttyACM1}"
+    devices:
+      - "${RADIOPAD_MACROPAD_PORT:-/dev/ttyACM1}:${RADIOPAD_MACROPAD_PORT:-/dev/ttyACM1}"
