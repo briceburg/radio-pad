@@ -16,66 +16,106 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { authStore, controlStore, listenStore, patchStore } from "../store.js";
+import {
+  authStore,
+  controlStore,
+  listenStore,
+  patchStore,
+  preferencesStore,
+} from "../store.js";
 import { toastWarning } from "../notifications.js";
 
 export function createControlActions({ control, listen }) {
   const getTabStore = (tabName) =>
     tabName === "listen" ? listenStore : controlStore;
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
+  const getOptionLabel = (key, value) => {
+    const options = preferencesStore.get().definitions?.[key]?.options || [];
+    return (
+      options.find((option) => option.value === value)?.label || value || null
+    );
+  };
+  const requestControllers = { control: null, listen: null };
 
-  // Track out-of-order fetch responses by storing current URL
-  const currentRequests = { control: null, listen: null };
+  const abortStationLoad = (tabName) => {
+    requestControllers[tabName]?.abort();
+    requestControllers[tabName] = null;
+  };
 
-  async function loadStations(url, tabName = "control") {
+  async function loadStations(url, tabName = "control", titleName = null) {
     if (!url) {
+      abortStationLoad(tabName);
       updateTab(tabName, {
         stationsData: null,
         currentStation: null,
         loading: false,
+        ...(tabName === "listen" ? { titleName } : {}),
       });
       return null;
     }
 
-    updateTab(tabName, { loading: true });
-    currentRequests[tabName] = url;
+    updateTab(tabName, {
+      loading: true,
+      ...(tabName === "listen" ? { titleName } : {}),
+    });
+    abortStationLoad(tabName);
+    const controller = new AbortController();
+    requestControllers[tabName] = controller;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
 
       const stationsData = await response.json();
-
-      // Prevent stale updates if another fetch started
-      if (currentRequests[tabName] !== url) return null;
+      if (requestControllers[tabName] !== controller) return null;
 
       if (tabName === "listen") listen.setStations(stationsData);
 
-      updateTab(tabName, { stationsData, loading: false });
+      updateTab(tabName, {
+        stationsData,
+        loading: false,
+        ...(tabName === "control"
+          ? { connectionState: "connected" }
+          : { titleName: stationsData?.name || titleName }),
+      });
+      requestControllers[tabName] = null;
       return stationsData;
     } catch (error) {
-      if (currentRequests[tabName] !== url) return null;
+      if (
+        error.name === "AbortError" ||
+        requestControllers[tabName] !== controller
+      ) {
+        return null;
+      }
 
+      requestControllers[tabName] = null;
       updateTab(tabName, { loading: false });
-      toastWarning("⚠️ Failed loading stations.", error);
+      toastWarning("Failed loading stations.", error);
       return null;
     }
   }
 
   control.addEventListener("connect", () =>
     updateTab("control", {
-      statusText: `✅ Connected to ${controlStore.get().player.name}`,
+      statusText: `Connected to ${controlStore.get().player.name}`,
+      connectionState: "connected",
     }),
   );
   control.addEventListener("connecting", () =>
-    updateTab("control", { statusText: "🔄 Connecting..." }),
+    updateTab("control", {
+      statusText: "Connecting to switchboard...",
+      connectionState: "connecting",
+    }),
   );
   control.addEventListener("disconnect", () =>
-    updateTab("control", { statusText: "🔌 Disconnected. Reconnecting..." }),
+    updateTab("control", {
+      statusText: controlStore.get().player?.id
+        ? "Switchboard unavailable. Reconnecting..."
+        : "Disconnected.",
+      connectionState: "disconnected",
+    }),
   );
-  control.addEventListener("error", (event) =>
-    toastWarning(`⚠️ ${event.detail}`),
-  );
+  control.addEventListener("error", (event) => toastWarning(event.detail));
   control.addEventListener("stationplaying", (event) =>
     updateTab("control", { currentStation: event.detail }),
   );
@@ -101,31 +141,41 @@ export function createControlActions({ control, listen }) {
   });
 
   return {
-    async selectPlayer(player) {
-      updateTab("control", {
-        player,
-        stationsData: null,
-        currentStation: null,
-        statusText: "",
-        loading: player ? true : false,
-      });
-      if (!player) {
+    async selectPlayer(player, options = {}) {
+      const { reconnectOnly = false } = options;
+      if (reconnectOnly) {
+        updateTab("control", { connectionState: "connecting" });
+      } else {
+        abortStationLoad("control");
+        updateTab("control", {
+          player,
+          stationsData: null,
+          currentStation: null,
+          statusText: "",
+          loading: player ? true : false,
+          connectionState: player ? "connecting" : "idle",
+        });
+      }
+      if (!player?.switchboard_url) {
         control.disconnect();
         return;
       }
       const token = authStore.get()?.registryBearerToken || null;
       await control.connect(player.switchboard_url, token);
+      if (!reconnectOnly) {
+        await loadStations(player.stations_url, "control");
+      }
     },
 
     async selectPreset(presetId) {
-      return loadStations(presetId, "listen");
+      const label = getOptionLabel("preset", presetId);
+      return loadStations(presetId, "listen", label);
     },
 
     async clickStation(tabName, station) {
       if (tabName === "listen") {
         const started = await listen.play(station);
-        if (!started)
-          return toastWarning("⚠️ Failed starting station playback.");
+        if (!started) return toastWarning("Failed starting station playback.");
         return updateTab("listen", { currentStation: station });
       }
       control.sendStationRequest(station);

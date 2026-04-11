@@ -19,15 +19,93 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { html } from "lit";
 import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
-import { controlStore, listenStore } from "../store.js";
+import { controlStore, listenStore, registryStore } from "../store.js";
+import {
+  isRegistryPending,
+  getRegistryPendingTitle,
+} from "./registry-status.js";
 
-function renderSkeleton() {
+/**
+ * Derive a display-friendly status text from the registry state.
+ * Returns a short string when registry is pending, empty otherwise.
+ */
+export function getRegistryStatusText(registryState) {
+  if (!isRegistryPending(registryState)) return "";
+  return "Connecting to Registry";
+}
+
+/**
+ * Build the title prefix (left side of colon).
+ * For control: use player name. For listen: use titleName from the store.
+ */
+export function getTitlePrefix(tabName, state) {
+  if (tabName === "listen") return state.titleName || "";
+  return state.player?.name || "";
+}
+
+/**
+ * Build the title suffix (right side of colon).
+ * Shows current station, loading indicator, or registry status.
+ */
+export function getTitleSuffix(tabName, state, registryState) {
+  if (state.currentStation) return state.currentStation;
+  if (state.loading) return "Loading...";
+
+  const hasContent =
+    tabName === "control" ? !!state.player?.id : !!state.stationsData;
+  if (!hasContent && isRegistryPending(registryState)) {
+    return getRegistryStatusText(registryState);
+  }
+  return "...";
+}
+
+/**
+ * Determine whether to render skeleton placeholders.
+ * Skeletons show during initial loading or pending registry discovery.
+ */
+export function shouldRenderSkeleton(tabName, state, registryState) {
+  if (state.loading) return true;
+  const hasContent =
+    tabName === "control" ? !!state.player?.id : !!state.stationsData;
+  return !hasContent && isRegistryPending(registryState);
+}
+
+/**
+ * Determine the visual state of station buttons:
+ *   "normal" — healthy, "warning" — degraded, "loading" — skeleton placeholder
+ */
+export function getStationVisualState(tabName, state, registryState) {
+  if (shouldRenderSkeleton(tabName, state, registryState)) return "loading";
+  if (!state.stationsData) return "normal";
+  if (
+    tabName === "control" &&
+    state.connectionState &&
+    state.connectionState !== "connected"
+  ) {
+    return "warning";
+  }
+  return "normal";
+}
+
+/**
+ * Map visual state to ion-button color, respecting active station override.
+ */
+export function getStationButtonColor(visualState, isActive) {
+  if (isActive) return "success";
+  return visualState === "warning" ? "warning" : "primary";
+}
+
+function renderSkeleton(visualState = "loading") {
   const rows = [1, 2, 3];
+  const cssClass =
+    visualState === "warning"
+      ? "station-placeholder station-placeholder-warning"
+      : "station-placeholder";
 
   return html`
     ${rows.map(
       () => html`
-        <ion-row class="station-placeholder">
+        <ion-row class="${cssClass}">
           ${Array.from({ length: 3 }).map(
             () => html`
               <ion-col size="4">
@@ -51,12 +129,17 @@ export class RadioPlayerTab extends RadioElement {
     this.tabName = "control";
     this.controlController = new StoreController(this, controlStore);
     this.listenController = new StoreController(this, listenStore);
+    this.registryController = new StoreController(this, registryStore);
   }
 
   get state() {
     return this.tabName === "listen"
       ? this.listenController.value
       : this.controlController.value;
+  }
+
+  get registryState() {
+    return this.registryController.value;
   }
 
   _onSelectStation(stationName) {
@@ -95,7 +178,7 @@ export class RadioPlayerTab extends RadioElement {
     `;
   }
 
-  renderStationButtons(stations, currentStation) {
+  renderStationButtons(stations, currentStation, visualState) {
     const rows = [];
     const stationsList = stations || [];
     for (let i = 0; i < stationsList.length; i += 3) {
@@ -108,11 +191,12 @@ export class RadioPlayerTab extends RadioElement {
           <ion-row>
             ${row.map((station) => {
               const isActive = station.name === currentStation;
+              const color = getStationButtonColor(visualState, isActive);
               return html`
                 <ion-col size="4">
                   <ion-button
                     expand="block"
-                    color=${isActive ? "success" : "primary"}
+                    color=${color}
                     @click=${() => this._onSelectStation(station.name)}
                   >
                     ${station.name}
@@ -128,25 +212,31 @@ export class RadioPlayerTab extends RadioElement {
 
   render() {
     const s = this.state;
+    const r = this.registryState;
+    const visualState = getStationVisualState(this.tabName, s, r);
 
     let content;
-    if (s.loading) {
-      content = renderSkeleton();
+    if (visualState === "loading") {
+      content = renderSkeleton(visualState);
     } else if (!s.stationsData) {
       content = this.renderEmptyState();
     } else {
       content = this.renderStationButtons(
         s.stationsData.stations,
         s.currentStation,
+        visualState,
       );
     }
+
+    const prefix = getTitlePrefix(this.tabName, s);
+    const suffix = getTitleSuffix(this.tabName, s, r);
 
     return html`
       <ion-header>
         <ion-toolbar>
           <ion-title size="large">
-            <span class="stations-name">${s.stationsData?.name || ""}</span>:
-            <span class="now-playing">${s.currentStation || "..."}</span>
+            <span class="stations-name">${prefix}</span>:
+            <span class="now-playing">${suffix}</span>
           </ion-title>
           <ion-buttons slot="end">
             <ion-button
