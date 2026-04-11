@@ -20,7 +20,7 @@
 import asyncio
 import logging
 import random
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import websockets
 
@@ -59,12 +59,14 @@ class SwitchboardClient(RadioPadClient):
         player: RadioPadPlayer,
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[], None] | None = None,
+        status_reporter: Callable[[str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
         self.url = player.config.switchboard_url
         self.ws = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
+        self.status_reporter = status_reporter
         self._connected = False
 
         self.http_headers = http_client_headers(
@@ -88,8 +90,10 @@ class SwitchboardClient(RadioPadClient):
                 logger.warning(
                     "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
                 )
+                await self._report_status(self._status_summary(e))
             except websockets.exceptions.WebSocketException as e:
                 logger.warning("switchboard websocket error: %s", e)
+                await self._report_status(self._status_summary(e))
             except Exception as e:
                 logger.error("Unexpected error: %s", e, exc_info=True)
 
@@ -108,12 +112,14 @@ class SwitchboardClient(RadioPadClient):
             self._connected = True
             if self.on_connect:
                 self.on_connect()
+            await self._report_status(None)
             asyncio.create_task(self.broadcast("station_playing"))
             async for msg in ws:
                 await self.handle_message(msg)
         self.ws = None
         if self._connected:
             self._connected = False
+            await self._report_status("Switchboard down")
             if self.on_disconnect:
                 self.on_disconnect()
 
@@ -121,6 +127,17 @@ class SwitchboardClient(RadioPadClient):
         """Send a message to the macropad or switchboard."""
         if self.ws:
             await self.ws.send(message)
+
+    async def _report_status(self, summary):
+        if self.status_reporter:
+            await self.status_reporter(summary)
+
+    def _status_summary(self, error: Exception) -> str:
+        if isinstance(error, ConnectionRefusedError):
+            return "Switchboard down"
+        if isinstance(error, TimeoutError):
+            return "Network timeout"
+        return "Network issue"
 
     async def close(self):
         if self.ws:

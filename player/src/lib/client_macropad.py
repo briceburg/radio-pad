@@ -18,6 +18,7 @@
 
 
 import asyncio
+import json
 import logging
 
 import serial.tools.list_ports
@@ -28,6 +29,7 @@ from lib.interfaces import RadioPadClient, RadioPadPlayer
 logger = logging.getLogger("MACROPAD")
 
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
+HEARTBEAT_INTERVAL_SECONDS = 2
 
 
 class MacropadClient(RadioPadClient):
@@ -35,6 +37,7 @@ class MacropadClient(RadioPadClient):
         super().__init__(player)
         self.writer = None
         self.reader = None
+        self._status_by_scope = {}
 
         # Override station_list handler
         self.register_event("station_list", self._handle_station_list)
@@ -100,8 +103,11 @@ class MacropadClient(RadioPadClient):
         except asyncio.TimeoutError:
             pass  # Ignore timeout
 
-        # Listen for new messages
-        await self._listen()
+        await self.resend_status()
+
+        async with asyncio.TaskGroup() as task_group:
+            task_group.create_task(self._heartbeat_loop())
+            task_group.create_task(self._listen())
 
     async def _listen(self):
         buffer = ""
@@ -129,11 +135,44 @@ class MacropadClient(RadioPadClient):
             except Exception as e:
                 logger.error("Failed to send: %s", e)
 
+    async def _heartbeat_loop(self):
+        while self.writer:
+            await self._send(json.dumps({"event": "player_heartbeat", "data": None}))
+            await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+
+    async def publish_status(self, scope, summary):
+        if not isinstance(scope, str) or not scope:
+            logger.warning("ignoring invalid macropad status scope: %r", scope)
+            return
+
+        self._status_by_scope[scope] = summary if isinstance(summary, str) else ""
+        await self.resend_status(scope=scope)
+
+    async def resend_status(self, scope=None):
+        if not self.writer:
+            return
+
+        scopes = [scope] if scope else list(self._status_by_scope.keys())
+        for status_scope in scopes:
+            await self._send(
+                json.dumps(
+                    {
+                        "event": "player_status",
+                        "data": {
+                            "scope": status_scope,
+                            "summary": self._status_by_scope.get(status_scope, ""),
+                        },
+                    }
+                )
+            )
+
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]
         await self.broadcast("station_list", data=station_list, limit_to_self=True)
         await asyncio.sleep(0.1)  # Handle backpressure
         await self.broadcast("station_playing")
+        await asyncio.sleep(0.1)
+        await self.resend_status()
 
     async def close(self):
         if self.writer:

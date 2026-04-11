@@ -44,17 +44,28 @@ async def cleanup(player):
             logger.error("Error closing client %s: %s", client.__class__.__name__, e)
 
 
+async def run_clients(player):
+    async with asyncio.TaskGroup() as task_group:
+        for client in player.clients:
+            task_group.create_task(
+                client.run(),
+                name=f"{client.__class__.__name__}.run",
+            )
+
+
 async def main(player):
     """Runs the main event loop for the radio-pad player."""
     try:
-        await asyncio.gather(*(client.run() for client in player.clients))
-
+        try:
+            await run_clients(player)
+        except* Exception as exc_group:
+            logger.critical("Unexpected error in main: %s", exc_group, exc_info=True)
+            raise
     except asyncio.CancelledError:
         logger.info("exiting...")
         await cleanup(player)
         raise
-    except Exception as e:
-        logger.critical("Unexpected error in main: %s", e, exc_info=True)
+    except Exception:
         await cleanup(player)
         raise
 
@@ -101,13 +112,23 @@ if __name__ == "__main__":
                 "RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"
             ),
         )
-        player.register_client(MacropadClient(player))
+        macropad_client = MacropadClient(player)
+
+        async def report_playback_status(summary):
+            await macropad_client.publish_status("playback", summary)
+
+        async def report_upstream_status(summary):
+            await macropad_client.publish_status("upstream", summary)
+
+        player.status_reporter = report_playback_status
+        player.register_client(macropad_client)
         if player.config.switchboard_url:
             player.register_client(
                 SwitchboardClient(
                     player,
                     on_connect=lambda: mark_healthy(health_path),
                     on_disconnect=lambda: clear_health(health_path),
+                    status_reporter=report_upstream_status,
                 )
             )
         else:
