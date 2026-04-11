@@ -16,20 +16,25 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-export {
-  alertCircleOutline,
-  checkmarkCircleOutline,
-  cloudOfflineOutline,
-  construct,
-  headset,
-  headsetOutline,
-  person,
-  personCircle,
-  radio,
-  radioOutline,
-  settings,
-  settingsOutline,
-  stop,
-  syncOutline,
-  warningOutline,
-} from "ionicons/icons";
+export function isRegistryPending(registryState) {
+  return ["loading", "retrying"].includes(registryState.phase);
+}
+
+export function formatRegistryAttempt(retryAttempt = 0) {
+  const attemptNumber = retryAttempt + 1;
+  return attemptNumber >= 10 ? "10+" : String(attemptNumber);
+}
+
+export function getRegistryPendingTitle(registryState) {
+  if (!isRegistryPending(registryState)) {
+    return null;
+  }
+
+  return `Connecting to Registry (attempt ${formatRegistryAttempt(
+    registryState.retryAttempt,
+  )})`;
+}
+
+export function getRegistryPendingDetail() {
+  return "Loading players and presets from the Registry...";
+}

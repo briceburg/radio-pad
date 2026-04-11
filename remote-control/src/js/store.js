@@ -54,7 +54,8 @@ export const controlStore = atom({
   player: EMPTY_PLAYER,
   stationsData: null,
   currentStation: null,
-  loading: true,
+  loading: false,
+  connectionState: "idle",
   statusText: "",
 });
 
@@ -62,6 +63,7 @@ export const listenStore = atom({
   stationsData: null,
   currentStation: null,
   loading: false,
+  titleName: null,
 });
 
 export const toastStore = atom({

@@ -20,8 +20,13 @@ import { html } from "lit";
 import { RadioElement } from "./radio-element.js";
 import { keyed } from "lit/directives/keyed.js";
 import { StoreController } from "@nanostores/lit";
-import { preferencesStore, settingsUiStore } from "../store.js";
+import { preferencesStore, registryStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
+import {
+  isRegistryPending,
+  getRegistryPendingTitle,
+  getRegistryPendingDetail,
+} from "./registry-status.js";
 
 const ACCOUNT_GROUP_KEY = "radio-account";
 
@@ -60,6 +65,7 @@ export function getVisiblePreferences(preferences = []) {
 export class RadioSettings extends RadioElement {
   prefsController = new StoreController(this, preferencesStore);
   uiController = new StoreController(this, settingsUiStore);
+  registryController = new StoreController(this, registryStore);
 
   _onChange() {
     if (this.uiController.value.saveState !== "saving") {
@@ -155,6 +161,21 @@ export class RadioSettings extends RadioElement {
     `;
   }
 
+  renderRegistryStatus() {
+    const r = this.registryController.value;
+    if (!isRegistryPending(r)) return "";
+
+    return html`
+      <ion-item lines="none" color="warning">
+        <ion-spinner name="crescent" slot="start"></ion-spinner>
+        <ion-label class="ion-text-wrap">
+          <h3>${getRegistryPendingTitle(r)}</h3>
+          <p>${getRegistryPendingDetail()}</p>
+        </ion-label>
+      </ion-item>
+    `;
+  }
+
   render() {
     const preferences = this.prefsController.value.definitions || {};
     const saveStateRaw = this.uiController.value.saveState;
@@ -164,6 +185,7 @@ export class RadioSettings extends RadioElement {
     const prefByGroup = groupPreferencesByGroup(preferences);
 
     return html`
+      ${this.renderRegistryStatus()}
       <ion-list id="settings-list">
         ${Object.entries(PREFERENCE_GROUPS).map(([groupKey, [label, icon]]) =>
           this.renderPreferenceGroup(

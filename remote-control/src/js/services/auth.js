@@ -86,7 +86,7 @@ export class RadioPadAuth extends EventTarget {
       this.initError = error;
       this.dispatchEvent(
         new CustomEvent("error", {
-          detail: { summary: "⚠️ Sign-in unavailable.", error },
+          detail: { summary: "Sign-in unavailable.", error },
         }),
       );
       return this.emitAuthState();
@@ -103,7 +103,7 @@ export class RadioPadAuth extends EventTarget {
       } catch (error) {
         this.dispatchEvent(
           new CustomEvent("error", {
-            detail: { summary: "⚠️ Sign-in failed.", error },
+            detail: { summary: "Sign-in failed.", error },
           }),
         );
       }
