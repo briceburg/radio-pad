@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-dev=$(find /dev/serial/by-id/ -type l -name '*Macropad*' | sort | head -n1)
-if [ -z "$dev" ]; then
-  echo "No Macropad device found."
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./libmacropad
+source "$SCRIPT_DIR/libmacropad"
+
+dev="$(find_macropad_console_port 2>/dev/null || true)"
+[ -n "$dev" ] || dev="$(find /dev/serial/by-id/ -type l -name '*Macropad*' 2>/dev/null | sort | head -n1)"
+[ -n "$dev" ] || {
+  echo "No Macropad console port found." >&2
+  echo "Try 'bin/status' to inspect detected storage and serial ports." >&2
   exit 1
-fi
+}
+
+echo "[info] opening console on $dev"
 
 screen "$dev" 115200
