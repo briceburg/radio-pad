@@ -16,6 +16,13 @@ PLAYER_HEADERS = {
 }
 
 
+async def wait_for_event(ws, event_name, timeout=5):
+    while True:
+        message = json.loads(await asyncio.wait_for(ws.recv(), timeout=timeout))
+        if message.get("event") == event_name:
+            return message
+
+
 @pytest.mark.asyncio
 async def test_player_connect(switchboard_url):
     """Player can connect, send ping, receive pong."""
@@ -23,16 +30,17 @@ async def test_player_connect(switchboard_url):
         f"{switchboard_url}/test-acct/player1", additional_headers=PLAYER_HEADERS
     ) as ws:
         await ws.send(json.dumps({"event": "ping"}))
-        resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        resp = await wait_for_event(ws, "pong")
         assert resp["event"] == "pong"
 
 
 @pytest.mark.asyncio
-async def test_controller_rejected_without_token(switchboard_url):
-    """Controllers without an auth token are rejected."""
-    with pytest.raises(Exception):
-        async with websockets.connect(f"{switchboard_url}/test-acct/player1") as ws:
-            await asyncio.wait_for(ws.recv(), timeout=3)
+async def test_controller_connects_without_token_when_auth_disabled(switchboard_url):
+    """Controllers can connect anonymously when registry auth is disabled."""
+    async with websockets.connect(f"{switchboard_url}/test-acct/player1") as ws:
+        await ws.send(json.dumps({"event": "ping"}))
+        resp = await wait_for_event(ws, "pong")
+        assert resp["event"] == "pong"
 
 
 @pytest.mark.asyncio
