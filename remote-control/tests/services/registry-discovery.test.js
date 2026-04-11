@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { discoverAccounts } from "../../src/js/services/registry-discovery.js";
+import {
+  discoverAccounts,
+  discoverPlayer,
+} from "../../src/js/services/registry-discovery.js";
 
 describe("Registry Discovery", () => {
   beforeEach(() => {
@@ -12,8 +15,8 @@ describe("Registry Discovery", () => {
       ok: true,
       json: async () => ({
         items: [{ id: "acct1", name: "Account One" }],
-        links: { next: "/v1/accounts?page=2" }
-      })
+        links: { next: "/v1/accounts?page=2" },
+      }),
     });
 
     // Mock the second fetch response (no next link)
@@ -21,17 +24,17 @@ describe("Registry Discovery", () => {
       ok: true,
       json: async () => ({
         items: [{ id: "acct2", name: "Account Two" }],
-        links: {}
-      })
+        links: {},
+      }),
     });
 
     const accounts = await discoverAccounts("http://mock-registry");
-    
+
     expect(global.fetch).toHaveBeenCalledTimes(2);
     // Should extract map { value, label } output correctly
     expect(accounts).toEqual([
       { value: "acct1", label: "Account One" },
-      { value: "acct2", label: "Account Two" }
+      { value: "acct2", label: "Account Two" },
     ]);
   });
 
@@ -40,15 +43,46 @@ describe("Registry Discovery", () => {
       ok: true,
       json: async () => ({
         items: [{ id: "acct1", name: "Account One" }],
-        links: {}
-      })
+        links: {},
+      }),
     });
 
     await discoverAccounts("/api/");
 
     expect(global.fetch).toHaveBeenCalledWith(
       "http://localhost:3000/api/accounts/",
-      {},
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
     );
+  });
+
+  it("discoverPlayer infers missing player urls from the registry base", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: "living-room",
+        name: "Living Room",
+        account_id: "briceburg",
+        stations_url: null,
+        switchboard_url: null,
+      }),
+    });
+
+    const prefs = {
+      get: vi.fn(async (key) => {
+        if (key === "accountId") return "briceburg";
+        if (key === "registryUrl") return "/api/";
+        return null;
+      }),
+    };
+
+    const player = await discoverPlayer("living-room", prefs);
+
+    expect(player).toMatchObject({
+      id: "living-room",
+      stations_url: "http://localhost:3000/api/presets/briceburg",
+      switchboard_url: "ws://localhost:3000/switchboard/briceburg/living-room",
+    });
   });
 });

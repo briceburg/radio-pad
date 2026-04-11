@@ -18,8 +18,31 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { RegistryRequestError } from "../utils/errors.js";
 
+const REGISTRY_REQUEST_TIMEOUT_MS = 10000;
+
 function resolveRegistryBaseUrl(registryUrl) {
   return new URL(registryUrl, window.location.origin).toString();
+}
+
+function inferPlayerStationsUrl(registryUrl, accountId) {
+  return new URL(
+    `presets/${accountId}`,
+    resolveRegistryBaseUrl(registryUrl),
+  ).toString();
+}
+
+function inferPlayerSwitchboardUrl(registryUrl, accountId, playerId) {
+  const baseUrl = new URL(resolveRegistryBaseUrl(registryUrl));
+  const scheme = baseUrl.protocol === "https:" ? "wss:" : "ws:";
+  const apiPath = baseUrl.pathname.replace(/\/$/, "");
+  const switchboardPath = apiPath.endsWith("/api")
+    ? `${apiPath.slice(0, -4)}/switchboard/${accountId}/${playerId}`
+    : `${apiPath}/switchboard/${accountId}/${playerId}`;
+
+  return new URL(
+    `${scheme}//${baseUrl.host}${switchboardPath}`,
+    window.location.origin,
+  ).toString();
 }
 
 function buildRequestOptions(auth, signal) {
@@ -30,6 +53,38 @@ function buildRequestOptions(auth, signal) {
     ...(headers ? { headers } : {}),
     ...(signal ? { signal } : {}),
   };
+}
+
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error("Request timed out."));
+  }, REGISTRY_REQUEST_TIMEOUT_MS);
+  const relayAbort = () => controller.abort(options.signal?.reason);
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort(options.signal.reason);
+    } else {
+      options.signal.addEventListener("abort", relayAbort, { once: true });
+    }
+  }
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (
+      controller.signal.aborted &&
+      controller.signal.reason instanceof Error &&
+      controller.signal.reason.message === "Request timed out."
+    ) {
+      throw controller.signal.reason;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener("abort", relayAbort);
+  }
 }
 
 async function fetchAllPages(
@@ -44,7 +99,7 @@ async function fetchAllPages(
   const options = buildRequestOptions(auth, signal);
 
   while (url) {
-    const resp = await fetch(url, options);
+    const resp = await fetchWithTimeout(url, options);
     if (!resp.ok) {
       throw new RegistryRequestError({ url, status: resp.status });
     }
@@ -163,13 +218,21 @@ export async function discoverPlayer(
       `accounts/${accountId}/players/${playerId}`,
       resolveRegistryBaseUrl(registryUrl),
     ).toString();
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       url,
       buildRequestOptions(auth, options.signal),
     );
     if (!response.ok) {
       throw new RegistryRequestError({ url, status: response.status });
     }
-    return await response.json();
+    const player = await response.json();
+    return {
+      ...player,
+      stations_url:
+        player.stations_url || inferPlayerStationsUrl(registryUrl, accountId),
+      switchboard_url:
+        player.switchboard_url ||
+        inferPlayerSwitchboardUrl(registryUrl, accountId, playerId),
+    };
   });
 }

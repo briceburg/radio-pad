@@ -43,6 +43,13 @@ export const settingsUiStore = atom({
   saveState: "idle",
 });
 
+export const registryStore = atom({
+  phase: "idle",
+  errorText: "",
+  retryAttempt: 0,
+  retryDelayMs: 0,
+});
+
 export const controlStore = atom({
   player: EMPTY_PLAYER,
   stationsData: null,
@@ -83,6 +90,7 @@ if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
       authStore,
       preferencesStore,
       settingsUiStore,
+      registryStore,
       controlStore,
       listenStore,
       toastStore,
