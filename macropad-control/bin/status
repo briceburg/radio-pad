@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./libmacropad
+source "$SCRIPT_DIR/libmacropad"
+
+target="$(macropad_mount_target)"
+
+echo "mount target: $target"
+if mountpoint -q "$target" 2>/dev/null; then
+  echo "storage: mounted"
+else
+  echo "storage: not mounted"
+fi
+
+if disk="$(find_circuitpy_block_device 2>/dev/null)"; then
+  echo "storage device: $disk"
+else
+  echo "storage device: not found"
+fi
+
+if console_port="$(find_macropad_console_port 2>/dev/null)"; then
+  echo "console port: $console_port"
+else
+  echo "console port: not found"
+fi
+
+if data_port="$(find_macropad_data_port 2>/dev/null)"; then
+  echo "player data port: $data_port"
+else
+  echo "player data port: not found"
+fi

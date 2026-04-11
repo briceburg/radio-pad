@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(git rev-parse --show-toplevel)/macropad-control"
+# shellcheck source=./libmacropad
+source "$SCRIPT_DIR/libmacropad"
 
-mount | grep -q /mnt/CIRCUITPY || {
-  echo "macropad not mounted, please run bin/mount and try again." >&2
-  exit 1
-}
+target="$(macropad_mount_target)"
 
-cd /mnt/CIRCUITPY/
+if ! mountpoint -q "$target" 2>/dev/null; then
+  echo "[info] macropad not mounted, attempting bin/mount"
+  "$SCRIPT_DIR/mount"
+fi
+
+cd "$target"
 
 if [ "${1:-}" = "--hard" ]; then
   echo "removing existing files"
   rm -rf ./*
 fi
 
-cp -r "$PROJECT_ROOT"/src/* .
+cp -r "$PROJECT_ROOT"/src/. .
 sync
-echo "[ok] copied files"
+echo "[ok] copied files to $target"
