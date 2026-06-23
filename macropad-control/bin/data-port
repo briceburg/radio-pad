@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ports=()
+
+for interface in /sys/class/tty/ttyACM*/device/interface /sys/class/tty/ttyUSB*/device/interface; do
+  [ -f "$interface" ] || continue
+  [[ "$(<"$interface")" == "CircuitPython CDC2"* ]] || continue
+  ports+=("/dev/$(basename "$(dirname "$(dirname "$interface")")")")
+done
+
+case "${#ports[@]}" in
+  0)
+    echo "macropad CDC2 data port not found" >&2
+    exit 1
+    ;;
+  1)
+    echo "${ports[0]}"
+    ;;
+  *)
+    echo "multiple macropad CDC2 data ports found:" >&2
+    printf '  %s\n' "${ports[@]}" >&2
+    echo "set RADIOPAD_MACROPAD_DEVICE explicitly" >&2
+    exit 1
+    ;;
+esac

@@ -37,10 +37,19 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
 2. **Customize button colors and behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
    - Stations are received from the connected [player](../player/), which loads them from a registry [station preset](../player/README.md#registry-discovery).
-3. **Sync your changes to the Macropad:**
+3. **Sync and verify your changes on the Macropad:**
 
    ```sh
-   bin/refresh
+   bin/sync
+   ```
+
+   Mounting is explicit because it may require `sudo`; syncing never mounts or
+   prompts. Run `bin/mount` again after reconnecting the device.
+
+   To verify the hardware is ready after syncing, run:
+
+   ```sh
+   bin/doctor
    ```
 
 4. **Debug via the USB serial console**

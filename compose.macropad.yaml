@@ -1,0 +1,7 @@
+services:
+  player:
+    user: root
+    environment:
+      RADIOPAD_MACROPAD_PORT: /dev/macropad
+    devices:
+      - "${RADIOPAD_MACROPAD_DEVICE:?set RADIOPAD_MACROPAD_DEVICE to the macropad CDC2 device}:/dev/macropad"

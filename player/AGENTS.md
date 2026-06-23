@@ -7,13 +7,14 @@ Guidance for coding agents working in `radio-pad/player`.
 - Python application that plays internet radio stations on a host device (e.g. Raspberry Pi).
 - Connects to the registry switchboard via WebSocket to receive station requests and broadcast currently playing station.
 - Uses `mpv` as the audio backend (system dependency, installed via `apk` in Docker).
-- No test directory currently — only static analysis via `bin/ci`.
+- Unit tests live in `tests/` and cover macropad serial-port selection and
+  serial message handling with fake readers/writers.
 
 ## Runtime and tooling
 
 - The checked-in project target is Python `3.13`.
-- `bin/ci` runs `black` (formatting), `isort` (import order), and `autoflake` (unused imports/variables) on `src/`.
-- Development dependencies are in `requirements-dev.txt` (`autoflake`, `black`, `isort`).
+- `bin/ci` runs `black` (formatting), `isort` (import order), and `autoflake` (unused imports/variables) on `src/` and `tests/`, then runs `pytest` when `tests/` exists.
+- Development dependencies are in `requirements-dev.txt` (`autoflake`, `black`, `isort`, `pytest`).
 - Runtime dependencies are in `requirements.txt`.
 
 ## Conventions

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)"
+source_dir="$repo_root/macropad-control/src"
+target="/mnt/CIRCUITPY"
+status=0
+storage_ready=0
+
+ok() { echo "[ok] $*"; }
+warn() { echo "[warn] $*"; }
+fail() {
+  echo "[fail] $*" >&2
+  status=1
+}
+
+if port="$("$script_dir/data-port" 2>&1)"; then
+  ok "data port: $port"
+else
+  fail "${port:-macropad CDC2 data port check failed}"
+fi
+
+device="$(readlink -f /dev/disk/by-label/CIRCUITPY 2>/dev/null || true)"
+mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true)"
+mounted_device="$(readlink -f "$mounted_source" 2>/dev/null || true)"
+mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || true),"
+
+if [ -z "$device" ]; then
+  fail "CIRCUITPY storage device not found"
+elif [ "$mounted_device" != "$device" ]; then
+  fail "$target is not mounted from $device"
+elif [[ "$mount_options" != *,rw,* ]]; then
+  fail "$target is mounted read-only"
+else
+  ok "$device mounted read/write at $target"
+  storage_ready=1
+fi
+
+if [ -z "$repo_root" ]; then
+  fail "not running from a git checkout"
+elif [ "$storage_ready" -ne 1 ]; then
+  warn "skipping firmware diff until CIRCUITPY is mounted read/write"
+elif [ ! -e "$target/boot.py" ] || [ ! -d "$target/lib" ] || [ ! -e "$target/main.py" ]; then
+  fail "firmware files are missing from $target; run bin/sync"
+elif diff -q "$source_dir/boot.py" "$target/boot.py" >/dev/null &&
+  diff -qr "$source_dir/lib" "$target/lib" >/dev/null &&
+  diff -q "$source_dir/main.py" "$target/main.py" >/dev/null; then
+  ok "firmware matches macropad-control/src"
+else
+  fail "firmware differs from macropad-control/src; run bin/sync"
+fi
+
+if command -v docker >/dev/null; then
+  if container="$(docker compose ps -q player 2>/dev/null)" && [ -n "$container" ]; then
+    if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" = "true" ]; then
+      ok "compose player running: ${container:0:12}"
+    else
+      warn "compose player container exists but is not running: ${container:0:12}"
+    fi
+  else
+    warn "compose player is not running"
+  fi
+else
+  warn "docker not found; skipping compose status"
+fi
+
+exit "$status"

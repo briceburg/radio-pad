@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -38,7 +38,7 @@ def get_auth_services(request: Request) -> AuthServices:
     services = getattr(request.app.state, "auth", None)
     if services is None or not isinstance(services, AuthServices):
         raise HTTPException(status_code=500, detail="Auth services not initialized")
-    return cast(AuthServices, services)
+    return services
 
 
 def current_identity(
