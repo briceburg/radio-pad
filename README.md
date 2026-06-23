@@ -81,6 +81,29 @@ bin/ci
 COMPOSE_FILE=compose.split.yaml bin/ci
 ```
 
+### Testing with a macropad
+
+Mount the macropad once after attaching it, sync local firmware changes, verify
+the device state, then discover the post-sync CDC2 data port and recreate the
+player:
+
+```sh
+macropad-control/bin/mount
+macropad-control/bin/sync
+macropad-control/bin/doctor
+
+RADIOPAD_MACROPAD_DEVICE="$(macropad-control/bin/data-port)" \
+  docker compose -f compose.yaml -f compose.macropad.yaml \
+  up -d --force-recreate player
+```
+
+The discovery command intentionally fails when it finds zero or multiple data
+ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one
+macropad is attached. The overlay runs the development player as root so it can
+access the host device; it is not intended for production. Sync before creating
+the player container because CircuitPython may reboot and renumber its USB
+interfaces during a firmware update.
+
 ## Architecture
 
 ### Deployment modes

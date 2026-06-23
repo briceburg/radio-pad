@@ -10,7 +10,8 @@ CROSS_MARK="\xE2\x9D\x8C"
 log(){ echo -e "$*" >&2; }
 die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
 
-paths=(src/)
+paths=(src/ tests/)
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 log "🧹 [black] Checking code style..."
 black --check "${paths[@]}" || \
@@ -26,7 +27,9 @@ autoflake -cd --quiet --remove-all-unused-imports --remove-unused-variables --re
 
 if [ -d "tests" ]; then
   log "🧪 [pytest] Running tests..."
-  pytest || die "pytest failed."
+  pytest_args=()
+  [ -w . ] || pytest_args=(-o cache_dir=/tmp/radio-pad-player-pytest-cache)
+  pytest "${pytest_args[@]}" || die "pytest failed."
 fi
 
 log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"

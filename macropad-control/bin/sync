@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_dir="$(git rev-parse --show-toplevel)/macropad-control/src"
+target="/mnt/CIRCUITPY"
+device="$(readlink -f /dev/disk/by-label/CIRCUITPY 2>/dev/null || true)"
+mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true)"
+mounted_device="$(readlink -f "$mounted_source" 2>/dev/null || true)"
+mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || true),"
+
+if [ -z "$device" ] || [ "$mounted_device" != "$device" ] ||
+  [[ "$mount_options" != *,rw,* ]]; then
+  echo "macropad storage is not mounted read/write; run bin/mount" >&2
+  exit 1
+fi
+
+rm -rf "$target"/{boot.py,lib,main.py}
+cp -R "$source_dir"/{boot.py,lib} "$target/"
+cp -R "$source_dir/main.py" "$target/main.py"
+sync
+
+diff -q "$source_dir/boot.py" "$target/boot.py"
+diff -qr "$source_dir/lib" "$target/lib"
+diff -q "$source_dir/main.py" "$target/main.py"
+
+echo "[ok] synced and verified firmware at $target"

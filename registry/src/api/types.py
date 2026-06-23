@@ -1,4 +1,4 @@
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Path, Query, Request
 
@@ -16,7 +16,7 @@ def get_store(request: Request) -> DataStore:
     ds = getattr(request.app.state, "store", None)
     if ds is None or not isinstance(ds, DataStore):
         raise HTTPException(status_code=500, detail="Datastore not initialized")
-    return cast(DataStore, ds)
+    return ds
 
 
 def pagination(

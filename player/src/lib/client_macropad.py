@@ -19,6 +19,7 @@
 
 import asyncio
 import logging
+import os
 
 import serial.tools.list_ports
 import serial_asyncio
@@ -28,6 +29,18 @@ from lib.interfaces import RadioPadClient, RadioPadPlayer
 logger = logging.getLogger("MACROPAD")
 
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
+
+
+def _candidate_ports():
+    configured_port = os.getenv("RADIOPAD_MACROPAD_PORT")
+    if configured_port:
+        return [configured_port]
+
+    return sorted(
+        port.device
+        for port in serial.tools.list_ports.comports()
+        if port.interface and port.interface.startswith(DATA_INTERFACE_NAME)
+    )
 
 
 class MacropadClient(RadioPadClient):
@@ -61,29 +74,30 @@ class MacropadClient(RadioPadClient):
             await asyncio.sleep(3)
 
     async def _connect(self):
-        macropad_ports = [
-            port.device
-            for port in serial.tools.list_ports.comports()
-            if port.interface and port.interface.startswith(DATA_INTERFACE_NAME)
-        ]
+        macropad_ports = _candidate_ports()
 
         if not macropad_ports:
-            logger.warning("no data ports found, is it plugged in?")
+            logger.warning("no macropad data port found; is it plugged in?")
             return None, None
 
-        logger.info("found ports: %s", macropad_ports)
-        for macropad_port in macropad_ports:
-            logger.info("attempting to connect to %s", macropad_port)
-            try:
-                reader, writer = await serial_asyncio.open_serial_connection(
-                    url=macropad_port, baudrate=115200
-                )
-                logger.info("connected to: %s", macropad_port)
-                return reader, writer
-            except Exception as e:
-                logger.warning("failed to connect to %s: %s", macropad_port, e)
-                continue
-        return None, None
+        if len(macropad_ports) > 1:
+            logger.warning(
+                "multiple macropad data ports found: %s; set RADIOPAD_MACROPAD_PORT",
+                macropad_ports,
+            )
+            return None, None
+
+        macropad_port = macropad_ports[0]
+        logger.info("attempting to connect to %s", macropad_port)
+        try:
+            reader, writer = await serial_asyncio.open_serial_connection(
+                url=macropad_port, baudrate=115200
+            )
+            logger.info("connected to: %s", macropad_port)
+            return reader, writer
+        except Exception as e:
+            logger.warning("failed to connect to %s: %s", macropad_port, e)
+            return None, None
 
     async def _connect_and_listen(self):
         self.reader, self.writer = await self._connect()

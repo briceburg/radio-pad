@@ -1,7 +1,7 @@
 FROM python:3.13-alpine AS base
 
 # TODO: use a backend w/o X/Wayland reqs
-RUN apk add --no-cache mpv \
+RUN apk add --no-cache bash mpv \
   && python3 -m venv /venv \
   && chown -R nobody:nobody /venv
 
