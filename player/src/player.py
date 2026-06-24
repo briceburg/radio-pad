@@ -60,17 +60,6 @@ def _bootstrap_config(player_id, registry_url):
     )
 
 
-def _config_status_summary(error):
-    message = str(error)
-    if "Failed fetching stations" in message:
-        return "Stations unavailable"
-    if "Station URL" in message:
-        return "Station config error"
-    if "Player must" in message:
-        return "Player config error"
-    return "Registry unavailable"
-
-
 async def _load_config_with_retry(player, macropad_client, settings, shutdown_event):
     while not shutdown_event.is_set():
         try:
@@ -79,9 +68,10 @@ async def _load_config_with_retry(player, macropad_client, settings, shutdown_ev
             await macropad_client.publish_status("upstream", "ok", None)
             return player_config
         except ConfigError as e:
-            summary = _config_status_summary(e)
             logger.error("Configuration error: %s", e)
-            await macropad_client.publish_status("upstream", "warning", summary)
+            await macropad_client.publish_status(
+                "upstream", "warning", e.status_summary
+            )
         except Exception as e:
             logger.error("Unexpected configuration error: %s", e, exc_info=True)
             await macropad_client.publish_status(
