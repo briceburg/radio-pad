@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ports=()
+
+for interface in /sys/class/tty/ttyACM*/device/interface /sys/class/tty/ttyUSB*/device/interface; do
+  [ -f "$interface" ] || continue
+  name="$(<"$interface")"
+  [[ "$name" == "CircuitPython CDC"* ]] || continue
+  [[ "$name" == "CircuitPython CDC2"* ]] && continue
+  ports+=("/dev/$(basename "$(dirname "$(dirname "$interface")")")")
+done
+
+case "${#ports[@]}" in
+  0)
+    echo "macropad CircuitPython console port not found" >&2
+    exit 1
+    ;;
+  1)
+    echo "${ports[0]}"
+    ;;
+  *)
+    echo "multiple macropad CircuitPython console ports found:" >&2
+    printf '  %s\n' "${ports[@]}" >&2
+    echo "disconnect extras or use screen directly" >&2
+    exit 1
+    ;;
+esac

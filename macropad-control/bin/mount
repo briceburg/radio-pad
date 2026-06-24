@@ -19,7 +19,7 @@ if [ "$mounted_disk" = "$disk" ] && [[ "$mount_options" == *,rw,* ]]; then
 fi
 
 if mountpoint -q "$target"; then
-  echo "[info] replacing stale or read-only mount"
+  echo "[info] replacing stale or read-only mount at $target"
   sudo umount "$target"
 fi
 

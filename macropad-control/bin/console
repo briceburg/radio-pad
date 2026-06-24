@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-dev=$(find /dev/serial/by-id/ -type l -name '*Macropad*' | sort | head -n1)
-if [ -z "$dev" ]; then
-  echo "No Macropad device found."
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+dev="$("$script_dir/console-port")"
+
+if ! command -v screen >/dev/null; then
+  echo "screen not found; install screen or connect manually to $dev at 115200 baud" >&2
   exit 1
 fi
 
+echo "[info] attaching to CircuitPython console at $dev" >&2
+echo "[info] screen detach: Ctrl-A d; quit: Ctrl-A k, then y" >&2
 screen "$dev" 115200
