@@ -10,11 +10,20 @@ from switchboard.broadcast import Broadcast
 router = APIRouter()
 logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
+RETAINED_EVENTS = {"stations_url", "station_playing"}
+
+
+def _state_key(event: str, data: object) -> str | None:
+    if event not in RETAINED_EVENTS:
+        return None
+    return event
 
 
 async def publish_event(broadcast: Broadcast, channel: str, event: str, data: object) -> None:
     message = json.dumps({"event": event, "data": data})
-    broadcast.set_state(channel, message)
+    state_key = _state_key(event, data)
+    if state_key:
+        broadcast.set_state(channel, state_key, message)
     await broadcast.publish(channel, message)
 
 

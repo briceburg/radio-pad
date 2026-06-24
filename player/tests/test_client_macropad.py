@@ -47,12 +47,24 @@ class FakeWriter:
     def __init__(self):
         self.writes = []
         self.drains = 0
+        self.closed = False
 
     def write(self, data):
         self.writes.append(data)
 
     async def drain(self):
         self.drains += 1
+
+    def close(self):
+        self.closed = True
+
+    async def wait_closed(self):
+        pass
+
+
+class FailingWriter(FakeWriter):
+    async def drain(self):
+        raise ConnectionError("Connection lost")
 
 
 def write_events(writer):
@@ -111,3 +123,62 @@ def test_station_list_request_writes_stations_and_current_station():
         {"event": "station_playing", "data": "KGUT"},
     ]
     assert writer.drains == 2
+
+
+def test_publish_status_writes_scoped_status_payload():
+    player = FakePlayer()
+    client = MacropadClient(player)
+    writer = FakeWriter()
+    client.writer = writer
+
+    asyncio.run(client.publish_status("upstream", "warning", "Switchboard down"))
+
+    assert write_events(writer) == [
+        {
+            "event": "player_status",
+            "data": {
+                "scope": "upstream",
+                "level": "warning",
+                "summary": "Switchboard down",
+            },
+        }
+    ]
+
+
+def test_station_list_request_replays_status_after_stations():
+    player = FakePlayer()
+    client = MacropadClient(player)
+    writer = FakeWriter()
+    player.register_client(client)
+    client.writer = writer
+    client._status_by_scope = {
+        "upstream": {"level": "warning", "summary": "Switchboard down"}
+    }
+
+    asyncio.run(client.handle_message('{"event":"station_list"}'))
+
+    assert write_events(writer) == [
+        {"event": "station_list", "data": ["KEXP", "KGUT"]},
+        {"event": "station_playing", "data": None},
+        {
+            "event": "player_status",
+            "data": {
+                "scope": "upstream",
+                "level": "warning",
+                "summary": "Switchboard down",
+            },
+        },
+    ]
+
+
+def test_send_drops_lost_macropad_connection_without_raising():
+    player = FakePlayer()
+    client = MacropadClient(player)
+    writer = FailingWriter()
+    client.writer = writer
+
+    asyncio.run(client._send('{"event":"player_heartbeat","data":null}'))
+
+    assert writer.closed
+    assert client.writer is None
+    assert client.reader is None

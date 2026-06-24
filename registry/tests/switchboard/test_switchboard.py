@@ -14,6 +14,7 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from registry import create_app
+from switchboard.switchboard import _state_key
 
 PLAYER_UA = "RadioPad/1.0 (test)"
 PLAYER_STATIONS_URL = "http://example.com/stations.json"
@@ -76,3 +77,7 @@ def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
         ws.send_json({"event": "ping"})
         resp = ws.receive_json()
         assert resp["event"] == "pong"
+
+
+def test_station_request_is_not_retained_state() -> None:
+    assert _state_key("station_request", "KEXP") is None

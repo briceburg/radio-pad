@@ -19,7 +19,7 @@
 import abc
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, TypedDict
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ class RadioPadStation:
 @dataclass
 class RadioPadPlayerConfig:
     id: str
-    stations_url: str
-    stations: list[RadioPadStation] = None
+    stations_url: str | None
+    stations: list[RadioPadStation] = field(default_factory=list)
     registry_url: Optional[str] = None
     switchboard_url: Optional[str] = None
 
@@ -63,6 +63,10 @@ class RadioPadPlayer(abc.ABC):
         """Get the player configuration."""
         return self._config
 
+    def update_config(self, config: RadioPadPlayerConfig):
+        """Replace the player configuration after discovery succeeds."""
+        self._config = config
+
     @property
     def station(self) -> Optional[RadioPadStation]:
         """Get or set the currently playing station."""
@@ -83,7 +87,7 @@ class RadioPadPlayer(abc.ABC):
 
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
-        """Play a radio station."""
+        """Play a radio station and return True when playback starts."""
 
     @abc.abstractmethod
     async def stop(self):
@@ -109,7 +113,13 @@ class RadioPadClient(abc.ABC):
         self.register_event("volume", self._handle_volume)
         self.register_event("station_request", self._handle_station_request)
         # Ignored events
-        for ignored in ("station_playing", "client_count", "stations_url"):
+        for ignored in (
+            "station_playing",
+            "client_count",
+            "stations_url",
+            "player_status",
+            "player_heartbeat",
+        ):
             self.register_event(ignored, self._handle_ignored)
 
     @property
@@ -169,6 +179,7 @@ class RadioPadClient(abc.ABC):
                 await self.player.play(station)
             else:
                 logger.warning("Station '%s' not found in RADIO_STATIONS.", data)
+                return
         else:
             await self.player.stop()
         await self.broadcast("station_playing")
