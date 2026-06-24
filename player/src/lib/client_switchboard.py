@@ -19,7 +19,7 @@
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import websockets
 
@@ -37,13 +37,16 @@ class SwitchboardClient(RadioPadClient):
         player: RadioPadPlayer,
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[], None] | None = None,
+        status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
         self.url = player.config.switchboard_url
         self.ws = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
+        self.status_reporter = status_reporter
         self._connected = False
+        self._closing = False
 
         self.http_headers = http_client_headers(
             {"RadioPad-Stations-Url": player.config.stations_url}
@@ -57,7 +60,11 @@ class SwitchboardClient(RadioPadClient):
         while True:
             try:
                 await self._connect_and_listen()
+            except asyncio.CancelledError:
+                self._closing = True
+                raise
             except Exception as e:
+                await self._report_status("warning", self._status_summary(e))
                 logger.error("Unexpected error: %s", e, exc_info=True)
             logger.info("reconnecting to switchboard in 5s...")
             await asyncio.sleep(5)
@@ -72,9 +79,13 @@ class SwitchboardClient(RadioPadClient):
                 self._connected = True
                 if self.on_connect:
                     self.on_connect()
-                asyncio.create_task(self.broadcast("station_playing"))
+                await self._report_status("ok", None)
+                await self.broadcast("station_playing")
                 async for msg in ws:
                     await self.handle_message(msg)
+            except asyncio.CancelledError:
+                self._closing = True
+                raise
             except websockets.exceptions.ConnectionClosed:
                 # If the connection fails with a transient error, it is retried with exponential backoff. If it fails with a fatal error, the exception is raised, breaking out of the loop.
                 continue
@@ -83,6 +94,7 @@ class SwitchboardClient(RadioPadClient):
                 logger.warning(
                     "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
                 )
+                await self._report_status("warning", self._status_summary(e))
                 continue
             finally:
                 self.ws = None
@@ -90,13 +102,27 @@ class SwitchboardClient(RadioPadClient):
                     self._connected = False
                     if self.on_disconnect:
                         self.on_disconnect()
+                    if not self._closing:
+                        await self._report_status("warning", "Switchboard down")
 
     async def _send(self, message):
         """Send a message to the macropad or switchboard."""
         if self.ws:
             await self.ws.send(message)
 
+    async def _report_status(self, level, summary):
+        if self.status_reporter:
+            await self.status_reporter(level, summary)
+
+    def _status_summary(self, error):
+        if isinstance(error, ConnectionRefusedError):
+            return "Switchboard down"
+        if isinstance(error, TimeoutError):
+            return "Network timeout"
+        return "Network issue"
+
     async def close(self):
+        self._closing = True
         if self.ws:
             self._connected = False
             await self.ws.close()

@@ -66,7 +66,7 @@ class Broadcast:
 
     def __init__(self) -> None:
         self._channels: dict[str, set[asyncio.Queue[Event | None]]] = {}
-        self._channel_state: dict[str, list[str]] = {}
+        self._channel_state: dict[str, dict[str, str]] = {}
 
     async def connect(self) -> None:
         """Prepare the broadcast (no-op for in-memory backend)."""
@@ -84,9 +84,9 @@ class Broadcast:
         for q in list(self._channels.get(channel, ())):
             await q.put(Event(channel=channel, message=message))
 
-    def set_state(self, channel: str, message: str) -> None:
-        """Record *message* as retained state for *channel*."""
-        self._channel_state.setdefault(channel, []).append(message)
+    def set_state(self, channel: str, key: str, message: str) -> None:
+        """Record *message* as retained state for *channel* under *key*."""
+        self._channel_state.setdefault(channel, {})[key] = message
 
     def clear_state(self, channel: str) -> None:
         """Remove all retained state for *channel*."""
@@ -94,7 +94,7 @@ class Broadcast:
 
     async def replay_state(self, channel: str, queue: asyncio.Queue[Event | None]) -> None:
         """Enqueue retained state messages for *channel* into *queue*."""
-        for message in self._channel_state.get(channel, ()):
+        for message in self._channel_state.get(channel, {}).values():
             await queue.put(Event(channel=channel, message=message))
 
     @asynccontextmanager

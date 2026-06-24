@@ -51,6 +51,7 @@ name | description | default
 ### Registry Discovery
 
 The player discovers its station preset and switchboard URL from the [registry](../registry/) using the `RADIOPAD_PLAYER` environment variable.
+The USB macropad client starts before registry discovery completes, so a headless player can still report loading or degraded startup state to the macropad when registry or station preset fetches fail.
 
 For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 
