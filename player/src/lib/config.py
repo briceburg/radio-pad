@@ -76,7 +76,8 @@ async def make(
 
     if not stations_url:
         raise ConfigError(
-            "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER."
+            "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER.",
+            status_summary="Station config error",
         )
 
     logger.info("Using stations_url: %s", stations_url)
@@ -84,14 +85,17 @@ async def make(
 
     station_data = await fetch_json_url(stations_url)
     if not station_data:
-        raise ConfigError("Failed fetching stations")
+        raise ConfigError(
+            "Failed fetching stations", status_summary="Stations unavailable"
+        )
     if (
         not isinstance(station_data, dict)
         or "name" not in station_data
         or "stations" not in station_data
     ):
         raise ConfigError(
-            'Station URL must return \'{"name": str, "stations": [{...}]}\''
+            'Station URL must return \'{"name": str, "stations": [{...}]}\'',
+            status_summary="Station config error",
         )
 
     # Create config object
@@ -116,7 +120,10 @@ async def discover_config(
     try:
         account_id, player_id = player.split("/", 1)
     except ValueError:
-        raise ConfigError("Player must be in 'account_id/player_id' format")
+        raise ConfigError(
+            "Player must be in 'account_id/player_id' format",
+            status_summary="Player config error",
+        )
 
     url = f"{registry_url.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)

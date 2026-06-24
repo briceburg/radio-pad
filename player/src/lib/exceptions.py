@@ -25,3 +25,7 @@ class RadioPadError(Exception):
 
 class ConfigError(RadioPadError):
     """Raised for configuration-related errors."""
+
+    def __init__(self, message, *, status_summary="Registry unavailable"):
+        super().__init__(message)
+        self.status_summary = status_summary
