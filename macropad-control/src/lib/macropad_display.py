@@ -23,6 +23,10 @@ from adafruit_display_text import label
 
 from .macropad_keys import MACROPAD_KEY_COUNT
 
+TITLE_MAX_CHARS = 18
+STATION_LABEL_MAX_CHARS = 6
+TRUNCATION_SUFFIX = ">"
+
 
 class MacropadDisplay:
     def __init__(self, macropad):
@@ -60,7 +64,20 @@ class MacropadDisplay:
 
         self.macropad.display.root_group = self._group
 
+    def _normalize_text(self, text, max_chars):
+        if not isinstance(text, str):
+            text = "" if text is None else str(text)
+
+        if len(text) <= max_chars:
+            return text
+
+        if max_chars <= len(TRUNCATION_SUFFIX):
+            return text[:max_chars]
+
+        return text[: max_chars - len(TRUNCATION_SUFFIX)] + TRUNCATION_SUFFIX
+
     def set_title(self, text, refresh=True):
+        text = self._normalize_text(text, TITLE_MAX_CHARS)
         if self._title_text.text == text:
             return
         self._title_text.text = text
@@ -69,7 +86,9 @@ class MacropadDisplay:
 
     def set_group_text(self, group_index, text):
         if 0 <= group_index < MACROPAD_KEY_COUNT:
-            self._group[group_index].text = text
+            self._group[group_index].text = self._normalize_text(
+                text, STATION_LABEL_MAX_CHARS
+            )
 
     def highlight_group(self, group_index):
         if 0 <= group_index < MACROPAD_KEY_COUNT:

@@ -21,51 +21,43 @@ import time
 from adafruit_macropad import MacroPad
 
 from lib.macropad_display import MacropadDisplay
-from lib.macropad_keys import DEFAULT_COLOR, PRESSED_COLOR, MacropadKeys
+from lib.macropad_keys import PRESSED_COLOR, MacropadKeys
 from lib.macropad_player import MacropadPlayer
+from lib.macropad_state import MacropadState
 
 macropad = MacroPad()
 display = MacropadDisplay(macropad)
 keys = MacropadKeys(macropad, display)
 player = MacropadPlayer()
+state = MacropadState()
 
 last_position = macropad.encoder
 last_encoder_switch = macropad.encoder_switch_debounced.pressed
-had_stations = False
-
-display.set_title("Connect to Player")
+state.apply(keys, force=True)
 
 while True:
-    # --- Player Connection ---
-    if player.connected and not had_stations:
-        display.set_title("Player connected!")
-        display.refresh()
-        player.request_stations()
-    elif not player.connected:
-        if had_stations:
-            keys.set_stations([])
-            display.set_title("Player disconnected!")
-            player.flush_buffer()
-            had_stations = False
+    event = player.read_event() if player.connected else None
+    if event:
+        print(f"Received event: {event}")
+        state.handle_event(event, keys)
 
+    # --- Player Connection ---
+    connected = player.connected
+    if not connected or player.session_stale:
+        state_changed = state.mark_player_unavailable(keys)
+        if not connected and state_changed:
+            player.flush_buffer()
+        state.apply(keys, force=state_changed)
+        keys.tick()
         time.sleep(0.01)
         continue
 
-    # --- Player Events ---
-    event = player.read_event()
-    if event:
-        print(f"Received event: {event}")
-        event_name = event.get("event")
-        data = event.get("data")
+    if state.mark_player_available():
+        state.apply(keys, force=True)
 
-        if event_name == "station_list":
-            station_list = [
-                {"name": station, "color": DEFAULT_COLOR} for station in data
-            ]
-            keys.set_stations(station_list)
-            had_stations = True
-        elif event_name == "station_playing":
-            keys.set_playing_station(data)
+    if state.needs_stations:
+        player.request_stations()
+        state.apply(keys)
 
     # --- Encoder Rotation ---
     position = macropad.encoder
@@ -108,3 +100,6 @@ while True:
 
     if last_pressed_station:
         player.send_command("station_request", last_pressed_station)
+
+    keys.tick()
+    time.sleep(0.01)

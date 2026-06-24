@@ -8,8 +8,19 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 
 ## How It Works
 
-- The Macropad sends coded keypresses to a host.
-- The host runs a [listener script](../player/) that detects these keypresses and starts/stops playback of the corresponding radio stream(s).
+- The Macropad communicates with the host [player](../player/) over USB serial (CircuitPython CDC2).
+- The player sends station lists, heartbeat, and status events; the Macropad renders them on the OLED and NeoPixel keys.
+- Pressing a key sends a station request to the player.
+
+### Visual States
+
+| State | OLED title row | NeoPixel keys |
+|-------|----------------|---------------|
+| Waiting for player | `Waiting for Player` | Dim grey skeleton animation |
+| Loading stations | `Loading stations` or a short status | Grey station-slot skeleton animation |
+| Healthy | Station/page name | Station colors, with green for the playing station |
+| Upstream degraded | Station/page name when stations are loaded | Amber warning treatment |
+| Playback issue | Short playback status | Existing station colors |
 
 ## Macropad Controls
 
