@@ -32,25 +32,21 @@ macropad_device() {
   "$root/macropad-control/bin/data-port"
 }
 
+use_macropad() {
+  export RADIOPAD_MACROPAD_DEVICE="$1"
+  compose_files+=(-f "$root/compose.macropad.yaml")
+  echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
+}
+
 case "$mode" in
-  auto)
+  auto|required)
     if device="$(macropad_device 2>&1)"; then
-      export RADIOPAD_MACROPAD_DEVICE="$device"
-      compose_files+=(-f "$root/compose.macropad.yaml")
-      echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
-    elif [[ "$device" == *"not found"* ]]; then
+      use_macropad "$device"
+    elif [ "$mode" = "auto" ] && [[ "$device" == *"not found"* ]]; then
       echo "[info] no macropad data port found; starting without local macropad" >&2
     else
       die "$device"
     fi
-    ;;
-  required)
-    if ! device="$(macropad_device 2>&1)"; then
-      die "$device"
-    fi
-    export RADIOPAD_MACROPAD_DEVICE="$device"
-    compose_files+=(-f "$root/compose.macropad.yaml")
-    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
     ;;
   off)
     ;;
