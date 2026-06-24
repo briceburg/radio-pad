@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mode="${RADIOPAD_MACROPAD:-auto}"
+compose_files=(-f "$root/compose.yaml")
+
+die() {
+  echo "[error] $*" >&2
+  exit 1
+}
+
+usage() {
+  cat >&2 <<'EOF'
+usage: bin/dev [docker compose args...]
+
+Macropad modes:
+  RADIOPAD_MACROPAD=auto      use the macropad overlay when one data port is found (default)
+  RADIOPAD_MACROPAD=required  fail if no macropad data port is available
+  RADIOPAD_MACROPAD=off       never use the macropad overlay
+
+Set RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM... to choose a specific CDC2 data port.
+EOF
+}
+
+macropad_device() {
+  if [ -n "${RADIOPAD_MACROPAD_DEVICE:-}" ]; then
+    echo "$RADIOPAD_MACROPAD_DEVICE"
+    return 0
+  fi
+
+  "$root/macropad-control/bin/data-port"
+}
+
+case "$mode" in
+  auto)
+    if device="$(macropad_device 2>&1)"; then
+      export RADIOPAD_MACROPAD_DEVICE="$device"
+      compose_files+=(-f "$root/compose.macropad.yaml")
+      echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
+    elif [[ "$device" == *"not found"* ]]; then
+      echo "[info] no macropad data port found; starting without local macropad" >&2
+    else
+      die "$device"
+    fi
+    ;;
+  required)
+    if ! device="$(macropad_device 2>&1)"; then
+      die "$device"
+    fi
+    export RADIOPAD_MACROPAD_DEVICE="$device"
+    compose_files+=(-f "$root/compose.macropad.yaml")
+    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
+    ;;
+  off)
+    ;;
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage
+    die "invalid RADIOPAD_MACROPAD mode: $mode"
+    ;;
+esac
+
+exec docker compose "${compose_files[@]}" "$@"

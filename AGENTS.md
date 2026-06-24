@@ -9,6 +9,9 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - `compose.yaml` runs unified mode (registry serves API + switchboard in one process).
 - `compose.split.yaml` runs split mode (registry and switchboard as separate services).
 - `compose.prod-smoke.yaml` builds all services with `target: prod` and verifies healthchecks.
+- `bin/dev` wraps local compose usage and auto-adds `compose.macropad.yaml` only
+  when a macropad CDC2 data port is available, unless `RADIOPAD_MACROPAD=off` or
+  `RADIOPAD_MACROPAD=required` is set.
 - Each component has its own `bin/ci`, `README.md`, and (where applicable) `AGENTS.md`.
 
 ## Runtime and tooling
@@ -26,6 +29,8 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME` control which topology runs.
 - Ports default to ephemeral. Pin them via `.env` (`RADIOPAD_REGISTRY_PORT`, `RADIOPAD_REMOTE_CONTROL_PORT`).
 - Services use healthchecks; the integration test container `depends_on` with `condition: service_healthy`.
+- `bin/dev` must not mount or sync macropad firmware; use the macropad-control
+  helpers explicitly before starting a hardware-backed player.
 
 ## Integration test conventions
 
