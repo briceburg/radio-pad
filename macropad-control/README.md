@@ -22,6 +22,11 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 | Upstream degraded | Station/page name when stations are loaded | Amber warning treatment |
 | Playback issue | Short playback status | Existing station colors |
 
+Skeleton animations run at low brightness and settle into a static skeleton
+after a long unavailable/loading period. Set `ENABLE_SKELETON_ANIMATION = False`
+in [`src/lib/macropad_keys.py`](./src/lib/macropad_keys.py) while diagnosing LED
+hardware.
+
 ## Macropad Controls
 
 - **Key Buttons:**  
@@ -71,7 +76,20 @@ Attaching to the console allows you to read stdout/stderr, for instance to view 
   bin/console
   ```
 
-  > this command requires that the executing user has access to /dev/ttyACM* devices, which are owned by the `uucp` group in archlinux.
+  `bin/console` attaches to the CircuitPython console port, not the CDC2 data
+  port used by the player. To print the console device without attaching:
+
+  ```sh
+  bin/console-port
+  ```
+
+  Detach from `screen` with `Ctrl-A d`; quit it with `Ctrl-A k`, then `y`.
+
+  > This command requires that the executing user has access to /dev/ttyACM* devices, which are owned by the `uucp` group in Arch Linux.
+
+After a reset, safe-mode session, or unplug/replug cycle, USB device names and
+the CIRCUITPY block device may change. Run `bin/mount` and `bin/doctor` again
+before syncing or recreating the compose player.
 
 ## Development
 

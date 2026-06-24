@@ -21,6 +21,12 @@ else
   fail "${port:-macropad CDC2 data port check failed}"
 fi
 
+if port="$("$script_dir/console-port" 2>&1)"; then
+  ok "console port: $port"
+else
+  fail "${port:-macropad CircuitPython console port check failed}"
+fi
+
 device="$(readlink -f /dev/disk/by-label/CIRCUITPY 2>/dev/null || true)"
 mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true)"
 mounted_device="$(readlink -f "$mounted_source" 2>/dev/null || true)"
@@ -28,10 +34,12 @@ mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || tru
 
 if [ -z "$device" ]; then
   fail "CIRCUITPY storage device not found"
+elif [ -z "$mounted_source" ]; then
+  fail "$target is not mounted; run macropad-control/bin/mount"
 elif [ "$mounted_device" != "$device" ]; then
-  fail "$target is not mounted from $device"
+  fail "$target is mounted from ${mounted_device:-$mounted_source}, but CIRCUITPY is $device; run macropad-control/bin/mount"
 elif [[ "$mount_options" != *,rw,* ]]; then
-  fail "$target is mounted read-only"
+  fail "$target is mounted read-only; run macropad-control/bin/mount"
 else
   ok "$device mounted read/write at $target"
   storage_ready=1

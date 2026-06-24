@@ -102,7 +102,9 @@ ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one
 macropad is attached. The overlay runs the development player as root so it can
 access the host device; it is not intended for production. Sync before creating
 the player container because CircuitPython may reboot and renumber its USB
-interfaces during a firmware update.
+interfaces during a firmware update. Use `macropad-control/bin/console` for the
+CircuitPython REPL console; it intentionally selects a different USB CDC
+interface than `macropad-control/bin/data-port`.
 
 ## Architecture
 

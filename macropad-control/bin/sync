@@ -8,9 +8,23 @@ mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true
 mounted_device="$(readlink -f "$mounted_source" 2>/dev/null || true)"
 mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || true),"
 
-if [ -z "$device" ] || [ "$mounted_device" != "$device" ] ||
-  [[ "$mount_options" != *,rw,* ]]; then
-  echo "macropad storage is not mounted read/write; run bin/mount" >&2
+if [ -z "$device" ]; then
+  echo "CIRCUITPY storage device not found; is the macropad attached?" >&2
+  exit 1
+fi
+
+if [ -z "$mounted_source" ]; then
+  echo "$target is not mounted; run macropad-control/bin/mount" >&2
+  exit 1
+fi
+
+if [ "$mounted_device" != "$device" ]; then
+  echo "$target is mounted from ${mounted_device:-$mounted_source}, but CIRCUITPY is $device; run macropad-control/bin/mount" >&2
+  exit 1
+fi
+
+if [[ "$mount_options" != *,rw,* ]]; then
+  echo "$target is mounted read-only; run macropad-control/bin/mount" >&2
   exit 1
 fi
 

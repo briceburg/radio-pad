@@ -25,10 +25,17 @@ PLAYING_COLOR = 0x015C01
 PRESSED_COLOR = 0x999999
 MACROPAD_KEY_COUNT = 12
 DEGRADED_COLOR = 0x402000
+KEY_PIXEL_BRIGHTNESS = 0.08
+ENABLE_SKELETON_ANIMATION = True
+SKELETON_ANIMATION_TIMEOUT_MS = 10 * 60 * 1000
 SKELETON_PERIOD_MS = 1600
-SKELETON_TICK_MS = 50
+SKELETON_TICK_MS = 100
 SKELETON_ROW_PHASE_STEP = 0.12
 SKELETON_COLUMN_PHASE_STEP = 0.08
+SKELETON_LOADING_MAX = 0x40
+SKELETON_WAITING_MAX = 0x18
+SKELETON_DEGRADED_RED_MAX = 0x40
+SKELETON_DEGRADED_GREEN_MAX = 0x20
 VISUAL_MODE_LOADING = "loading"
 VISUAL_MODE_WAITING = "waiting"
 UNCHANGED = object()
@@ -39,7 +46,7 @@ class MacropadKeys:
         self.macropad = macropad
         self.display = display
         self.macropad.pixels.auto_write = False
-        self.macropad.pixels.brightness = 0.10
+        self.macropad.pixels.brightness = KEY_PIXEL_BRIGHTNESS
         self.stations = []
         self.playing_station_index = None
         self.current_page_index = 0
@@ -47,6 +54,8 @@ class MacropadKeys:
         self.title_override = None
         self.visual_mode = None
         self._last_animation_tick = 0
+        self._visual_mode_started_at = ticks_ms()
+        self._static_skeleton_applied = False
         self.pages = [{"stations": [], "title": "iCEBURG Radio"}]
 
     def set_stations(self, stations_list, refresh=True):
@@ -95,6 +104,8 @@ class MacropadKeys:
             if self.visual_mode != visual_mode:
                 self.visual_mode = visual_mode
                 self._last_animation_tick = 0
+                self._visual_mode_started_at = ticks_ms()
+                self._static_skeleton_applied = False
                 changed = True
 
         if title_override is not UNCHANGED:
@@ -189,10 +200,20 @@ class MacropadKeys:
 
     def _animate_skeleton(self, force=False):
         now = ticks_ms()
+        if (
+            not ENABLE_SKELETON_ANIMATION
+            or ticks_diff(now, self._visual_mode_started_at)
+            >= SKELETON_ANIMATION_TIMEOUT_MS
+        ):
+            if force or not self._static_skeleton_applied:
+                self._set_static_skeleton()
+            return
+
         if not force and ticks_diff(now, self._last_animation_tick) < SKELETON_TICK_MS:
             return
 
         self._last_animation_tick = now
+        self._static_skeleton_applied = False
         animation_position = (now % SKELETON_PERIOD_MS) / SKELETON_PERIOD_MS
         for key_index in range(MACROPAD_KEY_COUNT):
             phase = (
@@ -205,6 +226,17 @@ class MacropadKeys:
             )
         self.macropad.pixels.show()
 
+    def _set_static_skeleton(self):
+        for key_index in range(MACROPAD_KEY_COUNT):
+            phase = (
+                (key_index // 3) * SKELETON_ROW_PHASE_STEP
+                + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
+            ) % 1.0
+            level = 0.35 + (self._triangle_wave(phase) * 0.35)
+            self.macropad.pixels[key_index] = self._skeleton_color(level)
+        self.macropad.pixels.show()
+        self._static_skeleton_applied = True
+
     def _triangle_wave(self, phase):
         if phase < 0.5:
             return phase * 2
@@ -212,9 +244,13 @@ class MacropadKeys:
 
     def _skeleton_color(self, level):
         if self.degraded:
-            red = int(0x50 * level)
-            green = int(0x28 * level)
+            red = int(SKELETON_DEGRADED_RED_MAX * level)
+            green = int(SKELETON_DEGRADED_GREEN_MAX * level)
             return (red << 16) | (green << 8)
-        maximum = 0x50 if self.visual_mode == VISUAL_MODE_LOADING else 0x24
+        maximum = (
+            SKELETON_LOADING_MAX
+            if self.visual_mode == VISUAL_MODE_LOADING
+            else SKELETON_WAITING_MAX
+        )
         grey = int(maximum * level)
         return (grey << 16) | (grey << 8) | grey
