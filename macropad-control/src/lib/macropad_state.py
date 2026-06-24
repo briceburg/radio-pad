@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from lib.macropad_keys import DEFAULT_COLOR, VISUAL_MODE_LOADING, VISUAL_MODE_WAITING
+from lib.macropad_keys import VISUAL_MODE_LOADING, VISUAL_MODE_WAITING
 
 PLAYER_STATUS_LEVELS = ("ok", "loading", "warning", "error")
 PLAYER_STATUS_SCOPES = ("upstream", "playback")
@@ -49,14 +49,10 @@ class MacropadState:
 
     @property
     def has_status(self):
-        for status in self.status_by_scope.values():
-            if status:
-                return True
-        return False
+        return any(self.status_by_scope.values())
 
     def clear_statuses(self):
-        for scope in self.status_by_scope:
-            self.status_by_scope[scope] = None
+        self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}
 
     def handle_event(self, event, keys):
         if not isinstance(event, dict):
@@ -82,9 +78,7 @@ class MacropadState:
             return
 
         station_list = [
-            {"name": station, "color": DEFAULT_COLOR}
-            for station in data
-            if isinstance(station, str)
+            {"name": station} for station in data if isinstance(station, str)
         ]
         self.has_stations = bool(station_list)
         keys.set_stations(station_list, refresh=False)
@@ -111,12 +105,9 @@ class MacropadState:
 
         self.status_by_scope[scope] = summary if isinstance(summary, str) else None
 
-    def status_summary(self, scope):
-        return self.status_by_scope.get(scope)
-
     def apply(self, keys, force=False):
-        upstream_summary = self.status_summary("upstream")
-        playback_summary = self.status_summary("playback")
+        upstream_summary = self.status_by_scope["upstream"]
+        playback_summary = self.status_by_scope["playback"]
 
         if not self.player_available:
             keys.set_visual_state(

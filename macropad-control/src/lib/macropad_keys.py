@@ -215,27 +215,27 @@ class MacropadKeys:
         self._last_animation_tick = now
         self._static_skeleton_applied = False
         animation_position = (now % SKELETON_PERIOD_MS) / SKELETON_PERIOD_MS
-        for key_index in range(MACROPAD_KEY_COUNT):
-            phase = (
-                animation_position
-                + (key_index // 3) * SKELETON_ROW_PHASE_STEP
-                + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
-            ) % 1.0
-            self.macropad.pixels[key_index] = self._skeleton_color(
-                self._triangle_wave(phase)
-            )
+        self._set_skeleton(animation_position, animated=True)
         self.macropad.pixels.show()
 
     def _set_static_skeleton(self):
-        for key_index in range(MACROPAD_KEY_COUNT):
-            phase = (
-                (key_index // 3) * SKELETON_ROW_PHASE_STEP
-                + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
-            ) % 1.0
-            level = 0.35 + (self._triangle_wave(phase) * 0.35)
-            self.macropad.pixels[key_index] = self._skeleton_color(level)
+        self._set_skeleton()
         self.macropad.pixels.show()
         self._static_skeleton_applied = True
+
+    def _set_skeleton(self, offset=0, animated=False):
+        for key_index in range(MACROPAD_KEY_COUNT):
+            level = self._triangle_wave(self._skeleton_phase(key_index, offset))
+            if not animated:
+                level = 0.35 + (level * 0.35)
+            self.macropad.pixels[key_index] = self._skeleton_color(level)
+
+    def _skeleton_phase(self, key_index, offset=0):
+        return (
+            offset
+            + (key_index // 3) * SKELETON_ROW_PHASE_STEP
+            + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
+        ) % 1.0
 
     def _triangle_wave(self, phase):
         if phase < 0.5:

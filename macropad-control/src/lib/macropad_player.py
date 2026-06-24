@@ -119,5 +119,6 @@ class MacropadPlayer:
 
     def reset_session(self):
         self._serial_buffer = ""
+        self._last_station_request_time = 0
         self._last_player_message_time = 0
         self._connected_since = 0
