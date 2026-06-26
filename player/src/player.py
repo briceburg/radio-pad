@@ -66,17 +66,17 @@ async def _load_config_with_retry(player, macropad_client, settings, shutdown_ev
         try:
             player_config = await config.make(**settings)
             player.update_config(player_config)
-            await macropad_client.publish_status("upstream", "ok", None)
+            await macropad_client.publish_status("stations", "ok", None)
             return player_config
         except ConfigError as e:
             logger.error("Configuration error: %s", e)
             await macropad_client.publish_status(
-                "upstream", "warning", e.status_summary
+                "stations", "warning", e.status_summary
             )
         except Exception as e:
             logger.error("Unexpected configuration error: %s", e, exc_info=True)
             await macropad_client.publish_status(
-                "upstream", "warning", "Registry unavailable"
+                "stations", "warning", "Registry unavailable"
             )
         logger.info("retrying player configuration in %ss...", CONFIG_RETRY_SECONDS)
         try:
@@ -109,7 +109,7 @@ async def main(player, macropad_client, settings, health_path):
     shutdown_event = asyncio.Event()
     sigterm_handler_installed = _install_sigterm_handler(shutdown_event)
     try:
-        await macropad_client.publish_status("upstream", "loading", None)
+        await macropad_client.publish_status("stations", "loading", None)
         player_config = await _load_config_with_retry(
             player, macropad_client, settings, shutdown_event
         )
@@ -121,7 +121,10 @@ async def main(player, macropad_client, settings, health_path):
                 player,
                 on_connect=lambda: mark_healthy(health_path),
                 on_disconnect=lambda: clear_health(health_path),
-                status_reporter=partial(macropad_client.publish_status, "upstream"),
+                status_reporter=partial(
+                    macropad_client.publish_status,
+                    "switchboard",
+                ),
             )
             player.register_client(switchboard_client)
             tasks.append(
@@ -192,7 +195,10 @@ if __name__ == "__main__":
         )
         macropad_client = MacropadClient(player)
 
-        player.status_reporter = partial(macropad_client.publish_status, "playback")
+        player.status_reporter = partial(
+            macropad_client.publish_status,
+            "playback",
+        )
         player.register_client(macropad_client)
 
         # Run the main event loop

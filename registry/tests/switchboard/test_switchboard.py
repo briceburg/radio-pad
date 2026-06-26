@@ -8,13 +8,21 @@ Those flows are covered by the compose-based integration tests instead.
 """
 
 from collections.abc import Generator
+from typing import cast
 
 import pytest
+from fastapi import WebSocket
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from registry import create_app
-from switchboard.switchboard import _state_key
+from switchboard.switchboard import (
+    ACTIVE_PLAYER_CONNECTIONS,
+    _cleared_state_key,
+    _register_player_connection,
+    _state_key,
+    _unregister_player_connection,
+)
 
 PLAYER_UA = "RadioPad/1.0 (test)"
 PLAYER_STATIONS_URL = "http://example.com/stations.json"
@@ -79,5 +87,32 @@ def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
         assert resp["event"] == "pong"
 
 
-def test_station_request_is_not_retained_state() -> None:
-    assert _state_key("station_request", "KEXP") is None
+def test_playback_start_is_not_retained_state() -> None:
+    assert _state_key("playback_start", {"station_name": "KEXP"}) is None
+
+
+def test_player_status_warning_is_retained_by_scope() -> None:
+    assert (
+        _state_key(
+            "player_status",
+            {"scope": "switchboard", "level": "warning", "summary": "down"},
+        )
+        == "player_status:switchboard"
+    )
+
+
+def test_player_status_ok_clears_scope() -> None:
+    data = {"scope": "switchboard", "level": "ok", "summary": None}
+    assert _state_key("player_status", data) is None
+    assert _cleared_state_key("player_status", data) == "player_status:switchboard"
+
+
+def test_player_connection_tracking_identifies_last_disconnect() -> None:
+    ACTIVE_PLAYER_CONNECTIONS.clear()
+    ws1 = cast(WebSocket, object())
+    ws2 = cast(WebSocket, object())
+
+    assert _register_player_connection("acct/player", ws1)
+    assert not _register_player_connection("acct/player", ws2)
+    assert not _unregister_player_connection("acct/player", ws1)
+    assert _unregister_player_connection("acct/player", ws2)

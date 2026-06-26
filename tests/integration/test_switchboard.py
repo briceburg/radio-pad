@@ -36,8 +36,8 @@ async def test_controller_rejected_without_token(switchboard_url):
 
 
 @pytest.mark.asyncio
-async def test_player_station_playing_broadcast(switchboard_url):
-    """Player publishes station_playing, a second player connection receives it.
+async def test_player_playback_state_broadcast(switchboard_url):
+    """Player publishes playback_state, a second player connection receives it.
 
     Uses two player connections to the same room to verify the broadcast
     path works end-to-end through the broadcaster, without needing an
@@ -46,27 +46,27 @@ async def test_player_station_playing_broadcast(switchboard_url):
     room = f"{switchboard_url}/test-acct/broadcast-test"
 
     async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player1:
-        # Drain the initial stations_url broadcast from player1 connecting
+        # Drain the initial state broadcasts from player1 connecting.
         try:
             await asyncio.wait_for(player1.recv(), timeout=1)
         except asyncio.TimeoutError:
             pass
 
         async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player2:
-            # Drain any initial messages on player2 (stations_url from player2 join)
+            # Drain any initial messages on player2.
             try:
                 while True:
                     await asyncio.wait_for(player2.recv(), timeout=1)
             except asyncio.TimeoutError:
                 pass
 
-            # player1 sends station_playing
+            # player1 sends playback_state
             await player1.send(json.dumps({
-                "event": "station_playing",
-                "data": {"name": "Test FM", "url": "http://example.com/stream"},
+                "event": "playback_state",
+                "data": {"station_name": "Test FM"},
             }))
 
             # player2 should receive the broadcast
             msg = json.loads(await asyncio.wait_for(player2.recv(), timeout=5))
-            assert msg["event"] == "station_playing"
-            assert msg["data"]["name"] == "Test FM"
+            assert msg["event"] == "playback_state"
+            assert msg["data"]["station_name"] == "Test FM"

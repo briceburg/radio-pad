@@ -32,7 +32,7 @@ logger = logging.getLogger("MACROPAD")
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
 HEARTBEAT_INTERVAL_SECONDS = 2
 PLAYER_STATUS_LEVELS = {"ok", "loading", "warning", "error"}
-PLAYER_STATUS_SCOPES = {"upstream", "playback"}
+PLAYER_STATUS_SCOPES = {"stations", "switchboard", "playback"}
 
 
 def _candidate_ports():
@@ -55,8 +55,10 @@ class MacropadClient(RadioPadClient):
         self._status_by_scope = {}
         self._closed = False
 
-        # Override station_list handler
-        self.register_event("station_list", self._handle_station_list)
+        # Override station catalog handler for the local serial controller.
+        self.register_event(
+            "station_catalog_request", self._handle_station_catalog_request
+        )
 
     async def run(self):
         self._closed = False
@@ -198,11 +200,16 @@ class MacropadClient(RadioPadClient):
             return
 
         summary = summary if isinstance(summary, str) else None
+        data = {
+            "scope": scope,
+            "level": level,
+            "summary": summary,
+        }
         if level == "ok":
             self._status_by_scope.pop(scope, None)
         else:
-            self._status_by_scope[scope] = {"level": level, "summary": summary}
-        await self._send_status(scope, level, summary)
+            self._status_by_scope[scope] = data
+        await self.broadcast("player_status", data=data)
 
     async def resend_status(self, scope=None):
         if not self.writer:
@@ -233,11 +240,16 @@ class MacropadClient(RadioPadClient):
             )
         )
 
-    async def _handle_station_list(self, event):
-        station_list = [station.name for station in self.player.config.stations]
-        await self.broadcast("station_list", data=station_list, limit_to_self=True)
+    async def _handle_station_catalog_request(self, event):
+        station_names = [station.name for station in self.player.config.stations]
+
+        await self.broadcast(
+            "station_catalog",
+            data={"stations": [{"name": name} for name in station_names]},
+            limit_to_self=True,
+        )
         await asyncio.sleep(0.1)  # Handle backpressure
-        await self.broadcast("station_playing")
+        await self.broadcast("playback_state", limit_to_self=True)
         await asyncio.sleep(0.1)
         await self.resend_status()
 

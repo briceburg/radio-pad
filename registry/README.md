@@ -145,7 +145,7 @@ The switchboard partitions connections by request path and expects clients to co
 
 Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
-All clients connected to the same `/{account_id}/{player_id}` channel receive each other's events directly via the in-process broadcast.
+The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `station_catalog_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
 ### Write authentication and authz seeding
 

@@ -101,7 +101,10 @@ async def make(
     # Create config object
     return RadioPadPlayerConfig(
         id=player,
-        stations=[RadioPadStation(**s) for s in station_data["stations"]],
+        stations=[
+            RadioPadStation(name=s["name"], url=s["url"])
+            for s in station_data["stations"]
+        ],
         stations_url=stations_url,
         registry_url=registry_url,
         switchboard_url=switchboard_url,

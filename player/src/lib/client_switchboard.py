@@ -78,7 +78,7 @@ class SwitchboardClient(RadioPadClient):
                 if self.on_connect:
                     self.on_connect()
                 await self._report_status("ok", None)
-                await self.broadcast("station_playing")
+                await self.broadcast("playback_state")
                 async for msg in ws:
                     await self.handle_message(msg)
             except asyncio.CancelledError:

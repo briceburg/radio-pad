@@ -58,15 +58,17 @@ while True:
         state.apply(keys, force=True)
 
     if state.needs_stations:
-        player.request_stations()
+        player.request_station_catalog()
         state.apply(keys)
 
     # --- Encoder Rotation ---
     position = macropad.encoder
     if position != last_position:
         if keys.playing_station_index is not None:
-            direction = "up" if position > last_position else "down"
-            player.send_command("volume", direction)
+            if position > last_position:
+                player.volume_up()
+            else:
+                player.volume_down()
         else:
             num_pages = len(keys.pages)
             if position > last_position:
@@ -80,7 +82,7 @@ while True:
     pressed = macropad.encoder_switch_debounced.pressed
     if pressed and not last_encoder_switch:
         if keys.playing_station_index is not None:
-            player.send_command("station_request", None)
+            player.stop_playback()
             keys.flash_keys()
     last_encoder_switch = pressed
 
@@ -101,7 +103,7 @@ while True:
             last_pressed_station = station_name
 
     if last_pressed_station:
-        player.send_command("station_request", last_pressed_station)
+        player.start_playback(last_pressed_station)
 
     keys.tick()
     time.sleep(0.01)

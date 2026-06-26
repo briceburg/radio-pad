@@ -19,7 +19,7 @@
 from lib.macropad_keys import VISUAL_MODE_LOADING, VISUAL_MODE_WAITING
 
 PLAYER_STATUS_LEVELS = ("ok", "loading", "warning", "error")
-PLAYER_STATUS_SCOPES = ("upstream", "playback")
+PLAYER_STATUS_SCOPES = ("stations", "switchboard", "playback")
 DEGRADED_STATUS_LEVELS = ("warning", "error")
 
 
@@ -61,27 +61,40 @@ class MacropadState:
         event_name = event.get("event")
         data = event.get("data")
 
-        if event_name == "station_list":
-            self.set_station_list(data, keys)
-        elif event_name == "station_playing":
-            keys.set_playing_station(data)
+        if event_name == "station_catalog":
+            self.set_station_catalog(data, keys)
+        elif event_name == "playback_state":
+            self.set_playback_state(data, keys)
         elif event_name == "player_status":
             self.update_status(data)
             self.apply(keys)
         elif event_name != "player_heartbeat":
             print(f"Unknown event: {event}")
 
-    def set_station_list(self, data, keys):
-        if not isinstance(data, list):
-            print(f"Unexpected station_list payload: {data}")
+    def set_station_catalog(self, data, keys):
+        if not isinstance(data, dict):
+            print(f"Unexpected station_catalog payload: {data}")
             return
 
-        station_list = [
-            {"name": station} for station in data if isinstance(station, str)
-        ]
-        self.has_stations = bool(station_list)
-        keys.set_stations(station_list, refresh=False)
+        stations = data.get("stations")
+        if not isinstance(stations, list):
+            print(f"Unexpected station_catalog stations: {stations}")
+            return
+
+        station_items = []
+        for station in stations:
+            if isinstance(station, dict) and isinstance(station.get("name"), str):
+                station_items.append({"name": station["name"]})
+
+        self.has_stations = bool(station_items)
+        keys.set_stations(station_items, refresh=False)
         self.apply(keys, force=True)
+
+    def set_playback_state(self, data, keys):
+        if not isinstance(data, dict):
+            print(f"Unexpected playback_state payload: {data}")
+            return
+        keys.set_playing_station(data.get("station_name"))
 
     def update_status(self, data):
         if not isinstance(data, dict):
@@ -114,18 +127,25 @@ class MacropadState:
         if not self.player_available:
             return False, VISUAL_MODE_WAITING, "Waiting for Player"
 
-        upstream_level, upstream_summary = self._status("upstream")
+        stations_level, stations_summary = self._status("stations")
+        switchboard_level, switchboard_summary = self._status("switchboard")
         _, playback_summary = self._status("playback")
-        upstream_degraded = upstream_level in DEGRADED_STATUS_LEVELS
+        degraded = (
+            stations_level in DEGRADED_STATUS_LEVELS
+            or switchboard_level in DEGRADED_STATUS_LEVELS
+        )
 
         if not self.has_stations:
             return (
-                upstream_degraded,
+                degraded,
                 VISUAL_MODE_LOADING,
-                playback_summary or upstream_summary or "Loading stations",
+                playback_summary
+                or stations_summary
+                or switchboard_summary
+                or "Loading stations",
             )
 
-        return upstream_degraded, None, playback_summary
+        return degraded, None, playback_summary
 
     def apply(self, keys, force=False):
         degraded, visual_mode, title_override = self.view()

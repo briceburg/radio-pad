@@ -24,11 +24,48 @@ export function createControlActions({ control, listen }) {
     tabName === "listen" ? listenStore : controlStore;
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
 
-  // Track out-of-order fetch responses by storing current URL
-  const currentRequests = { control: null, listen: null };
+  const requestControllers = { control: null, listen: null };
+
+  function abortStationLoad(tabName) {
+    const controller = requestControllers[tabName];
+    if (controller) {
+      controller.abort();
+      requestControllers[tabName] = null;
+    }
+  }
+
+  function updatePlayerStatus(status) {
+    const { scope, level, summary } = status.detail || {};
+    if (!scope) return;
+
+    const controlState = controlStore.get();
+    const nextStatuses = { ...controlState.playerStatuses };
+    if (level === "ok") {
+      delete nextStatuses[scope];
+    } else {
+      nextStatuses[scope] = {
+        level,
+        summary: typeof summary === "string" ? summary : null,
+      };
+    }
+
+    const playbackSummary = nextStatuses.playback?.summary;
+    const statusText =
+      playbackSummary ||
+      (controlState.playerConnected === false
+        ? "Player offline."
+        : controlState.connectionState === "connected"
+          ? `Connected to ${controlState.player.name}`
+          : controlState.statusText);
+    updateTab("control", {
+      playerStatuses: nextStatuses,
+      statusText,
+    });
+  }
 
   async function loadStations(url, tabName = "control") {
     if (!url) {
+      abortStationLoad(tabName);
       updateTab(tabName, {
         stationsData: null,
         currentStation: null,
@@ -37,51 +74,78 @@ export function createControlActions({ control, listen }) {
       return null;
     }
 
+    abortStationLoad(tabName);
+    const controller = new AbortController();
+    requestControllers[tabName] = controller;
     updateTab(tabName, { loading: true });
-    currentRequests[tabName] = url;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
 
       const stationsData = await response.json();
 
-      // Prevent stale updates if another fetch started
-      if (currentRequests[tabName] !== url) return null;
+      if (requestControllers[tabName] !== controller) return null;
 
       if (tabName === "listen") listen.setStations(stationsData);
 
       updateTab(tabName, { stationsData, loading: false });
+      requestControllers[tabName] = null;
       return stationsData;
     } catch (error) {
-      if (currentRequests[tabName] !== url) return null;
+      if (
+        error?.name === "AbortError" ||
+        requestControllers[tabName] !== controller
+      ) {
+        return null;
+      }
 
+      requestControllers[tabName] = null;
       updateTab(tabName, { loading: false });
-      toastWarning("⚠️ Failed loading stations.", error);
+      toastWarning("Failed loading stations.", error);
       return null;
     }
   }
 
   control.addEventListener("connect", () =>
     updateTab("control", {
-      statusText: `✅ Connected to ${controlStore.get().player.name}`,
+      statusText: `Connected to ${controlStore.get().player.name}`,
+      connectionState: "connected",
     }),
   );
   control.addEventListener("connecting", () =>
-    updateTab("control", { statusText: "🔄 Connecting..." }),
+    updateTab("control", {
+      statusText: "Connecting to switchboard...",
+      connectionState: "connecting",
+      playerConnected: null,
+    }),
   );
   control.addEventListener("disconnect", () =>
-    updateTab("control", { statusText: "🔌 Disconnected. Reconnecting..." }),
+    updateTab("control", {
+      statusText: controlStore.get().player?.id
+        ? "Switchboard unavailable. Reconnecting..."
+        : "Disconnected.",
+      connectionState: "disconnected",
+      playerConnected: null,
+    }),
   );
-  control.addEventListener("error", (event) =>
-    toastWarning(`⚠️ ${event.detail}`),
-  );
-  control.addEventListener("stationplaying", (event) =>
+  control.addEventListener("error", (event) => toastWarning(event.detail));
+  control.addEventListener("playbackstate", (event) =>
     updateTab("control", { currentStation: event.detail }),
   );
-  control.addEventListener("stationsurl", (event) =>
+  control.addEventListener("stationcatalogurl", (event) =>
     loadStations(event.detail, "control"),
   );
+  control.addEventListener("playerpresence", (event) => {
+    const connected = event.detail?.connected === true;
+    updateTab("control", {
+      playerConnected: connected,
+      statusText: connected
+        ? `Connected to ${controlStore.get().player.name}`
+        : "Player offline.",
+    });
+  });
+  control.addEventListener("playerstatus", updatePlayerStatus);
 
   let lastAuthToken = authStore.get()?.registryBearerToken;
   authStore.subscribe((authState) => {
@@ -107,14 +171,19 @@ export function createControlActions({ control, listen }) {
         stationsData: null,
         currentStation: null,
         statusText: "",
+        connectionState: player ? "connecting" : "idle",
+        playerConnected: null,
+        playerStatuses: {},
         loading: player ? true : false,
       });
       if (!player) {
+        abortStationLoad("control");
         control.disconnect();
         return;
       }
       const token = authStore.get()?.registryBearerToken || null;
       await control.connect(player.switchboard_url, token);
+      await loadStations(player.stations_url, "control");
     },
 
     async selectPreset(presetId) {
@@ -128,7 +197,7 @@ export function createControlActions({ control, listen }) {
           return toastWarning("⚠️ Failed starting station playback.");
         return updateTab("listen", { currentStation: station });
       }
-      control.sendStationRequest(station);
+      control.startPlayback(station);
     },
 
     async stopStation(tabName) {
@@ -136,7 +205,7 @@ export function createControlActions({ control, listen }) {
         await listen.stop();
         return updateTab("listen", { currentStation: null });
       }
-      control.sendStationRequest(null);
+      control.stopPlayback();
     },
   };
 }

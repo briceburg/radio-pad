@@ -10,20 +10,73 @@ from switchboard.broadcast import Broadcast
 router = APIRouter()
 logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
-RETAINED_EVENTS = {"stations_url", "station_playing"}
+RETAINED_EVENTS = {"station_catalog_url", "player_presence", "playback_state"}
+PLAYER_STATUS_SCOPES = {"stations", "switchboard", "playback"}
+PLAYER_COMMAND_EVENTS = {
+    "playback_start",
+    "playback_stop",
+    "volume_up",
+    "volume_down",
+}
+PLAYER_STATE_EVENTS = {
+    "playback_state",
+    "player_status",
+}
+ACTIVE_PLAYER_CONNECTIONS: dict[str, set[int]] = {}
+
+
+def _register_player_connection(player_key: str, websocket: WebSocket) -> bool:
+    connections = ACTIVE_PLAYER_CONNECTIONS.setdefault(player_key, set())
+    was_empty = not connections
+    connections.add(id(websocket))
+    return was_empty
+
+
+def _unregister_player_connection(player_key: str, websocket: WebSocket) -> bool:
+    connections = ACTIVE_PLAYER_CONNECTIONS.get(player_key)
+    if not connections:
+        return True
+
+    connections.discard(id(websocket))
+    if connections:
+        return False
+
+    ACTIVE_PLAYER_CONNECTIONS.pop(player_key, None)
+    return True
 
 
 def _state_key(event: str, data: object) -> str | None:
-    if event not in RETAINED_EVENTS:
-        return None
-    return event
+    if event in RETAINED_EVENTS:
+        return event
+
+    if event == "player_status" and isinstance(data, dict):
+        scope = data.get("scope")
+        level = data.get("level")
+        if scope in PLAYER_STATUS_SCOPES and level != "ok":
+            return f"player_status:{scope}"
+
+    return None
+
+
+def _cleared_state_key(event: str, data: object) -> str | None:
+    if event == "player_status" and isinstance(data, dict):
+        scope = data.get("scope")
+        level = data.get("level")
+        if scope in PLAYER_STATUS_SCOPES and level == "ok":
+            return f"player_status:{scope}"
+
+    return None
 
 
 async def publish_event(broadcast: Broadcast, channel: str, event: str, data: object) -> None:
     message = json.dumps({"event": event, "data": data})
-    state_key = _state_key(event, data)
-    if state_key:
-        broadcast.set_state(channel, state_key, message)
+    key_to_clear = _cleared_state_key(event, data)
+    if key_to_clear:
+        broadcast.clear_state_key(channel, key_to_clear)
+
+    key_to_retain = _state_key(event, data)
+    if key_to_retain:
+        broadcast.set_state(channel, key_to_retain, message)
     await broadcast.publish(channel, message)
 
 
@@ -48,10 +101,10 @@ async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str,
                     continue
 
                 match event:
-                    case "station_playing" if is_player:
-                        await publish_event(broadcast, player_key, "station_playing", data)
-                    case "station_request" if not is_player:
-                        await publish_event(broadcast, player_key, "station_request", data)
+                    case player_event if is_player and player_event in PLAYER_STATE_EVENTS:
+                        await publish_event(broadcast, player_key, player_event, data)
+                    case command_event if not is_player and command_event in PLAYER_COMMAND_EVENTS:
+                        await publish_event(broadcast, player_key, command_event, data)
                     case "ping":
                         await websocket.send_json({"event": "pong"})
             except json.JSONDecodeError:
@@ -106,12 +159,37 @@ async def websocket_endpoint(
         await websocket.close()
         return
 
+    registered_player = False
     if is_player:
-        await publish_event(broadcast, player_key, "stations_url", stations_url)
+        registered_player = True
+        _register_player_connection(player_key, websocket)
+        await publish_event(
+            broadcast,
+            player_key,
+            "player_presence",
+            {"connected": True},
+        )
+        await publish_event(
+            broadcast,
+            player_key,
+            "station_catalog_url",
+            {"url": stations_url},
+        )
 
     try:
         await _run_loop(websocket, broadcast, player_key, is_player=is_player)
     finally:
-        if is_player:
+        if registered_player and _unregister_player_connection(player_key, websocket):
             broadcast.clear_state(player_key)
-            await publish_event(broadcast, player_key, "station_playing", None)
+            await publish_event(
+                broadcast,
+                player_key,
+                "player_presence",
+                {"connected": False},
+            )
+            await publish_event(
+                broadcast,
+                player_key,
+                "playback_state",
+                {"station_name": None},
+            )

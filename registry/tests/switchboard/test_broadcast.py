@@ -76,26 +76,26 @@ async def test_subscriber_iteration(broadcast: Broadcast) -> None:
 
 
 async def test_set_state_replayed_on_subscribe(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "stations_url", '{"event": "stations_url", "data": "http://x"}')
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "KEXP"}')
+    broadcast.set_state("ch", "station_catalog_url", '{"event": "station_catalog_url", "data": {"url": "http://x"}}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "KEXP"}}')
 
     async with broadcast.subscribe("ch", replay=True) as sub:
         e1 = await asyncio.wait_for(sub.__anext__(), timeout=1)
         e2 = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert e1.message == '{"event": "stations_url", "data": "http://x"}'
-    assert e2.message == '{"event": "station_playing", "data": "KEXP"}'
+    assert e1.message == '{"event": "station_catalog_url", "data": {"url": "http://x"}}'
+    assert e2.message == '{"event": "playback_state", "data": {"station_name": "KEXP"}}'
 
 
 async def test_no_replay_without_flag(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "KEXP"}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "KEXP"}}')
 
     async with broadcast.subscribe("ch") as sub:
         assert sub._queue.empty()
 
 
 async def test_clear_state_removes_retained(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "KEXP"}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "KEXP"}}')
     broadcast.clear_state("ch")
 
     async with broadcast.subscribe("ch", replay=True) as sub:
@@ -103,16 +103,27 @@ async def test_clear_state_removes_retained(broadcast: Broadcast) -> None:
 
 
 async def test_disconnect_clears_state(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "KEXP"}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "KEXP"}}')
     await broadcast.disconnect()
     assert broadcast._channel_state == {}
 
 
 async def test_set_state_replaces_existing_key(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "KEXP"}')
-    broadcast.set_state("ch", "station_playing", '{"event": "station_playing", "data": "WWOZ"}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "KEXP"}}')
+    broadcast.set_state("ch", "playback_state", '{"event": "playback_state", "data": {"station_name": "WWOZ"}}')
 
     async with broadcast.subscribe("ch", replay=True) as sub:
         event = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert event.message == '{"event": "station_playing", "data": "WWOZ"}'
+    assert event.message == '{"event": "playback_state", "data": {"station_name": "WWOZ"}}'
+
+
+async def test_clear_state_key_removes_one_retained_item(broadcast: Broadcast) -> None:
+    broadcast.set_state("ch", "player_status:switchboard", "switchboard")
+    broadcast.set_state("ch", "playback_state", "playing")
+    broadcast.clear_state_key("ch", "player_status:switchboard")
+
+    async with broadcast.subscribe("ch", replay=True) as sub:
+        event = await asyncio.wait_for(sub.__anext__(), timeout=1)
+
+    assert event.message == "playing"

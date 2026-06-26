@@ -9,8 +9,8 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 ## How It Works
 
 - The Macropad communicates with the host [player](../player/) over USB serial (CircuitPython CDC2).
-- The player sends station lists, heartbeat, and status events; the Macropad renders them on the OLED and NeoPixel keys.
-- Pressing a key sends a station request to the player.
+- The player sends station catalogs, heartbeat, playback state, and status events; the Macropad renders them on the OLED and NeoPixel keys.
+- Pressing a key sends a playback start command to the player.
 
 ### Visual States
 
@@ -18,9 +18,9 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 |-------|----------------|---------------|
 | Waiting for player | `Waiting for Player` | Dim grey skeleton animation |
 | Loading stations | `Loading stations` or a short status | Grey station-slot skeleton animation |
-| Healthy | Station/page name | Station colors, with green for the playing station |
-| Upstream degraded | Station/page name when stations are loaded | Amber warning treatment |
-| Playback issue | Short playback status | Existing station colors |
+| Healthy | Station/page name | Blue station keys, with green for the playing station |
+| Station or switchboard degraded | Station/page name when stations are loaded | Amber warning treatment |
+| Playback issue | Short playback status | Existing station key state |
 
 Skeleton animations run at low brightness and settle into a static skeleton
 after a long unavailable/loading period. Set `ENABLE_SKELETON_ANIMATION = False`
@@ -50,7 +50,7 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/mount
    ```
 
-2. **Customize button colors and behavior:**
+2. **Customize button behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
    - Stations are received from the connected [player](../player/), which loads them from a registry [station preset](../player/README.md#registry-discovery).
 3. **Sync and verify your changes on the Macropad:**

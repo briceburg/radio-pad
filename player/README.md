@@ -72,7 +72,7 @@ To bypass registry discovery entirely, set `RADIOPAD_STATIONS_URL` to any URL th
   "name": "Casa Briceburg",
   "stations": [
     {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
-    {"name": "KEXP", "url": "https://kexp.org/stream", "color": 0x770077}
+    {"name": "KEXP", "url": "https://kexp.org/stream"}
   ]
 }
 ```
