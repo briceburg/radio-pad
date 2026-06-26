@@ -197,11 +197,12 @@ class MacropadClient(RadioPadClient):
             logger.warning("ignoring invalid macropad status level: %r", level)
             return
 
-        self._status_by_scope[scope] = {
-            "level": level,
-            "summary": summary if isinstance(summary, str) else None,
-        }
-        await self.resend_status(scope)
+        summary = summary if isinstance(summary, str) else None
+        if level == "ok":
+            self._status_by_scope.pop(scope, None)
+        else:
+            self._status_by_scope[scope] = {"level": level, "summary": summary}
+        await self._send_status(scope, level, summary)
 
     async def resend_status(self, scope=None):
         if not self.writer:
@@ -212,18 +213,25 @@ class MacropadClient(RadioPadClient):
             status = self._status_by_scope.get(status_scope)
             if not status:
                 continue
-            await self._send(
-                json.dumps(
-                    {
-                        "event": "player_status",
-                        "data": {
-                            "scope": status_scope,
-                            "level": status["level"],
-                            "summary": status["summary"],
-                        },
-                    }
-                )
+            await self._send_status(
+                status_scope,
+                status["level"],
+                status["summary"],
             )
+
+    async def _send_status(self, scope, level, summary):
+        await self._send(
+            json.dumps(
+                {
+                    "event": "player_status",
+                    "data": {
+                        "scope": scope,
+                        "level": level,
+                        "summary": summary,
+                    },
+                }
+            )
+        )
 
     async def _handle_station_list(self, event):
         station_list = [station.name for station in self.player.config.stations]

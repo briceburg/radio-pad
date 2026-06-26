@@ -67,7 +67,28 @@ class FailingWriter(FakeWriter):
         raise ConnectionError("Connection lost")
 
 
-def write_events(writer):
+def client_with_writer(register=False):
+    player = FakePlayer()
+    client = MacropadClient(player)
+    writer = FakeWriter()
+    client.writer = writer
+    if register:
+        player.register_client(client)
+    return player, client, writer
+
+
+def event(name, data=None):
+    return {"event": name, "data": data}
+
+
+def player_status(scope, level, summary=None):
+    return event(
+        "player_status",
+        {"scope": scope, "level": level, "summary": summary},
+    )
+
+
+def written_events(writer):
     return [json.loads(data.decode()) for data in writer.writes]
 
 
@@ -94,80 +115,64 @@ def test_candidate_ports_filters_and_sorts_cdc2_ports():
 
 
 def test_listen_handles_serial_station_request():
-    player = FakePlayer()
-    client = MacropadClient(player)
-    writer = FakeWriter()
-    player.register_client(client)
-    client.writer = writer
+    player, client, writer = client_with_writer(register=True)
     client.reader = FakeReader([b'{"event":"station_request","data":"KEXP"}\n', b""])
 
     asyncio.run(client._listen())
 
     assert player.played == [player.kexp]
-    assert write_events(writer) == [{"event": "station_playing", "data": "KEXP"}]
+    assert written_events(writer) == [event("station_playing", "KEXP")]
     assert writer.drains == 1
 
 
 def test_station_list_request_writes_stations_and_current_station():
-    player = FakePlayer()
-    client = MacropadClient(player)
-    writer = FakeWriter()
-    player.register_client(client)
-    client.writer = writer
+    player, client, writer = client_with_writer(register=True)
     player.station = player.kgut
 
     asyncio.run(client.handle_message('{"event":"station_list"}'))
 
-    assert write_events(writer) == [
-        {"event": "station_list", "data": ["KEXP", "KGUT"]},
-        {"event": "station_playing", "data": "KGUT"},
+    assert written_events(writer) == [
+        event("station_list", ["KEXP", "KGUT"]),
+        event("station_playing", "KGUT"),
     ]
     assert writer.drains == 2
 
 
 def test_publish_status_writes_scoped_status_payload():
-    player = FakePlayer()
-    client = MacropadClient(player)
-    writer = FakeWriter()
-    client.writer = writer
+    _, client, writer = client_with_writer()
 
     asyncio.run(client.publish_status("upstream", "warning", "Switchboard down"))
 
-    assert write_events(writer) == [
-        {
-            "event": "player_status",
-            "data": {
-                "scope": "upstream",
-                "level": "warning",
-                "summary": "Switchboard down",
-            },
-        }
+    assert written_events(writer) == [
+        player_status("upstream", "warning", "Switchboard down")
     ]
 
 
+def test_publish_ok_status_clears_retained_status_after_sending():
+    _, client, writer = client_with_writer()
+    asyncio.run(client.publish_status("upstream", "warning", "Switchboard down"))
+    writer.writes.clear()
+
+    asyncio.run(client.publish_status("upstream", "ok"))
+    assert written_events(writer) == [player_status("upstream", "ok")]
+
+    writer.writes.clear()
+    asyncio.run(client.resend_status())
+
+    assert written_events(writer) == []
+
+
 def test_station_list_request_replays_status_after_stations():
-    player = FakePlayer()
-    client = MacropadClient(player)
-    writer = FakeWriter()
-    player.register_client(client)
-    client.writer = writer
-    client._status_by_scope = {
-        "upstream": {"level": "warning", "summary": "Switchboard down"}
-    }
+    _, client, writer = client_with_writer(register=True)
+    asyncio.run(client.publish_status("upstream", "warning", "Switchboard down"))
+    writer.writes.clear()
 
     asyncio.run(client.handle_message('{"event":"station_list"}'))
 
-    assert write_events(writer) == [
-        {"event": "station_list", "data": ["KEXP", "KGUT"]},
-        {"event": "station_playing", "data": None},
-        {
-            "event": "player_status",
-            "data": {
-                "scope": "upstream",
-                "level": "warning",
-                "summary": "Switchboard down",
-            },
-        },
+    assert written_events(writer) == [
+        event("station_list", ["KEXP", "KGUT"]),
+        event("station_playing"),
+        player_status("upstream", "warning", "Switchboard down"),
     ]
 
 

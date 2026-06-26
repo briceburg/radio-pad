@@ -20,6 +20,7 @@ from lib.macropad_keys import VISUAL_MODE_LOADING, VISUAL_MODE_WAITING
 
 PLAYER_STATUS_LEVELS = ("ok", "loading", "warning", "error")
 PLAYER_STATUS_SCOPES = ("upstream", "playback")
+DEGRADED_STATUS_LEVELS = ("warning", "error")
 
 
 class MacropadState:
@@ -38,11 +39,9 @@ class MacropadState:
         self.player_available = True
         return True
 
-    def mark_player_unavailable(self, keys):
+    def mark_player_unavailable(self):
         changed = self.player_available or self.has_stations or self.has_status
         self.player_available = False
-        if self.has_stations:
-            keys.set_stations([], refresh=False)
         self.has_stations = False
         self.clear_statuses()
         return changed
@@ -103,35 +102,36 @@ class MacropadState:
             self.status_by_scope[scope] = None
             return
 
-        self.status_by_scope[scope] = summary if isinstance(summary, str) else None
+        self.status_by_scope[scope] = (
+            level,
+            summary if isinstance(summary, str) else None,
+        )
 
-    def apply(self, keys, force=False):
-        upstream_summary = self.status_by_scope["upstream"]
-        playback_summary = self.status_by_scope["playback"]
+    def _status(self, scope):
+        return self.status_by_scope[scope] or (None, None)
 
+    def view(self):
         if not self.player_available:
-            keys.set_visual_state(
-                degraded=False,
-                visual_mode=VISUAL_MODE_WAITING,
-                title_override="Waiting for Player",
-                force=force,
-            )
-            return
+            return False, VISUAL_MODE_WAITING, "Waiting for Player"
+
+        upstream_level, upstream_summary = self._status("upstream")
+        _, playback_summary = self._status("playback")
+        upstream_degraded = upstream_level in DEGRADED_STATUS_LEVELS
 
         if not self.has_stations:
-            keys.set_visual_state(
-                degraded=bool(upstream_summary),
-                visual_mode=VISUAL_MODE_LOADING,
-                title_override=playback_summary
-                or upstream_summary
-                or "Loading stations",
-                force=force,
+            return (
+                upstream_degraded,
+                VISUAL_MODE_LOADING,
+                playback_summary or upstream_summary or "Loading stations",
             )
-            return
 
+        return upstream_degraded, None, playback_summary
+
+    def apply(self, keys, force=False):
+        degraded, visual_mode, title_override = self.view()
         keys.set_visual_state(
-            degraded=bool(upstream_summary),
-            visual_mode=None,
-            title_override=playback_summary,
+            degraded=degraded,
+            visual_mode=visual_mode,
+            title_override=title_override,
             force=force,
         )
