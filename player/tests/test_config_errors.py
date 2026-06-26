@@ -49,3 +49,26 @@ def test_unavailable_station_preset_reports_station_unavailable():
             ),
             "Stations unavailable",
         )
+
+
+@pytest.mark.parametrize(
+    "station_catalog",
+    [
+        {"name": "Test", "stations": "invalid"},
+        {"name": "Test", "stations": [None]},
+        {"name": "Test", "stations": [{"name": "Missing URL"}]},
+        {"name": "Test", "stations": [{"name": 7, "url": "https://example.test"}]},
+        {"name": "Test", "stations": [{"name": "Test", "url": 7}]},
+    ],
+)
+def test_malformed_station_catalog_reports_station_config_error(station_catalog):
+    with patch("lib.config.fetch_json_url", AsyncMock(return_value=station_catalog)):
+        assert_config_error_status(
+            config.make(
+                player="briceburg/living-room",
+                registry_url="https://registry.example.test/api",
+                stations_url="https://stations.example.test/preset.json",
+                enable_discovery=False,
+            ),
+            "Station config error",
+        )
