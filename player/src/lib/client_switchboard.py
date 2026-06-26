@@ -28,8 +28,6 @@ from lib.interfaces import RadioPadClient, RadioPadPlayer
 
 logger = logging.getLogger("SWITCHBOARD")
 
-MPV_SOCKET_FILE = "/tmp/radio-pad-mpv.sock"
-
 
 class SwitchboardClient(RadioPadClient):
     def __init__(

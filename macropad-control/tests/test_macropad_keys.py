@@ -47,7 +47,12 @@ def test_skeleton_animation_settles_static_after_timeout(monkeypatch):
     monkeypatch.setattr(macropad_keys, "ticks_ms", lambda: now)
 
     keys = MacropadKeys(FakeMacropad(), FakeDisplay())
-    keys.set_visual_state(visual_mode=macropad_keys.VISUAL_MODE_WAITING, force=True)
+    keys.set_visual_state(
+        False,
+        macropad_keys.VISUAL_MODE_WAITING,
+        None,
+        force=True,
+    )
     animated_values = list(keys.macropad.pixels.values)
 
     now += SKELETON_ANIMATION_TIMEOUT_MS + 1

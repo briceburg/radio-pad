@@ -23,6 +23,7 @@ import logging
 import os
 import signal
 import sys
+from functools import partial
 
 import lib.config as config
 from lib.client_macropad import MacropadClient
@@ -116,15 +117,11 @@ async def main(player, macropad_client, settings, health_path):
             return
 
         if player_config.switchboard_url:
-
-            async def report_upstream_status(level, summary):
-                await macropad_client.publish_status("upstream", level, summary)
-
             switchboard_client = SwitchboardClient(
                 player,
                 on_connect=lambda: mark_healthy(health_path),
                 on_disconnect=lambda: clear_health(health_path),
-                status_reporter=report_upstream_status,
+                status_reporter=partial(macropad_client.publish_status, "upstream"),
             )
             player.register_client(switchboard_client)
             tasks.append(
@@ -195,10 +192,7 @@ if __name__ == "__main__":
         )
         macropad_client = MacropadClient(player)
 
-        async def report_playback_status(level, summary):
-            await macropad_client.publish_status("playback", level, summary)
-
-        player.status_reporter = report_playback_status
+        player.status_reporter = partial(macropad_client.publish_status, "playback")
         player.register_client(macropad_client)
 
         # Run the main event loop

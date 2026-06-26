@@ -38,7 +38,6 @@ SKELETON_DEGRADED_RED_MAX = 0x40
 SKELETON_DEGRADED_GREEN_MAX = 0x20
 VISUAL_MODE_LOADING = "loading"
 VISUAL_MODE_WAITING = "waiting"
-UNCHANGED = object()
 
 
 class MacropadKeys:
@@ -85,37 +84,32 @@ class MacropadKeys:
 
     def set_visual_state(
         self,
-        degraded=UNCHANGED,
-        visual_mode=UNCHANGED,
-        title_override=UNCHANGED,
+        degraded,
+        visual_mode,
+        title_override,
         force=False,
     ):
-        changed = False
+        degraded = bool(degraded)
+        if visual_mode not in (VISUAL_MODE_LOADING, VISUAL_MODE_WAITING):
+            visual_mode = None
+        if title_override and not isinstance(title_override, str):
+            title_override = str(title_override)
+        title_override = title_override or None
 
-        if degraded is not UNCHANGED:
-            degraded = bool(degraded)
-            if self.degraded != degraded:
-                self.degraded = degraded
-                changed = True
+        changed = (
+            self.degraded != degraded
+            or self.visual_mode != visual_mode
+            or self.title_override != title_override
+        )
+        mode_changed = self.visual_mode != visual_mode
+        self.degraded = degraded
+        self.visual_mode = visual_mode
+        self.title_override = title_override
 
-        if visual_mode is not UNCHANGED:
-            if visual_mode not in (VISUAL_MODE_LOADING, VISUAL_MODE_WAITING):
-                visual_mode = None
-            if self.visual_mode != visual_mode:
-                self.visual_mode = visual_mode
-                self._last_animation_tick = 0
-                self._visual_mode_started_at = ticks_ms()
-                self._static_skeleton_applied = False
-                changed = True
-
-        if title_override is not UNCHANGED:
-            title = title_override
-            if title and not isinstance(title, str):
-                title = str(title)
-            title = title or None
-            if self.title_override != title:
-                self.title_override = title
-                changed = True
+        if mode_changed:
+            self._last_animation_tick = 0
+            self._visual_mode_started_at = ticks_ms()
+            self._static_skeleton_applied = False
 
         if changed or force:
             self.refresh()

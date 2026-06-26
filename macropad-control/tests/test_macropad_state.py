@@ -4,25 +4,11 @@ from lib.macropad_state import MacropadState
 
 class FakeKeys:
     def __init__(self):
-        self.visual_states = []
         self.station_lists = []
         self.playing_stations = []
 
-    def set_visual_state(
-        self,
-        degraded=False,
-        visual_mode=None,
-        title_override=None,
-        force=False,
-    ):
-        self.visual_states.append(
-            {
-                "degraded": degraded,
-                "visual_mode": visual_mode,
-                "title_override": title_override,
-                "force": force,
-            }
-        )
+    def set_visual_state(self, degraded, visual_mode, title_override, force=False):
+        pass
 
     def set_stations(self, stations, refresh=True):
         self.station_lists.append((stations, refresh))
@@ -31,13 +17,16 @@ class FakeKeys:
         self.playing_stations.append(station)
 
 
-def assert_visual(keys, degraded, visual_mode, title_override, force=False):
-    assert keys.visual_states[-1] == {
-        "degraded": degraded,
-        "visual_mode": visual_mode,
-        "title_override": title_override,
-        "force": force,
-    }
+def assert_view(state, degraded, visual_mode, title_override):
+    assert state.view() == (degraded, visual_mode, title_override)
+
+
+def state_keys(available=False):
+    state = MacropadState()
+    keys = FakeKeys()
+    if available:
+        state.mark_player_available()
+    return state, keys
 
 
 def player_status(scope, level, summary=None):
@@ -47,72 +36,79 @@ def player_status(scope, level, summary=None):
     }
 
 
-def test_state_flows_from_waiting_to_loading_to_ready():
-    state = MacropadState()
-    keys = FakeKeys()
+def station_list(*stations):
+    return {"event": "station_list", "data": list(stations)}
 
-    state.apply(keys, force=True)
-    assert_visual(keys, False, VISUAL_MODE_WAITING, "Waiting for Player", force=True)
+
+def test_state_flows_from_waiting_to_loading_to_ready():
+    state, keys = state_keys()
+
+    assert_view(state, False, VISUAL_MODE_WAITING, "Waiting for Player")
 
     assert state.mark_player_available()
-    state.apply(keys, force=True)
-    assert_visual(keys, False, VISUAL_MODE_LOADING, "Loading stations", force=True)
+    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
 
-    state.handle_event({"event": "station_list", "data": ["KEXP"]}, keys)
+    state.handle_event(station_list("KEXP"), keys)
     assert state.has_stations
     assert keys.station_lists[-1] == ([{"name": "KEXP"}], False)
-    assert_visual(keys, False, None, None, force=True)
+    assert_view(state, False, None, None)
 
 
 def test_upstream_warning_degrades_ready_stations_without_taking_title_line():
-    state = MacropadState()
-    keys = FakeKeys()
+    state, keys = state_keys(available=True)
 
-    state.mark_player_available()
     state.handle_event(player_status("upstream", "warning", "Switchboard down"), keys)
-    assert_visual(keys, True, VISUAL_MODE_LOADING, "Switchboard down")
+    assert_view(state, True, VISUAL_MODE_LOADING, "Switchboard down")
 
-    state.handle_event({"event": "station_list", "data": ["KEXP"]}, keys)
-    assert_visual(keys, True, None, None, force=True)
+    state.handle_event(station_list("KEXP"), keys)
+    assert_view(state, True, None, None)
+
+
+def test_upstream_warning_without_summary_still_degrades_keys():
+    state, keys = state_keys(available=True)
+
+    state.handle_event(player_status("upstream", "warning"), keys)
+
+    assert_view(state, True, VISUAL_MODE_LOADING, "Loading stations")
 
 
 def test_ok_status_clears_degraded_state():
-    state = MacropadState()
-    keys = FakeKeys()
+    state, keys = state_keys(available=True)
 
-    state.mark_player_available()
     state.handle_event(player_status("upstream", "warning", "Switchboard down"), keys)
     state.handle_event(player_status("upstream", "ok"), keys)
 
     assert not state.has_status
-    assert_visual(keys, False, VISUAL_MODE_LOADING, "Loading stations")
+    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
 
 
 def test_empty_station_list_keeps_loading_state():
-    state = MacropadState()
-    keys = FakeKeys()
+    state, keys = state_keys(available=True)
 
-    state.mark_player_available()
-    state.handle_event({"event": "station_list", "data": []}, keys)
+    state.handle_event(station_list(), keys)
 
     assert not state.has_stations
     assert keys.station_lists[-1] == ([], False)
-    assert_visual(keys, False, VISUAL_MODE_LOADING, "Loading stations", force=True)
+    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
 
 
-def test_unavailable_player_clears_session_state_and_station_keys():
-    state = MacropadState()
-    keys = FakeKeys()
+def test_station_playing_event_updates_keys():
+    state, keys = state_keys()
 
-    state.mark_player_available()
+    state.handle_event({"event": "station_playing", "data": "KEXP"}, keys)
+
+    assert keys.playing_stations == ["KEXP"]
+
+
+def test_unavailable_player_clears_session_state():
+    state, keys = state_keys(available=True)
+
     state.handle_event(player_status("upstream", "warning", "Switchboard down"), keys)
-    state.handle_event({"event": "station_list", "data": ["KEXP"]}, keys)
+    state.handle_event(station_list("KEXP"), keys)
 
-    assert state.mark_player_unavailable(keys)
+    assert state.mark_player_unavailable()
     assert not state.player_available
     assert not state.has_stations
     assert not state.has_status
-    assert keys.station_lists[-1] == ([], False)
 
-    state.apply(keys, force=True)
-    assert_visual(keys, False, VISUAL_MODE_WAITING, "Waiting for Player", force=True)
+    assert_view(state, False, VISUAL_MODE_WAITING, "Waiting for Player")

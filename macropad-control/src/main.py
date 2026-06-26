@@ -44,9 +44,11 @@ while True:
     # --- Player Connection ---
     connected = player.connected
     if not connected or player.session_stale:
-        state_changed = state.mark_player_unavailable(keys)
+        state_changed = state.mark_player_unavailable()
         if not connected and state_changed:
             player.flush_buffer()
+        if state_changed:
+            keys.set_stations([], refresh=False)
         state.apply(keys, force=state_changed)
         keys.tick()
         time.sleep(0.01)
