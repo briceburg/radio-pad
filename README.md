@@ -54,7 +54,7 @@ docker compose -f compose.split.yaml up
 
 `bin/dev` wraps `docker compose` and passes through compose arguments. By
 default it uses the physical macropad overlay when exactly one CDC2 data port is
-attached, and otherwise starts without a local macropad:
+attached; if none are found it starts without a local macropad (multiple ports require `RADIOPAD_MACROPAD_DEVICE`):
 
 ```sh
 bin/dev up -d
