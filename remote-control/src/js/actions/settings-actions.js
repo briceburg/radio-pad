@@ -25,11 +25,15 @@ import {
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { toastDanger, toastRegistryFailure } from "../notifications.js";
 
+const REGISTRY_UNAVAILABLE_SUMMARY =
+  "Registry unavailable. Using last known selections.";
+
 export function createSettingsActions({
   prefs,
   auth,
   onPlayerSelected,
   onPresetSelected,
+  onRegistryStatus = () => {},
 }) {
   let lastPlayerId = null;
   let lastPresetId = null;
@@ -39,36 +43,49 @@ export function createSettingsActions({
   async function sync(failureReason = "accounts", options = {}) {
     if (syncPromise) return syncPromise;
     syncPromise = (async () => {
+      let registryFailure = null;
+      const noteRegistryFailure = (message, error) => {
+        if (error?.name === "AbortError") throw error;
+        console.warn(message, error);
+        if (!registryFailure) registryFailure = error;
+      };
+
       try {
         const url = await prefs.get("registryUrl");
         if (!url) return;
 
-        let accounts = [];
+        // null means discovery failed; [] means the registry was reachable and returned no items.
+        let accounts = null;
         try {
           accounts = await discoverAccounts(url, auth, options);
         } catch (err) {
-          console.warn("Failed to discover accounts", err);
+          noteRegistryFailure("Failed to discover accounts", err);
         }
-        await prefs.setOptions("accountId", accounts);
+        if (accounts !== null) {
+          await prefs.setOptions("accountId", accounts);
+        }
 
         const accountId = (await prefs.get("accountId")) || null;
 
         // Discover APIs natively handle null accountId safely
-        let players = [],
-          presets = [];
-        try {
-          const results = await Promise.allSettled([
-            discoverPlayers(accountId, prefs, auth, options),
-            discoverPresets(accountId, prefs, auth, options),
-          ]);
-          players = results[0].status === "fulfilled" ? results[0].value : [];
-          presets = results[1].status === "fulfilled" ? results[1].value : [];
-        } catch (err) {
-          console.warn("Error resolving players or presets", err);
+        const results = await Promise.allSettled([
+          discoverPlayers(accountId, prefs, auth, options),
+          discoverPresets(accountId, prefs, auth, options),
+        ]);
+        const players =
+          results[0].status === "fulfilled" ? results[0].value : null;
+        const presets =
+          results[1].status === "fulfilled" ? results[1].value : null;
+
+        if (results[0].status === "rejected") {
+          noteRegistryFailure("Failed to discover players", results[0].reason);
+        }
+        if (results[1].status === "rejected") {
+          noteRegistryFailure("Failed to discover presets", results[1].reason);
         }
 
-        await prefs.setOptions("playerId", players);
-        await prefs.setOptions("presetId", presets);
+        if (players !== null) await prefs.setOptions("playerId", players);
+        if (presets !== null) await prefs.setOptions("presetId", presets);
 
         const playerId = (await prefs.get("playerId")) || null;
         // Validate against available options, clear if no longer available (e.g. signed out)
@@ -80,14 +97,25 @@ export function createSettingsActions({
 
         if (resolvedPlayerId) {
           if (resolvedPlayerId !== lastPlayerId || !hasSyncedOnce) {
-            const player = await discoverPlayer(
-              resolvedPlayerId,
-              prefs,
-              auth,
-              options,
-            );
-            await onPlayerSelected(player || null);
-            lastPlayerId = player ? resolvedPlayerId : null;
+            let player = null;
+            try {
+              player = await discoverPlayer(
+                resolvedPlayerId,
+                prefs,
+                auth,
+                options,
+              );
+            } catch (err) {
+              noteRegistryFailure("Failed to discover selected player", err);
+            }
+
+            if (player) {
+              await onPlayerSelected(player);
+              lastPlayerId = resolvedPlayerId;
+            } else if (!registryFailure) {
+              await onPlayerSelected(null);
+              lastPlayerId = null;
+            }
           }
         } else if (lastPlayerId !== null || !hasSyncedOnce) {
           await onPlayerSelected(null);
@@ -100,12 +128,21 @@ export function createSettingsActions({
           lastPresetId = presetId;
         }
         hasSyncedOnce = true;
+
+        if (registryFailure) {
+          onRegistryStatus("warning", REGISTRY_UNAVAILABLE_SUMMARY);
+          toastRegistryFailure(failureReason, registryFailure, options);
+        } else {
+          onRegistryStatus("ok");
+        }
       } catch (error) {
         if (error.name !== "AbortError") {
+          onRegistryStatus("warning", REGISTRY_UNAVAILABLE_SUMMARY);
           toastRegistryFailure(failureReason, error, options);
+          if (!registryFailure) registryFailure = error;
         }
       } finally {
-        if (!hasSyncedOnce) {
+        if (!hasSyncedOnce && !registryFailure) {
           await onPlayerSelected(null);
           await onPresetSelected(null);
           hasSyncedOnce = true;

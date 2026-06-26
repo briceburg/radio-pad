@@ -51,7 +51,7 @@ export const controlStore = atom({
   connectionState: "idle",
   playerConnected: null,
   playerStatuses: {},
-  statusText: "",
+  resourceStatuses: {},
 });
 
 export const listenStore = atom({

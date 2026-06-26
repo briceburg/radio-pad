@@ -34,12 +34,8 @@ export function createControlActions({ control, listen }) {
     }
   }
 
-  function updatePlayerStatus(status) {
-    const { scope, level, summary } = status.detail || {};
-    if (!scope) return;
-
-    const controlState = controlStore.get();
-    const nextStatuses = { ...controlState.playerStatuses };
+  function updateRetainedStatus(statuses = {}, scope, level, summary = null) {
+    const nextStatuses = { ...statuses };
     if (level === "ok") {
       delete nextStatuses[scope];
     } else {
@@ -48,19 +44,40 @@ export function createControlActions({ control, listen }) {
         summary: typeof summary === "string" ? summary : null,
       };
     }
+    return nextStatuses;
+  }
 
-    const playbackSummary = nextStatuses.playback?.summary;
-    const statusText =
-      playbackSummary ||
-      (controlState.playerConnected === false
-        ? "Player offline."
-        : controlState.connectionState === "connected"
-          ? `Connected to ${controlState.player.name}`
-          : controlState.statusText);
-    updateTab("control", {
-      playerStatuses: nextStatuses,
-      statusText,
-    });
+  function setPlayerStatus(scope, level, summary = null) {
+    if (!scope) return;
+
+    const controlState = controlStore.get();
+    const playerStatuses = updateRetainedStatus(
+      controlState.playerStatuses,
+      scope,
+      level,
+      summary,
+    );
+
+    updateTab("control", { playerStatuses });
+  }
+
+  function setResourceStatus(scope, level, summary = null) {
+    if (!scope) return;
+
+    const controlState = controlStore.get();
+    const resourceStatuses = updateRetainedStatus(
+      controlState.resourceStatuses,
+      scope,
+      level,
+      summary,
+    );
+
+    updateTab("control", { resourceStatuses });
+  }
+
+  function updatePlayerStatus(status) {
+    const { scope, level, summary } = status.detail || {};
+    setPlayerStatus(scope, level, summary);
   }
 
   async function loadStationCatalog(url, tabName = "control") {
@@ -89,6 +106,8 @@ export function createControlActions({ control, listen }) {
 
       if (tabName === "listen") listen.setStationCatalog(stationCatalog);
 
+      if (tabName === "control") setResourceStatus("station_catalog", "ok");
+
       updateTab(tabName, { stationCatalog, loading: false });
       requestControllers[tabName] = null;
       return stationCatalog;
@@ -102,6 +121,13 @@ export function createControlActions({ control, listen }) {
 
       requestControllers[tabName] = null;
       updateTab(tabName, { loading: false });
+      if (tabName === "control") {
+        setResourceStatus(
+          "station_catalog",
+          "warning",
+          "Station catalog unavailable.",
+        );
+      }
       toastWarning("Failed loading station catalog.", error);
       return null;
     }
@@ -109,22 +135,17 @@ export function createControlActions({ control, listen }) {
 
   control.addEventListener("connect", () =>
     updateTab("control", {
-      statusText: `Connected to ${controlStore.get().player.name}`,
       connectionState: "connected",
     }),
   );
   control.addEventListener("connecting", () =>
     updateTab("control", {
-      statusText: "Connecting to switchboard...",
       connectionState: "connecting",
       playerConnected: null,
     }),
   );
   control.addEventListener("disconnect", () =>
     updateTab("control", {
-      statusText: controlStore.get().player?.id
-        ? "Switchboard unavailable. Reconnecting..."
-        : "Disconnected.",
       connectionState: "disconnected",
       playerConnected: null,
     }),
@@ -140,9 +161,6 @@ export function createControlActions({ control, listen }) {
     const connected = event.detail?.connected === true;
     updateTab("control", {
       playerConnected: connected,
-      statusText: connected
-        ? `Connected to ${controlStore.get().player.name}`
-        : "Player offline.",
     });
   });
   control.addEventListener("playerstatus", updatePlayerStatus);
@@ -165,15 +183,19 @@ export function createControlActions({ control, listen }) {
   });
 
   return {
+    setRegistryStatus(level, summary = null) {
+      setResourceStatus("registry", level, summary);
+    },
+
     async selectPlayer(player) {
       updateTab("control", {
         player,
         stationCatalog: null,
         currentStation: null,
-        statusText: "",
         connectionState: player ? "connecting" : "idle",
         playerConnected: null,
         playerStatuses: {},
+        resourceStatuses: {},
         loading: player ? true : false,
       });
       if (!player) {

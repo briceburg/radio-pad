@@ -49,6 +49,8 @@ async function bootstrap() {
     auth,
     onPlayerSelected: (player) => controlActions.selectPlayer(player),
     onPresetSelected: (presetId) => controlActions.selectPreset(presetId),
+    onRegistryStatus: (level, summary) =>
+      controlActions.setRegistryStatus(level, summary),
   });
   const authActions = createAuthActions({
     auth,

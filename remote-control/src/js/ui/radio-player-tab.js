@@ -21,14 +21,66 @@ import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
 import { controlStore, listenStore } from "../store.js";
 
+const PLAYER_DEGRADED_SCOPES = ["stations", "switchboard"];
+const RESOURCE_DEGRADED_SCOPES = ["registry", "station_catalog"];
+const STATUS_SUMMARY_ORDER = [
+  ["playerStatuses", "playback"],
+  ["playerStatuses", "stations"],
+  ["resourceStatuses", "station_catalog"],
+  ["resourceStatuses", "registry"],
+  ["playerStatuses", "switchboard"],
+];
+
+function isDegradedStatus(status) {
+  return ["warning", "error"].includes(status?.level);
+}
+
+function hasDegradedStatus(statuses = {}, scopes = []) {
+  return scopes.some((scope) => isDegradedStatus(statuses[scope]));
+}
+
+function retainedStatusSummary(state) {
+  for (const [statusMap, scope] of STATUS_SUMMARY_ORDER) {
+    const status = state[statusMap]?.[scope];
+    if (
+      isDegradedStatus(status) &&
+      typeof status.summary === "string" &&
+      status.summary
+    ) {
+      return status.summary;
+    }
+  }
+  return null;
+}
+
 export function isControlDegraded(state) {
   if (state.connectionState === "disconnected") return true;
   if (state.playerConnected === false) return true;
 
-  const degradedStatuses = ["stations", "switchboard"];
-  return degradedStatuses.some((scope) =>
-    ["warning", "error"].includes(state.playerStatuses?.[scope]?.level),
+  return (
+    hasDegradedStatus(state.playerStatuses, PLAYER_DEGRADED_SCOPES) ||
+    hasDegradedStatus(state.resourceStatuses, RESOURCE_DEGRADED_SCOPES)
   );
+}
+
+export function getControlStatusText(state) {
+  if (state.playerConnected === false) return "Player offline.";
+  if (state.connectionState === "disconnected") {
+    return state.player?.id
+      ? "Switchboard unavailable. Reconnecting..."
+      : "Disconnected.";
+  }
+
+  const summary = retainedStatusSummary(state);
+  if (summary) return summary;
+
+  if (state.connectionState === "connecting") {
+    return "Connecting to switchboard...";
+  }
+  if (state.connectionState === "connected" && state.player?.name) {
+    return `Connected to ${state.player.name}`;
+  }
+  return "";
 }
 
 export function getStationVisualState(tabName, state) {
@@ -155,6 +207,8 @@ export class RadioPlayerTab extends RadioElement {
   render() {
     const s = this.state;
     const visualState = getStationVisualState(this.tabName, s);
+    const statusText =
+      this.tabName === "control" ? getControlStatusText(s) : "";
     const shouldRenderSkeleton =
       s.loading ||
       (visualState === "warning" &&
@@ -209,7 +263,7 @@ export class RadioPlayerTab extends RadioElement {
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <div class="radio-info ion-text-center">${s.statusText || ""}</div>
+        <div class="radio-info ion-text-center">${statusText}</div>
         <ion-grid class="station-grid">${content}</ion-grid>
       </ion-content>
     `;
