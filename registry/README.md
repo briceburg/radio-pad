@@ -7,27 +7,17 @@ System architecture and the player-access/auth diagrams live in the [root README
 ## Usage
 
 ```bash
-# run these once
-python -m venv venv
-. venv/bin/activate
-pip3 install -r requirements.txt
-
-# run everytime you want to start the registry
+# run every time you want to start the registry
 bin/registry
 ```
 
 see the swagger API docs by visiting: http://localhost:8000/
 
-### Python version notes
-
-- The repository targets Python `3.13` language semantics in tooling and type checking.
-- The locked runtime dependencies in `requirements.txt` support installing and running the service on Python `3.14` as well.
-
 ### Dependency workflow
 
-- `requirements-latest.txt` is the editable runtime dependency source.
-- `requirements.txt` is the frozen runtime lockfile used by Docker and CI.
-- `requirements-dev.txt` contains development-only tools used for `bin/ci` and `pytest`.
+- Runtime and development dependencies live in `pyproject.toml`.
+- `uv.lock` is the frozen dependency lockfile used by Docker and CI.
+- After changing dependencies, run `uv lock`.
 
 ### Environment Variables
 
@@ -187,18 +177,16 @@ In production, the private authz store should use a separate local path such as 
 
 For compose-based development with all services, see the [root README](../README.md#development).
 
-To run the tests, first install the development dependencies:
+Run the default test suite and static checks with:
 
 ```sh
-pip install -r requirements-dev.txt
+bin/ci
 ```
 
-If you update runtime dependencies, edit `requirements-latest.txt` first and then re-freeze `requirements.txt`.
-
-Then, run the default test suite using pytest:
+To run only pytest:
 
 ```sh
-pytest
+uv run pytest
 ```
 
 This runs the regular unit, API, datastore, and functional tests. Performance tests are excluded by default.
@@ -206,7 +194,7 @@ This runs the regular unit, API, datastore, and functional tests. Performance te
 To run the functional tests directly:
 
 ```sh
-pytest tests/functional -m 'not performance'
+uv run pytest tests/functional -m 'not performance'
 ```
 
 ### Performance Tests
@@ -214,11 +202,11 @@ pytest tests/functional -m 'not performance'
 The suite includes performance tests that are disabled by default. To run them, use the `performance` marker:
 
 ```sh
-pytest tests/functional/test_performance.py -m performance
+uv run pytest tests/functional/test_performance.py -m performance
 ```
 
 To view the output from performance tests, set the log level:
 
 ```sh
-pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
+uv run pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
 ```

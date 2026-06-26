@@ -27,7 +27,7 @@ class MacropadState:
     def __init__(self):
         self.player_available = False
         self.has_stations = False
-        self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}
+        self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}  # type: dict
 
     @property
     def needs_stations(self):
@@ -130,19 +130,13 @@ class MacropadState:
         stations_level, stations_summary = self._status("stations")
         switchboard_level, switchboard_summary = self._status("switchboard")
         _, playback_summary = self._status("playback")
-        degraded = (
-            stations_level in DEGRADED_STATUS_LEVELS
-            or switchboard_level in DEGRADED_STATUS_LEVELS
-        )
+        degraded = stations_level in DEGRADED_STATUS_LEVELS or switchboard_level in DEGRADED_STATUS_LEVELS
 
         if not self.has_stations:
             return (
                 degraded,
                 VISUAL_MODE_LOADING,
-                playback_summary
-                or stations_summary
-                or switchboard_summary
-                or "Loading stations",
+                playback_summary or stations_summary or switchboard_summary or "Loading stations",
             )
 
         return degraded, None, playback_summary

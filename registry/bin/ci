@@ -1,29 +1,12 @@
-#!/usr/bin/env bash
-set -eo pipefail
+#!/usr/bin/env sh
+set -eu
 
-GREEN='\033[1;32m'
-RED='\033[1;31m'
-NC='\033[0m'
-CHECK_MARK="\xE2\x9C\x94"
-CROSS_MARK="\xE2\x9D\x8C"
+cd "$(dirname "$0")/.."
+export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
+# Dulwich resolves a fallback username even when commit identities are explicit.
+export USER="${USER:-radiopad}"
 
-log(){ echo -e "$*" >&2; }
-die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
-
-paths=(src/ tests/)
-
-log "🔍 [mypy] Static type checking..."
-mypy "${paths[@]}" || die "mypy failed."
-
-log "🎨 [ruff] Formatting check..."
-ruff format --check "${paths[@]}" || die "ruff format failed. run: ruff format ${paths[*]}"
-
-log "🧹 [ruff] Linting (no fixes)..."
-ruff check "${paths[@]}" || die "ruff lint failed. run: ruff check --fix ${paths[*]}"
-
-if [ -d "tests" ]; then
-  log "🧪 [pytest] Running tests..."
-  pytest || die "pytest failed."
-fi
-
-log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"
+uv run mypy src/ tests/
+uv run ruff format --check src/ tests/
+uv run ruff check src/ tests/
+uv run pytest

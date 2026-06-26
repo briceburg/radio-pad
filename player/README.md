@@ -12,7 +12,8 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 ### Running the Player
 
-start the player via a script that automatically activates a python virtual environment and installs dependencies.
+Start the player through the project script, which uses `uv run` with the
+dependencies from `pyproject.toml`.
 
 ```sh
 ./bin/player
@@ -92,6 +93,12 @@ options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
 ## Development
 
 For compose-based development with all services, see the [root README](../README.md#development).
+
+Run player checks with:
+
+```sh
+bin/ci
+```
 
 ### Contributing
 

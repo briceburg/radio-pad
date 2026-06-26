@@ -1,24 +1,5 @@
-#!/usr/bin/env bash
-set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/player"
+#!/usr/bin/env sh
+set -eu
 
-[[ "$VIRTUAL_ENV" = "$PROJECT_ROOT/"* ]] || { 
-    if [ -n "$VIRTUAL_ENV" ]; then
-        echo "You are in a virtual environment, but it does not match the project root." >&2
-        echo "Please run this script from within the virtual environment:" >&2
-        echo "  source $PROJECT_ROOT/venv/bin/activate" >&2
-        exit 1
-    fi
-    if [ ! -d venv ]; then
-        echo "Creating virtual environment..."
-        python3 -m venv "$PROJECT_ROOT/venv"
-    fi
-    echo "Activating virtual environment..."
-    source "$PROJECT_ROOT/venv/bin/activate"
-}
-
-cd "$PROJECT_ROOT"
-pip install -r requirements.txt
-echo -e "  :check: activated.\n" >&2
-
-exec python3 src/player.py "$@"
+cd "$(dirname "$0")/.."
+exec uv run python src/player.py "$@"

@@ -5,7 +5,7 @@ DEFAULT_HEALTH_PATH = "/tmp/radio-pad-ready"
 
 
 def health_path(path: str | None = None) -> Path:
-    return Path(path or os.getenv("RADIOPAD_HEALTH_PATH", DEFAULT_HEALTH_PATH))
+    return Path(path or os.getenv("RADIOPAD_HEALTH_PATH") or DEFAULT_HEALTH_PATH)
 
 
 def mark_healthy(path: str | None = None) -> None:

@@ -1,3 +1,32 @@
+[project]
+name = "radio-pad-registry"
+version = "2025.01.0"
+description = "FastAPI registry and switchboard service for radio-pad"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "boto3",
+  "dulwich>=1.1,<1.2",
+  "fastapi",
+  "fastapi-oidc",
+  "httpx",
+  "pydantic",
+  "uvicorn[standard]",
+]
+
+[dependency-groups]
+dev = [
+  "hypothesis",
+  "moto[s3]",
+  "mypy",
+  "pytest",
+  "pytest-asyncio",
+  "ruff",
+]
+
+[tool.uv]
+cache-dir = "tmp/.uv_cache"
+package = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-m 'not performance'"
@@ -12,32 +41,19 @@ markers = [
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"
 line-length = 120
-target-version = "py313"
 
 [tool.ruff.lint]
-select = [
-  "E","F","I","UP","B","Q","RUF"
-]
+select = ["E", "F", "I", "UP", "B", "Q", "RUF"]
 ignore = ["B008"]
 
 [tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
 line-ending = "lf"
-skip-magic-trailing-comma = false
 
 [tool.mypy]
 cache_dir = "tmp/.mypy_cache"
 python_version = "3.13"
-plugins = []
 strict = true
-warn_unused_configs = true
-warn_return_any = true
 warn_unreachable = true
 show_error_codes = true
 ignore_missing_imports = true
-allow_redefinition = false
-no_implicit_optional = true
 pretty = true
-exclude = ["venv/", "tmp/"]
-

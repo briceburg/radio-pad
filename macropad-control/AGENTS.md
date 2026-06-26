@@ -2,6 +2,8 @@
 
 Guidance for coding agents working in `radio-pad/macropad-control`.
 
+- Python-side tests and tooling are `uv`/`pyproject.toml` driven. Run
+  `bin/ci`; it runs mypy, Ruff format/lint checks, and pytest through `uv run`.
 - Never assume a `/dev/ttyACM*` number. Use `bin/data-port` to discover the
   CircuitPython CDC2 data interface after firmware changes have settled.
 - Use `bin/console-port` or `bin/console` for the CircuitPython REPL console;

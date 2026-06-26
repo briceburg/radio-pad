@@ -2,5 +2,5 @@
 !/bin
 !/src
 !/seed-data
-!/requirements.txt
-!/requirements-dev.txt
+!/pyproject.toml
+!/uv.lock

@@ -20,6 +20,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import websockets
 
@@ -39,16 +40,14 @@ class SwitchboardClient(RadioPadClient):
     ):
         super().__init__(player)
         self.url = player.config.switchboard_url
-        self.ws = None
+        self.ws: Any | None = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
         self.status_reporter = status_reporter
         self._connected = False
         self._closing = False
 
-        self.http_headers = http_client_headers(
-            {"RadioPad-Stations-Url": player.config.stations_url}
-        )
+        self.http_headers = http_client_headers({"RadioPad-Stations-Url": player.config.stations_url})
 
     async def run(self):
         if not self.url:
@@ -68,9 +67,10 @@ class SwitchboardClient(RadioPadClient):
             await asyncio.sleep(5)
 
     async def _connect_and_listen(self):
-        async for ws in websockets.connect(
-            self.url, additional_headers=self.http_headers
-        ):
+        if not self.url:
+            return
+
+        async for ws in websockets.connect(self.url, additional_headers=self.http_headers):
             try:
                 logger.info("connected to: %s", self.url)
                 self.ws = ws
@@ -80,7 +80,7 @@ class SwitchboardClient(RadioPadClient):
                 await self._report_status("ok", None)
                 await self.broadcast("playback_state")
                 async for msg in ws:
-                    await self.handle_message(msg)
+                    await self.handle_message(msg.decode() if isinstance(msg, bytes) else msg)
             except asyncio.CancelledError:
                 self._closing = True
                 raise
@@ -89,9 +89,7 @@ class SwitchboardClient(RadioPadClient):
                 continue
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("failed to connect to %s: %s", self.url, e)
-                logger.warning(
-                    "If this is the wrong URL, please set the SWITCHBOARD_URL environment variable."
-                )
+                logger.warning("If this is the wrong URL, please set the SWITCHBOARD_URL environment variable.")
                 await self._report_status("warning", self._status_summary(e))
                 continue
             finally:

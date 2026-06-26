@@ -118,10 +118,7 @@ class MacropadPlayer:
 
     def request_station_catalog(self):
         current_time = ticks_ms()
-        if (
-            ticks_diff(current_time, self._last_station_catalog_request_time)
-            >= STATION_CATALOG_REQUEST_INTERVAL_MS
-        ):
+        if ticks_diff(current_time, self._last_station_catalog_request_time) >= STATION_CATALOG_REQUEST_INTERVAL_MS:
             self._last_station_catalog_request_time = current_time
             self.send_command("station_catalog_request")
 

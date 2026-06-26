@@ -96,11 +96,7 @@ class MacropadKeys:
             title_override = str(title_override)
         title_override = title_override or None
 
-        changed = (
-            self.degraded != degraded
-            or self.visual_mode != visual_mode
-            or self.title_override != title_override
-        )
+        changed = self.degraded != degraded or self.visual_mode != visual_mode or self.title_override != title_override
         mode_changed = self.visual_mode != visual_mode
         self.degraded = degraded
         self.visual_mode = visual_mode
@@ -116,20 +112,21 @@ class MacropadKeys:
 
     def refresh(self):
         page = self.pages[self.current_page_index]
+        stations = page["stations"] if isinstance(page["stations"], list) else []
 
         title = self.title_override or page["title"]
         if self.title_override is None and self.playing_station_index is not None:
             station_page_index = self.get_station_page_index(self.playing_station_index)
             if self.current_page_index == station_page_index:
                 station_index_on_page = self.playing_station_index % MACROPAD_KEY_COUNT
-                title = page["stations"][station_index_on_page].get("name", "?")
+                title = stations[station_index_on_page].get("name", "?")
 
         self.display.set_title(title, False)
 
         for i in range(MACROPAD_KEY_COUNT):
             self.display.unhighlight_group(i)
-            if i < len(page["stations"]):
-                station = page["stations"][i]
+            if i < len(stations):
+                station = stations[i]
                 self.display.set_group_text(i, station.get("name", ""))
 
                 station_global_index = self.current_page_index * MACROPAD_KEY_COUNT + i
@@ -137,9 +134,7 @@ class MacropadKeys:
                     self.macropad.pixels[i] = PLAYING_COLOR
                     self.display.highlight_group(i)
                 else:
-                    self.macropad.pixels[i] = (
-                        DEGRADED_COLOR if self.degraded else DEFAULT_COLOR
-                    )
+                    self.macropad.pixels[i] = DEGRADED_COLOR if self.degraded else DEFAULT_COLOR
             else:
                 self.macropad.pixels[i] = 0
                 self.display.set_group_text(i, "")
@@ -193,8 +188,7 @@ class MacropadKeys:
         now = ticks_ms()
         if (
             not ENABLE_SKELETON_ANIMATION
-            or ticks_diff(now, self._visual_mode_started_at)
-            >= SKELETON_ANIMATION_TIMEOUT_MS
+            or ticks_diff(now, self._visual_mode_started_at) >= SKELETON_ANIMATION_TIMEOUT_MS
         ):
             if force or not self._static_skeleton_applied:
                 self._set_static_skeleton()
@@ -223,9 +217,7 @@ class MacropadKeys:
 
     def _skeleton_phase(self, key_index, offset=0):
         return (
-            offset
-            + (key_index // 3) * SKELETON_ROW_PHASE_STEP
-            + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
+            offset + (key_index // 3) * SKELETON_ROW_PHASE_STEP + (key_index % 3) * SKELETON_COLUMN_PHASE_STEP
         ) % 1.0
 
     def _triangle_wave(self, phase):
@@ -238,10 +230,6 @@ class MacropadKeys:
             red = int(SKELETON_DEGRADED_RED_MAX * level)
             green = int(SKELETON_DEGRADED_GREEN_MAX * level)
             return (red << 16) | (green << 8)
-        maximum = (
-            SKELETON_LOADING_MAX
-            if self.visual_mode == VISUAL_MODE_LOADING
-            else SKELETON_WAITING_MAX
-        )
+        maximum = SKELETON_LOADING_MAX if self.visual_mode == VISUAL_MODE_LOADING else SKELETON_WAITING_MAX
         grey = int(maximum * level)
         return (grey << 16) | (grey << 8) | grey

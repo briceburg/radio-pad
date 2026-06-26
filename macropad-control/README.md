@@ -93,6 +93,12 @@ before syncing or recreating the compose player.
 
 ## Development
 
+Run Python-side checks for the macropad control code with:
+
+```sh
+bin/ci
+```
+
 ### Troubleshooting Sound
 
 If plugging in the Macropad interferes with your Alsa sound configuration (because it is also registered as a snd-usb-audio device), follow the "[How to choose a particular order for multiple installed cards](https://alsa.opensrc.org/MultipleCards#The_newer_.22slots.3D.22_method)" section of the Alsa docs.

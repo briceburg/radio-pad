@@ -12,10 +12,12 @@ Guidance for coding agents working in `radio-pad/player`.
 
 ## Runtime and tooling
 
-- The checked-in project target is Python `3.13`.
-- `bin/ci` runs `black` (formatting), `isort` (import order), and `autoflake` (unused imports/variables) on `src/` and `tests/`, then runs `pytest` when `tests/` exists.
-- Development dependencies are in `requirements-dev.txt` (`autoflake`, `black`, `isort`, `pytest`).
-- Runtime dependencies are in `requirements.txt`.
+- Python dependencies and tool settings live in `pyproject.toml`.
+- Use `bin/ci` for validation. It runs mypy, Ruff format/lint checks, and pytest
+  through `uv run`.
+- Use `bin/player` or `uv run python src/player.py` for local execution.
+- The Docker image installs dependencies with `uv sync` from `pyproject.toml`
+  and `uv.lock`.
 
 ## Conventions
 

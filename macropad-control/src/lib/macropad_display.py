@@ -86,9 +86,7 @@ class MacropadDisplay:
 
     def set_group_text(self, group_index, text):
         if 0 <= group_index < MACROPAD_KEY_COUNT:
-            self._group[group_index].text = self._normalize_text(
-                text, STATION_LABEL_MAX_CHARS
-            )
+            self._group[group_index].text = self._normalize_text(text, STATION_LABEL_MAX_CHARS)
 
     def highlight_group(self, group_index):
         if 0 <= group_index < MACROPAD_KEY_COUNT:

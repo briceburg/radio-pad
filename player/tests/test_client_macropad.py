@@ -93,9 +93,10 @@ def written_events(writer):
 
 
 def test_candidate_ports_prefers_configured_port():
-    with patch.dict(
-        os.environ, {"RADIOPAD_MACROPAD_PORT": "/dev/macropad"}, clear=True
-    ), patch("lib.client_macropad.serial.tools.list_ports.comports") as comports:
+    with (
+        patch.dict(os.environ, {"RADIOPAD_MACROPAD_PORT": "/dev/macropad"}, clear=True),
+        patch("lib.client_macropad.serial.tools.list_ports.comports") as comports,
+    ):
         assert _candidate_ports() == ["/dev/macropad"]
         comports.assert_not_called()
 
@@ -108,17 +109,16 @@ def test_candidate_ports_filters_and_sorts_cdc2_ports():
         SimpleNamespace(device="/dev/ttyUSB0", interface=None),
     ]
 
-    with patch.dict(os.environ, {}, clear=True), patch(
-        "lib.client_macropad.serial.tools.list_ports.comports", return_value=ports
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("lib.client_macropad.serial.tools.list_ports.comports", return_value=ports),
     ):
         assert _candidate_ports() == ["/dev/ttyACM1", "/dev/ttyACM2"]
 
 
 def test_listen_handles_serial_playback_start():
     player, client, writer = client_with_writer(register=True)
-    client.reader = FakeReader(
-        [b'{"event":"playback_start","data":{"station_name":"KEXP"}}\n', b""]
-    )
+    client.reader = FakeReader([b'{"event":"playback_start","data":{"station_name":"KEXP"}}\n', b""])
 
     asyncio.run(client._listen())
 
@@ -148,9 +148,7 @@ def test_publish_status_writes_scoped_status_payload():
 
     asyncio.run(client.publish_status("switchboard", "warning", "Switchboard down"))
 
-    assert written_events(writer) == [
-        player_status("switchboard", "warning", "Switchboard down")
-    ]
+    assert written_events(writer) == [player_status("switchboard", "warning", "Switchboard down")]
 
 
 def test_publish_ok_status_clears_retained_status_after_sending():

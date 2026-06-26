@@ -60,9 +60,7 @@ def test_state_flows_from_waiting_to_loading_to_ready():
 def test_switchboard_warning_degrades_ready_stations_without_taking_title_line():
     state, keys = state_keys(available=True)
 
-    state.handle_event(
-        player_status("switchboard", "warning", "Switchboard down"), keys
-    )
+    state.handle_event(player_status("switchboard", "warning", "Switchboard down"), keys)
     assert_view(state, True, VISUAL_MODE_LOADING, "Switchboard down")
 
     state.handle_event(station_catalog("KEXP"), keys)
@@ -80,9 +78,7 @@ def test_switchboard_warning_without_summary_still_degrades_keys():
 def test_ok_status_clears_degraded_state():
     state, keys = state_keys(available=True)
 
-    state.handle_event(
-        player_status("switchboard", "warning", "Switchboard down"), keys
-    )
+    state.handle_event(player_status("switchboard", "warning", "Switchboard down"), keys)
     state.handle_event(player_status("switchboard", "ok"), keys)
 
     assert not state.has_status
@@ -113,9 +109,7 @@ def test_playback_state_event_updates_keys():
 def test_unavailable_player_clears_session_state():
     state, keys = state_keys(available=True)
 
-    state.handle_event(
-        player_status("switchboard", "warning", "Switchboard down"), keys
-    )
+    state.handle_event(player_status("switchboard", "warning", "Switchboard down"), keys)
     state.handle_event(station_catalog("KEXP"), keys)
 
     assert state.mark_player_unavailable()

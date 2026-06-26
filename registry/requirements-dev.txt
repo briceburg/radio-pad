@@ -1,7 +1,0 @@
-httpx
-hypothesis
-moto[s3]
-mypy
-pytest
-pytest-asyncio
-ruff
