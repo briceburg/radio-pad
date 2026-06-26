@@ -80,21 +80,21 @@ async def make(
             status_summary="Station config error",
         )
 
-    logger.info("Using stations_url: %s", stations_url)
+    logger.info("Using station catalog URL: %s", stations_url)
     logger.info("Using switchboard_url: %s", switchboard_url)
 
-    station_data = await fetch_json_url(stations_url)
-    if not station_data:
+    station_catalog = await fetch_json_url(stations_url)
+    if not station_catalog:
         raise ConfigError(
-            "Failed fetching stations", status_summary="Stations unavailable"
+            "Failed fetching station catalog", status_summary="Stations unavailable"
         )
     if (
-        not isinstance(station_data, dict)
-        or "name" not in station_data
-        or "stations" not in station_data
+        not isinstance(station_catalog, dict)
+        or "name" not in station_catalog
+        or "stations" not in station_catalog
     ):
         raise ConfigError(
-            'Station URL must return \'{"name": str, "stations": [{...}]}\'',
+            'Station catalog URL must return \'{"name": str, "stations": [{...}]}\'',
             status_summary="Station config error",
         )
 
@@ -103,7 +103,7 @@ async def make(
         id=player,
         stations=[
             RadioPadStation(name=s["name"], url=s["url"])
-            for s in station_data["stations"]
+            for s in station_catalog["stations"]
         ],
         stations_url=stations_url,
         registry_url=registry_url,

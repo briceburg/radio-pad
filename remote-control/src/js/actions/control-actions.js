@@ -26,7 +26,7 @@ export function createControlActions({ control, listen }) {
 
   const requestControllers = { control: null, listen: null };
 
-  function abortStationLoad(tabName) {
+  function abortStationCatalogLoad(tabName) {
     const controller = requestControllers[tabName];
     if (controller) {
       controller.abort();
@@ -63,18 +63,18 @@ export function createControlActions({ control, listen }) {
     });
   }
 
-  async function loadStations(url, tabName = "control") {
+  async function loadStationCatalog(url, tabName = "control") {
     if (!url) {
-      abortStationLoad(tabName);
+      abortStationCatalogLoad(tabName);
       updateTab(tabName, {
-        stationsData: null,
+        stationCatalog: null,
         currentStation: null,
         loading: false,
       });
       return null;
     }
 
-    abortStationLoad(tabName);
+    abortStationCatalogLoad(tabName);
     const controller = new AbortController();
     requestControllers[tabName] = controller;
     updateTab(tabName, { loading: true });
@@ -83,15 +83,15 @@ export function createControlActions({ control, listen }) {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
 
-      const stationsData = await response.json();
+      const stationCatalog = await response.json();
 
       if (requestControllers[tabName] !== controller) return null;
 
-      if (tabName === "listen") listen.setStations(stationsData);
+      if (tabName === "listen") listen.setStationCatalog(stationCatalog);
 
-      updateTab(tabName, { stationsData, loading: false });
+      updateTab(tabName, { stationCatalog, loading: false });
       requestControllers[tabName] = null;
-      return stationsData;
+      return stationCatalog;
     } catch (error) {
       if (
         error?.name === "AbortError" ||
@@ -102,7 +102,7 @@ export function createControlActions({ control, listen }) {
 
       requestControllers[tabName] = null;
       updateTab(tabName, { loading: false });
-      toastWarning("Failed loading stations.", error);
+      toastWarning("Failed loading station catalog.", error);
       return null;
     }
   }
@@ -134,7 +134,7 @@ export function createControlActions({ control, listen }) {
     updateTab("control", { currentStation: event.detail }),
   );
   control.addEventListener("stationcatalogurl", (event) =>
-    loadStations(event.detail, "control"),
+    loadStationCatalog(event.detail, "control"),
   );
   control.addEventListener("playerpresence", (event) => {
     const connected = event.detail?.connected === true;
@@ -168,7 +168,7 @@ export function createControlActions({ control, listen }) {
     async selectPlayer(player) {
       updateTab("control", {
         player,
-        stationsData: null,
+        stationCatalog: null,
         currentStation: null,
         statusText: "",
         connectionState: player ? "connecting" : "idle",
@@ -177,17 +177,17 @@ export function createControlActions({ control, listen }) {
         loading: player ? true : false,
       });
       if (!player) {
-        abortStationLoad("control");
+        abortStationCatalogLoad("control");
         control.disconnect();
         return;
       }
       const token = authStore.get()?.registryBearerToken || null;
       await control.connect(player.switchboard_url, token);
-      await loadStations(player.stations_url, "control");
+      await loadStationCatalog(player.stations_url, "control");
     },
 
     async selectPreset(presetId) {
-      return loadStations(presetId, "listen");
+      return loadStationCatalog(presetId, "listen");
     },
 
     async clickStation(tabName, station) {

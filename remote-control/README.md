@@ -7,7 +7,7 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 * connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
   * remote controls publish playback commands and listen for playback state
   * players listen for playback commands and publish current playback and status state
-* loads available players and station data from the [registry](../registry/)
+* loads available players and station catalogs from the [registry](../registry/)
   * sign in when you need to control managed players
 
 ## Usage
