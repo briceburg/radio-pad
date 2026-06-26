@@ -1,14 +1,13 @@
 FROM python:3.13-alpine
-
-RUN python3 -m venv /venv \
-  && chown -R nobody:nobody /venv
+COPY --from=ghcr.io/astral-sh/uv:0.11.24 /uv /uvx /bin/
 
 ENV \
   PATH="/venv/bin:$PATH" \
-  PYTHONPYCACHEPREFIX=/tmp/pycache
+  UV_PROJECT_ENVIRONMENT=/venv
 
 WORKDIR /app
-USER nobody
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev && uv cache clean
+
+USER nobody

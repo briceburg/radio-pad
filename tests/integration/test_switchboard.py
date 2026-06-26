@@ -19,9 +19,7 @@ PLAYER_HEADERS = {
 @pytest.mark.asyncio
 async def test_player_connect(switchboard_url):
     """Player can connect, send ping, receive pong."""
-    async with websockets.connect(
-        f"{switchboard_url}/test-acct/player1", additional_headers=PLAYER_HEADERS
-    ) as ws:
+    async with websockets.connect(f"{switchboard_url}/test-acct/player1", additional_headers=PLAYER_HEADERS) as ws:
         await ws.send(json.dumps({"event": "ping"}))
         resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
         assert resp["event"] == "pong"
@@ -46,25 +44,16 @@ async def test_player_playback_state_broadcast(switchboard_url):
     room = f"{switchboard_url}/test-acct/broadcast-test"
 
     async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player1:
-        # Drain the initial state broadcasts from player1 connecting.
-        try:
-            await asyncio.wait_for(player1.recv(), timeout=1)
-        except asyncio.TimeoutError:
-            pass
-
         async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player2:
-            # Drain any initial messages on player2.
-            try:
-                while True:
-                    await asyncio.wait_for(player2.recv(), timeout=1)
-            except asyncio.TimeoutError:
-                pass
-
             # player1 sends playback_state
-            await player1.send(json.dumps({
-                "event": "playback_state",
-                "data": {"station_name": "Test FM"},
-            }))
+            await player1.send(
+                json.dumps(
+                    {
+                        "event": "playback_state",
+                        "data": {"station_name": "Test FM"},
+                    }
+                )
+            )
 
             # player2 should receive the broadcast
             msg = json.loads(await asyncio.wait_for(player2.recv(), timeout=5))

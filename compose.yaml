@@ -4,7 +4,7 @@ services:
       context: ./registry
       target: dev
     ports:
-      - "${RADIOPAD_REGISTRY_PORT}:1980"
+      - "${RADIOPAD_REGISTRY_PORT:-0}:1980"
     environment:
       REGISTRY_PROFILES: "api,switchboard"
       REGISTRY_BIND_PORT: "1980"
@@ -34,7 +34,7 @@ services:
       RADIOPAD_REGISTRY_PROXY_TARGET: "http://registry:1980"
       RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://registry:1980"
     ports:
-      - "${RADIOPAD_REMOTE_CONTROL_PORT}:5173"
+      - "${RADIOPAD_REMOTE_CONTROL_PORT:-5173}:5173"
     volumes:
       - ./remote-control:/app
       - /app/node_modules
@@ -44,7 +44,7 @@ services:
       - tests
     build:
       context: ./tests/integration
-    command: ["pytest", "-v", "--tb=short", "-p", "no:cacheprovider"]
+    command: ["pytest", "-v"]
     depends_on:
       player:
         condition: service_healthy

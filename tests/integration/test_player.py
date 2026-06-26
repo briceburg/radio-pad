@@ -11,13 +11,14 @@ CONTROLLER_TOKEN = "integration-test-token"
 
 
 async def wait_for_event(ws, event_name, predicate=None, timeout=15):
-    while True:
-        message = json.loads(await asyncio.wait_for(ws.recv(), timeout=timeout))
-        if message.get("event") != event_name:
-            continue
-        if predicate is not None and not predicate(message.get("data")):
-            continue
-        return message
+    async with asyncio.timeout(timeout):
+        while True:
+            message = json.loads(await ws.recv())
+            if message.get("event") != event_name:
+                continue
+            if predicate is not None and not predicate(message.get("data")):
+                continue
+            return message
 
 
 @pytest.mark.asyncio
@@ -25,11 +26,7 @@ async def test_real_player_processes_playback_commands(switchboard_url):
     controller_url = f"{switchboard_url}/{PLAYER_ROOM}?token={CONTROLLER_TOKEN}"
 
     async with websockets.connect(controller_url) as controller:
-        await controller.send(
-            json.dumps(
-                {"event": "playback_start", "data": {"station_name": "wwoz"}}
-            )
-        )
+        await controller.send(json.dumps({"event": "playback_start", "data": {"station_name": "wwoz"}}))
 
         playing = await wait_for_event(
             controller,
