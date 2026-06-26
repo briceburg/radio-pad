@@ -16,46 +16,36 @@ jobs:
           - macropad-control
           - player
           - registry
+          - tests/integration
     defaults:
       run:
         working-directory: ./${{ matrix.project }}
     steps:
       - uses: actions/checkout@v6
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.2.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || '' }}
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-          cache-dependency-path: ./${{ matrix.project }}/requirements*.txt
-      - name: Install dependencies
-        run: |
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
+          version: "0.11.24"
+          working-directory: ./${{ matrix.project }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ github.workspace }}/${{ matrix.project }}/tmp/.uv_cache
       - name: Run CI checks
         run: bin/ci
 
   node-ci:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - remote-control
     defaults:
       run:
-        working-directory: ./${{ matrix.project }}
+        working-directory: ./remote-control
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha || '' }}
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: ./${{ matrix.project }}/package-lock.json
+          cache-dependency-path: ./remote-control/package-lock.json
       - name: Install dependencies
         run: npm ci
       - name: Run CI
@@ -66,14 +56,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - compose_file: compose.yaml
-          - compose_file: compose.split.yaml
-          - compose_file: compose.prod-smoke.yaml
+        compose_file: [compose.yaml, compose.split.yaml, compose.prod-smoke.yaml]
     steps:
       - uses: actions/checkout@v6
       - name: Run compose integration tests
-        env:
-          COMPOSE_FILE: ${{ matrix.compose_file }}
-          CI_CLEANUP: "false"
-        run: bin/ci
+        run: bin/ci ${{ matrix.compose_file }}

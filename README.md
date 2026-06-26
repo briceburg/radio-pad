@@ -66,7 +66,8 @@ Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad
 data port. `bin/dev` does not mount or sync firmware; those steps stay explicit
 because they can prompt for privileges and write to the device.
 
-Ports default to ephemeral (see [.env](.env)). Override in `.env` to pin them:
+Registry and switchboard ports default to ephemeral; the web app defaults to
+port 5173 for OAuth redirects. Override them in `.env` when needed:
 
 ```
 RADIOPAD_REGISTRY_PORT=1980
@@ -88,11 +89,17 @@ Integration tests validate cross-service behavior (reachability, handshakes, mes
 Individual project tests live within each component folder.
 
 ```sh
+# Integration test static checks and collection
+tests/integration/bin/ci
+
 # Unified mode
 bin/ci
 
 # Split mode
-COMPOSE_FILE=compose.split.yaml bin/ci
+bin/ci compose.split.yaml
+
+# Production images and healthchecks
+bin/ci compose.prod-smoke.yaml
 ```
 
 ### Testing with a macropad
