@@ -11,6 +11,25 @@ vi.mock("@capacitor/core", () => ({
 describe("RadioControl", () => {
   let mockWebSocketInstance;
 
+  function connectOpenControl(url = "ws://example.com/") {
+    const rc = new RadioControl();
+    rc.connect(url);
+    rc.ws.readyState = WebSocket.OPEN;
+    return rc;
+  }
+
+  function receiveEvent(rc, event, data) {
+    rc.ws.onmessage({
+      data: JSON.stringify({ event, data }),
+    });
+  }
+
+  function expectSentEvent(expected) {
+    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
+      JSON.stringify(expected),
+    );
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
     mockWebSocketInstance = {
@@ -31,7 +50,7 @@ describe("RadioControl", () => {
     vi.unstubAllEnvs();
   });
 
-  it("resolves switchboard URL override correctly in browser mode", async () => {
+  it("resolves switchboard URL override correctly in browser mode", () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
     const rc = new RadioControl();
 
@@ -42,7 +61,7 @@ describe("RadioControl", () => {
     );
   });
 
-  it("resolves same-origin switchboard overrides correctly in browser mode", async () => {
+  it("resolves same-origin switchboard overrides correctly in browser mode", () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "/switchboard");
     const rc = new RadioControl();
 
@@ -53,7 +72,7 @@ describe("RadioControl", () => {
     );
   });
 
-  it("connect ignores override in native platform", async () => {
+  it("connect ignores override in native platform", () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
     Capacitor.isNativePlatform.mockReturnValue(true);
     const rc = new RadioControl();
@@ -65,39 +84,26 @@ describe("RadioControl", () => {
     );
   });
 
-  it("sending playback start works when connected", async () => {
-    const rc = new RadioControl();
-    rc.connect("ws://example.com/");
+  it.each([
+    [
+      "playback_start",
+      (rc) => rc.startPlayback("WXXI"),
+      { event: "playback_start", data: { station_name: "WXXI" } },
+    ],
+    [
+      "playback_stop",
+      (rc) => rc.stopPlayback(),
+      { event: "playback_stop", data: null },
+    ],
+  ])("sends %s when connected", (_event, sendCommand, expected) => {
+    const rc = connectOpenControl();
 
-    rc.ws.readyState = WebSocket.OPEN;
+    sendCommand(rc);
 
-    rc.startPlayback("WXXI");
-
-    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: "playback_start",
-        data: { station_name: "WXXI" },
-      }),
-    );
+    expectSentEvent(expected);
   });
 
-  it("sending playback stop works when connected", async () => {
-    const rc = new RadioControl();
-    rc.connect("ws://example.com/");
-
-    rc.ws.readyState = WebSocket.OPEN;
-
-    rc.stopPlayback();
-
-    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        event: "playback_stop",
-        data: null,
-      }),
-    );
-  });
-
-  it("sends error event if sending request while disconnected", async () => {
+  it("sends error event if sending request while disconnected", () => {
     const rc = new RadioControl();
     const errorSpy = vi.fn();
     rc.addEventListener("error", errorSpy);
@@ -107,7 +113,7 @@ describe("RadioControl", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  it("emits playback state and station catalog URL events", async () => {
+  it("emits playback state and station catalog URL events", () => {
     const rc = new RadioControl();
     const playbackSpy = vi.fn();
     const catalogSpy = vi.fn();
@@ -115,17 +121,9 @@ describe("RadioControl", () => {
     rc.addEventListener("stationcatalogurl", catalogSpy);
     rc.connect("ws://example.com/");
 
-    rc.ws.onmessage({
-      data: JSON.stringify({
-        event: "playback_state",
-        data: { station_name: "WXXI" },
-      }),
-    });
-    rc.ws.onmessage({
-      data: JSON.stringify({
-        event: "station_catalog_url",
-        data: { url: "https://example.test/stations.json" },
-      }),
+    receiveEvent(rc, "playback_state", { station_name: "WXXI" });
+    receiveEvent(rc, "station_catalog_url", {
+      url: "https://example.test/stations.json",
     });
 
     expect(playbackSpy).toHaveBeenCalledWith(

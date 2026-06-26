@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
 
+import pytest
+from httpx import Response
 from starlette.testclient import TestClient
 
 from api.auth import AuthServices
@@ -11,6 +12,8 @@ from auth import AccountAccess, AuthzStore, GlobalAdmins, RegistryIDToken
 from datastore import DataStore, LocalBackend
 from models import Account, GlobalStationPreset, Player, Station
 from registry import create_app
+
+FRESH_PRESET = {"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]}
 
 
 def _token(*, subject: str, email: str | None = None, email_verified: bool = False) -> RegistryIDToken:
@@ -66,15 +69,48 @@ def _build_client(tmp_path: Path, auth_services: AuthServices) -> TestClient:
     return TestClient(app, raise_server_exceptions=False, base_url=f"http://testserver{API_PREFIX}/")
 
 
-def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
+def _auth_client(
+    tmp_path: Path,
+    identities: dict[str, RegistryIDToken] | None = None,
+    configure_authz: Callable[[AuthzStore], None] | None = None,
+) -> TestClient:
     authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    client = _build_client(
+    if configure_authz:
+        configure_authz(authz_store)
+
+    return _build_client(
         tmp_path,
         AuthServices(
-            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
+            authenticate_user=StubAuthenticator(identities or {}),
             authz_store=authz_store,
         ),
     )
+
+
+def _bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _with_global_admin(email: str) -> Callable[[AuthzStore], None]:
+    def configure_authz(store: AuthzStore) -> None:
+        store.save_global_admins(GlobalAdmins(emails=[email]))
+
+    return configure_authz
+
+
+def _with_account_owner(account_id: str, email: str) -> Callable[[AuthzStore], None]:
+    def configure_authz(store: AuthzStore) -> None:
+        store.save_account_access(AccountAccess(id=account_id, emails=[email]))
+
+    return configure_authz
+
+
+def _put_fresh_global_preset(client: TestClient, headers: dict[str, str] | None = None) -> Response:
+    return client.put("presets/fresh", headers=headers or {}, json=FRESH_PRESET)
+
+
+def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
+    client = _auth_client(tmp_path)
 
     with client:
         # All read endpoints must remain public even when auth is enabled
@@ -84,139 +120,60 @@ def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
         assert client.get("accounts/testuser1/players").status_code == 200
 
 
-def test_global_preset_write_requires_bearer_token(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    client = _build_client(
-        tmp_path,
-        AuthServices(
-            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
-            authz_store=authz_store,
-        ),
-    )
+@pytest.mark.parametrize(
+    "headers",
+    [
+        None,
+        {"Authorization": "Basic not-a-bearer-token"},
+        {"Authorization": "Bearer    "},
+    ],
+    ids=["missing", "wrong-scheme", "empty-bearer"],
+)
+def test_global_preset_write_requires_bearer_token(tmp_path: Path, headers: dict[str, str] | None) -> None:
+    client = _auth_client(tmp_path)
 
     with client:
-        response = client.put(
-            "presets/fresh",
-            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
-        )
-
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Bearer token required"
-
-
-def test_global_preset_write_rejects_non_bearer_scheme(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    client = _build_client(
-        tmp_path,
-        AuthServices(
-            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
-            authz_store=authz_store,
-        ),
-    )
-
-    with client:
-        response = client.put(
-            "presets/fresh",
-            headers={"Authorization": "Basic not-a-bearer-token"},
-            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
-        )
-
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Bearer token required"
-
-
-def test_global_preset_write_requires_non_empty_bearer_token(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    client = _build_client(
-        tmp_path,
-        AuthServices(
-            authenticate_user=cast(Callable[[str], RegistryIDToken], StubAuthenticator({})),
-            authz_store=authz_store,
-        ),
-    )
-
-    with client:
-        response = client.put(
-            "presets/fresh",
-            headers={"Authorization": "Bearer    "},
-            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
-        )
+        response = _put_fresh_global_preset(client, headers)
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Bearer token required"
 
 
 def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    client = _build_client(
-        tmp_path,
-        AuthServices(
-            authenticate_user=cast(
-                Callable[[str], RegistryIDToken],
-                StubAuthenticator({"owner-token": _token(subject="owner-123")}),
-            ),
-            authz_store=authz_store,
-        ),
-    )
+    client = _auth_client(tmp_path, {"owner-token": _token(subject="owner-123")})
 
     with client:
-        response = client.put(
-            "presets/fresh",
-            headers={"Authorization": "Bearer owner-token"},
-            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
-        )
+        response = _put_fresh_global_preset(client, _bearer("owner-token"))
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Admin access required"
 
 
 def test_admin_can_write_global_preset(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    authz_store.save_global_admins(GlobalAdmins(emails=["briceburg@gmail.com"]))
-    client = _build_client(
+    client = _auth_client(
         tmp_path,
-        AuthServices(
-            authenticate_user=cast(
-                Callable[[str], RegistryIDToken],
-                StubAuthenticator(
-                    {"admin-token": _token(subject="admin-123", email="briceburg@gmail.com", email_verified=True)}
-                ),
-            ),
-            authz_store=authz_store,
-        ),
+        {"admin-token": _token(subject="admin-123", email="briceburg@gmail.com", email_verified=True)},
+        _with_global_admin("briceburg@gmail.com"),
     )
 
     with client:
-        response = client.put(
-            "presets/fresh",
-            headers={"Authorization": "Bearer admin-token"},
-            json={"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]},
-        )
+        response = _put_fresh_global_preset(client, _bearer("admin-token"))
 
     assert response.status_code == 200
     assert response.json()["id"] == "fresh"
 
 
 def test_account_owner_can_update_owned_account(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    authz_store.save_account_access(AccountAccess(id="testuser1", emails=["owner@example.com"]))
-    client = _build_client(
+    client = _auth_client(
         tmp_path,
-        AuthServices(
-            authenticate_user=cast(
-                Callable[[str], RegistryIDToken],
-                StubAuthenticator(
-                    {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)}
-                ),
-            ),
-            authz_store=authz_store,
-        ),
+        {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)},
+        _with_account_owner("testuser1", "owner@example.com"),
     )
 
     with client:
         response = client.put(
             "accounts/testuser1",
-            headers={"Authorization": "Bearer owner-token"},
+            headers=_bearer("owner-token"),
             json={"name": "Updated User 1"},
         )
 
@@ -225,25 +182,16 @@ def test_account_owner_can_update_owned_account(tmp_path: Path) -> None:
 
 
 def test_account_owner_cannot_update_other_account(tmp_path: Path) -> None:
-    authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
-    authz_store.save_account_access(AccountAccess(id="testuser1", emails=["owner@example.com"]))
-    client = _build_client(
+    client = _auth_client(
         tmp_path,
-        AuthServices(
-            authenticate_user=cast(
-                Callable[[str], RegistryIDToken],
-                StubAuthenticator(
-                    {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)}
-                ),
-            ),
-            authz_store=authz_store,
-        ),
+        {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)},
+        _with_account_owner("testuser1", "owner@example.com"),
     )
 
     with client:
         response = client.put(
             "accounts/testuser2",
-            headers={"Authorization": "Bearer owner-token"},
+            headers=_bearer("owner-token"),
             json={"name": "Updated User 2"},
         )
 
