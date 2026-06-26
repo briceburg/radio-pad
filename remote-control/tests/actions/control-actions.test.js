@@ -11,6 +11,17 @@ function createMockControl() {
   return control;
 }
 
+function createMockListen() {
+  return { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
+}
+
+const PLAYER = {
+  id: "living-room",
+  name: "Living Room",
+  stations_url: "https://example.test/stations.json",
+  switchboard_url: "wss://example.test/switchboard/briceburg/living-room",
+};
+
 describe("control-actions", () => {
   beforeEach(() => {
     global.fetch = vi.fn();
@@ -28,7 +39,7 @@ describe("control-actions", () => {
       connectionState: "idle",
       playerConnected: null,
       playerStatuses: {},
-      statusText: "",
+      resourceStatuses: {},
     });
     listenStore.set({
       stationCatalog: null,
@@ -39,7 +50,7 @@ describe("control-actions", () => {
 
   it("selects a player, connects, and loads its station catalog", async () => {
     const control = createMockControl();
-    const listen = { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
+    const listen = createMockListen();
     const stationCatalog = {
       name: "Casa Briceburg",
       stations: [{ name: "KEXP" }],
@@ -50,30 +61,47 @@ describe("control-actions", () => {
     });
 
     const actions = createControlActions({ control, listen });
-    const player = {
-      id: "living-room",
-      name: "Living Room",
-      stations_url: "https://example.test/stations.json",
-      switchboard_url: "wss://example.test/switchboard/briceburg/living-room",
-    };
 
-    await actions.selectPlayer(player);
+    await actions.selectPlayer(PLAYER);
 
-    expect(control.connect).toHaveBeenCalledWith(player.switchboard_url, null);
+    expect(control.connect).toHaveBeenCalledWith(PLAYER.switchboard_url, null);
     expect(global.fetch).toHaveBeenCalledWith(
-      player.stations_url,
+      PLAYER.stations_url,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(controlStore.get()).toMatchObject({
-      player,
+      player: PLAYER,
       stationCatalog,
       loading: false,
     });
   });
 
+  it("retains a degraded station state when station catalog loading fails", async () => {
+    const control = createMockControl();
+    const actions = createControlActions({
+      control,
+      listen: createMockListen(),
+    });
+    global.fetch.mockRejectedValue(new Error("Failed to fetch"));
+
+    await actions.selectPlayer(PLAYER);
+
+    expect(controlStore.get()).toMatchObject({
+      player: PLAYER,
+      stationCatalog: null,
+      loading: false,
+      resourceStatuses: {
+        station_catalog: {
+          level: "warning",
+          summary: "Station catalog unavailable.",
+        },
+      },
+    });
+  });
+
   it("dispatches explicit playback commands for control stations", async () => {
     const control = createMockControl();
-    const listen = { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
+    const listen = createMockListen();
     const actions = createControlActions({ control, listen });
 
     await actions.clickStation("control", "KEXP");

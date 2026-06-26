@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getControlStatusText,
   getStationButtonColor,
   getStationVisualState,
   isControlDegraded,
@@ -11,7 +12,7 @@ describe("radio-player-tab visual helpers", () => {
     expect(isControlDegraded({ playerConnected: false })).toBe(true);
   });
 
-  it("treats station and switchboard warnings as degraded", () => {
+  it("treats protocol and resource warnings as degraded", () => {
     expect(
       isControlDegraded({
         connectionState: "connected",
@@ -21,6 +22,36 @@ describe("radio-player-tab visual helpers", () => {
         },
       }),
     ).toBe(true);
+    expect(
+      isControlDegraded({
+        resourceStatuses: {
+          registry: { level: "warning", summary: "Registry unavailable." },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("derives control status text from connection and retained statuses", () => {
+    expect(
+      getControlStatusText({
+        playerConnected: false,
+        resourceStatuses: {
+          registry: { level: "warning", summary: "Registry unavailable." },
+        },
+      }),
+    ).toBe("Player offline.");
+    expect(
+      getControlStatusText({
+        connectionState: "connected",
+        player: { name: "Living Room" },
+        resourceStatuses: {
+          station_catalog: {
+            level: "warning",
+            summary: "Station catalog unavailable.",
+          },
+        },
+      }),
+    ).toBe("Station catalog unavailable.");
   });
 
   it("derives station visual states and button colors", () => {
