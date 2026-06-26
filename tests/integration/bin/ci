@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
+
+uv run mypy .
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest --collect-only -q
