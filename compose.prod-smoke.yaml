@@ -1,6 +1,6 @@
 # Prod-image smoke tests — builds all services with target: prod and waits
 # for healthchecks. Run locally or in CI via:
-#   COMPOSE_FILE=compose.prod-smoke.yaml bin/ci
+#   bin/ci compose.prod-smoke.yaml
 
 services:
   registry:

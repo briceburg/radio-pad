@@ -11,7 +11,7 @@ services:
       file: compose.yaml
       service: registry
     ports:
-      - "${RADIOPAD_SWITCHBOARD_PORT}:1980"
+      - "${RADIOPAD_SWITCHBOARD_PORT:-0}:1980"
     environment:
       REGISTRY_PROFILES: "switchboard"
       REGISTRY_BIND_PORT: "1980"
