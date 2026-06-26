@@ -92,6 +92,15 @@ class Broadcast:
         """Remove all retained state for *channel*."""
         self._channel_state.pop(channel, None)
 
+    def clear_state_key(self, channel: str, key: str) -> None:
+        """Remove one retained state item for *channel*."""
+        channel_state = self._channel_state.get(channel)
+        if not channel_state:
+            return
+        channel_state.pop(key, None)
+        if not channel_state:
+            self._channel_state.pop(channel, None)
+
     async def replay_state(self, channel: str, queue: asyncio.Queue[Event | None]) -> None:
         """Enqueue retained state messages for *channel* into *queue*."""
         for message in self._channel_state.get(channel, {}).values():

@@ -10,7 +10,7 @@ vi.mock("@capacitor/core", () => ({
 
 describe("RadioControl", () => {
   let mockWebSocketInstance;
-  
+
   beforeEach(() => {
     vi.useFakeTimers();
     mockWebSocketInstance = {
@@ -25,18 +25,21 @@ describe("RadioControl", () => {
     });
     Capacitor.isNativePlatform.mockReturnValue(false);
   });
-  
+
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("resolves switchboard URL override correctly in browser mode", async () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
     const rc = new RadioControl();
-    
+
     rc.connect("ws://remote-server:9000/player/foo?token=123");
-    
-    expect(global.WebSocket).toHaveBeenCalledWith("ws://localhost:8080/player/foo?token=123");
+
+    expect(global.WebSocket).toHaveBeenCalledWith(
+      "ws://localhost:8080/player/foo?token=123",
+    );
   });
 
   it("resolves same-origin switchboard overrides correctly in browser mode", async () => {
@@ -54,35 +57,84 @@ describe("RadioControl", () => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
     Capacitor.isNativePlatform.mockReturnValue(true);
     const rc = new RadioControl();
-    
+
     rc.connect("ws://remote-server:9000/player/foo?token=123");
-    
-    expect(global.WebSocket).toHaveBeenCalledWith("ws://remote-server:9000/player/foo?token=123");
+
+    expect(global.WebSocket).toHaveBeenCalledWith(
+      "ws://remote-server:9000/player/foo?token=123",
+    );
   });
-  
-  it("sending station request works when connected", async () => {
+
+  it("sending playback start works when connected", async () => {
     const rc = new RadioControl();
     rc.connect("ws://example.com/");
-    
-    // simulate open
-    mockWebSocketInstance.readyState = WebSocket.OPEN;
-    
-    rc.sendStationRequest("WXXI");
-    
-    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(JSON.stringify({
-      event: "station_request",
-      data: "WXXI"
-    }));
+
+    rc.ws.readyState = WebSocket.OPEN;
+
+    rc.startPlayback("WXXI");
+
+    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: "playback_start",
+        data: { station_name: "WXXI" },
+      }),
+    );
+  });
+
+  it("sending playback stop works when connected", async () => {
+    const rc = new RadioControl();
+    rc.connect("ws://example.com/");
+
+    rc.ws.readyState = WebSocket.OPEN;
+
+    rc.stopPlayback();
+
+    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: "playback_stop",
+        data: null,
+      }),
+    );
   });
 
   it("sends error event if sending request while disconnected", async () => {
     const rc = new RadioControl();
     const errorSpy = vi.fn();
     rc.addEventListener("error", errorSpy);
-    
-    // we never call connect() or don't set readyState
-    rc.sendStationRequest("WXXI");
-    
+
+    rc.startPlayback("WXXI");
+
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("emits playback state and station catalog URL events", async () => {
+    const rc = new RadioControl();
+    const playbackSpy = vi.fn();
+    const catalogSpy = vi.fn();
+    rc.addEventListener("playbackstate", playbackSpy);
+    rc.addEventListener("stationcatalogurl", catalogSpy);
+    rc.connect("ws://example.com/");
+
+    rc.ws.onmessage({
+      data: JSON.stringify({
+        event: "playback_state",
+        data: { station_name: "WXXI" },
+      }),
+    });
+    rc.ws.onmessage({
+      data: JSON.stringify({
+        event: "station_catalog_url",
+        data: { url: "https://example.test/stations.json" },
+      }),
+    });
+
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: "WXXI" }),
+    );
+    expect(catalogSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: "https://example.test/stations.json",
+      }),
+    );
   });
 });

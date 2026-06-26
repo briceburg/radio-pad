@@ -91,19 +91,25 @@ export class RadioControl extends EventTarget {
     }
   }
 
-  sendStationRequest(stationName) {
+  sendCommand(event, data = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({ event: "station_request", data: stationName }),
-      );
+      this.ws.send(JSON.stringify({ event, data }));
       return;
     }
 
     this.dispatchEvent(
       new CustomEvent("error", {
-        detail: "WebSocket not connected. Cannot send station request.",
+        detail: "WebSocket not connected. Cannot send command.",
       }),
     );
+  }
+
+  startPlayback(stationName) {
+    this.sendCommand("playback_start", { station_name: stationName });
+  }
+
+  stopPlayback() {
+    this.sendCommand("playback_stop");
   }
 
   _connectWebSocket(url, token) {
@@ -162,15 +168,36 @@ export class RadioControl extends EventTarget {
       try {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
-          case "station_playing":
+          case "playback_state":
             this.dispatchEvent(
-              new CustomEvent("stationplaying", { detail: data }),
+              new CustomEvent("playbackstate", {
+                detail:
+                  data && typeof data === "object"
+                    ? data.station_name || null
+                    : null,
+              }),
             );
             break;
-          case "stations_url":
-            this.dispatchEvent(
-              new CustomEvent("stationsurl", { detail: data }),
-            );
+          case "station_catalog_url":
+            if (data && typeof data === "object" && data.url) {
+              this.dispatchEvent(
+                new CustomEvent("stationcatalogurl", { detail: data.url }),
+              );
+            }
+            break;
+          case "player_presence":
+            if (data && typeof data === "object") {
+              this.dispatchEvent(
+                new CustomEvent("playerpresence", { detail: data }),
+              );
+            }
+            break;
+          case "player_status":
+            if (data && typeof data === "object") {
+              this.dispatchEvent(
+                new CustomEvent("playerstatus", { detail: data }),
+              );
+            }
             break;
         }
       } catch {

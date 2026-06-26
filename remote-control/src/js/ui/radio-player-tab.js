@@ -21,13 +21,38 @@ import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
 import { controlStore, listenStore } from "../store.js";
 
-function renderSkeleton() {
+export function isControlDegraded(state) {
+  if (state.connectionState === "disconnected") return true;
+  if (state.playerConnected === false) return true;
+
+  const degradedStatuses = ["stations", "switchboard"];
+  return degradedStatuses.some((scope) =>
+    ["warning", "error"].includes(state.playerStatuses?.[scope]?.level),
+  );
+}
+
+export function getStationVisualState(tabName, state) {
+  if (tabName === "control" && isControlDegraded(state)) return "warning";
+  if (state.loading) return "loading";
+  return "normal";
+}
+
+export function getStationButtonColor(visualState, isActive) {
+  if (isActive) return "success";
+  return visualState === "warning" ? "warning" : "primary";
+}
+
+function renderSkeleton(visualState = "loading") {
   const rows = [1, 2, 3];
+  const cssClass =
+    visualState === "warning"
+      ? "station-placeholder station-placeholder-warning"
+      : "station-placeholder";
 
   return html`
     ${rows.map(
       () => html`
-        <ion-row class="station-placeholder">
+        <ion-row class=${cssClass}>
           ${Array.from({ length: 3 }).map(
             () => html`
               <ion-col size="4">
@@ -95,7 +120,7 @@ export class RadioPlayerTab extends RadioElement {
     `;
   }
 
-  renderStationButtons(stations, currentStation) {
+  renderStationButtons(stations, currentStation, visualState) {
     const rows = [];
     const stationsList = stations || [];
     for (let i = 0; i < stationsList.length; i += 3) {
@@ -108,11 +133,12 @@ export class RadioPlayerTab extends RadioElement {
           <ion-row>
             ${row.map((station) => {
               const isActive = station.name === currentStation;
+              const color = getStationButtonColor(visualState, isActive);
               return html`
                 <ion-col size="4">
                   <ion-button
                     expand="block"
-                    color=${isActive ? "success" : "primary"}
+                    color=${color}
                     @click=${() => this._onSelectStation(station.name)}
                   >
                     ${station.name}
@@ -128,25 +154,45 @@ export class RadioPlayerTab extends RadioElement {
 
   render() {
     const s = this.state;
+    const visualState = getStationVisualState(this.tabName, s);
+    const shouldRenderSkeleton =
+      s.loading ||
+      (visualState === "warning" &&
+        !s.stationsData &&
+        this.tabName === "control" &&
+        s.player?.id);
 
     let content;
-    if (s.loading) {
-      content = renderSkeleton();
+    if (shouldRenderSkeleton) {
+      content = renderSkeleton(visualState);
     } else if (!s.stationsData) {
       content = this.renderEmptyState();
     } else {
       content = this.renderStationButtons(
         s.stationsData.stations,
         s.currentStation,
+        visualState,
       );
     }
+
+    const titleName =
+      this.tabName === "control"
+        ? s.player?.name || s.stationsData?.name || ""
+        : s.stationsData?.name || "";
+    const nowPlaying =
+      s.currentStation ||
+      (s.loading
+        ? "Loading..."
+        : s.playerConnected === false
+          ? "Offline"
+          : "...");
 
     return html`
       <ion-header>
         <ion-toolbar>
           <ion-title size="large">
-            <span class="stations-name">${s.stationsData?.name || ""}</span>:
-            <span class="now-playing">${s.currentStation || "..."}</span>
+            <span class="stations-name">${titleName}</span>:
+            <span class="now-playing">${nowPlaying}</span>
           </ion-title>
           <ion-buttons slot="end">
             <ion-button

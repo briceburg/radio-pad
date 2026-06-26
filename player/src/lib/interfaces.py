@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 class RadioPadStation:
     name: str
     url: str
-    color: Optional[str] = None
 
 
 @dataclass
@@ -43,9 +42,7 @@ class RadioPadPlayerConfig:
 
 class RadioPadEvent(TypedDict, total=False):
     event: str
-    data: Optional[
-        object
-    ]  # Any JSON serializable data, including strings, numbers, lists, or dictionaries
+    data: Optional[object]
 
 
 class RadioPadPlayer(abc.ABC):
@@ -110,15 +107,19 @@ class RadioPadClient(abc.ABC):
     def __init__(self, player: RadioPadPlayer):
         self._player = player
         self._event_handlers = {}
-        self.register_event("volume", self._handle_volume)
-        self.register_event("station_request", self._handle_station_request)
+        self.register_event("playback_start", self._handle_playback_start)
+        self.register_event("playback_stop", self._handle_playback_stop)
+        self.register_event("volume_up", self._handle_volume_up)
+        self.register_event("volume_down", self._handle_volume_down)
         # Ignored events
         for ignored in (
-            "station_playing",
+            "playback_state",
             "client_count",
-            "stations_url",
+            "player_presence",
             "player_status",
             "player_heartbeat",
+            "station_catalog",
+            "station_catalog_url",
         ):
             self.register_event(ignored, self._handle_ignored)
 
@@ -133,8 +134,12 @@ class RadioPadClient(abc.ABC):
 
     async def broadcast(self, event, data=None, limit_to_self=False):
         """Broadcast an event to clients registered with the player."""
-        if event == "station_playing":
-            data = self.player.station.name if self.player.station else None
+        if event == "playback_state":
+            data = {
+                "station_name": (
+                    self.player.station.name if self.player.station else None
+                )
+            }
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
             if limit_to_self and client is not self:
@@ -162,27 +167,32 @@ class RadioPadClient(abc.ABC):
         handler = self._event_handlers.get(event_name, self._handle_unknown)
         await handler(event)
 
-    async def _handle_volume(self, event):
-        data = event.get("data")
-        if data == "up":
-            await self.player.volume_up()
-        else:
-            await self.player.volume_down()
+    async def _handle_volume_up(self, event):
+        await self.player.volume_up()
 
-    async def _handle_station_request(self, event):
+    async def _handle_volume_down(self, event):
+        await self.player.volume_down()
+
+    async def _handle_playback_start(self, event):
         data = event.get("data")
-        if data:
-            station = next(
-                (s for s in self.player.config.stations if s.name == data), None
-            )
-            if station:
-                await self.player.play(station)
-            else:
-                logger.warning("Station '%s' not found in RADIO_STATIONS.", data)
-                return
-        else:
-            await self.player.stop()
-        await self.broadcast("station_playing")
+        station_name = data.get("station_name") if isinstance(data, dict) else None
+        if not station_name:
+            logger.warning("playback_start missing station_name")
+            return
+
+        station = next(
+            (s for s in self.player.config.stations if s.name == station_name), None
+        )
+        if station:
+            await self.player.play(station)
+            await self.broadcast("playback_state")
+            return
+
+        logger.warning("Station '%s' not found in RADIO_STATIONS.", station_name)
+
+    async def _handle_playback_stop(self, event):
+        await self.player.stop()
+        await self.broadcast("playback_state")
 
     async def _handle_ignored(self, event):
         pass  # Ignore these events

@@ -137,7 +137,9 @@ class MacropadKeys:
                     self.macropad.pixels[i] = PLAYING_COLOR
                     self.display.highlight_group(i)
                 else:
-                    self.macropad.pixels[i] = self._station_color(station)
+                    self.macropad.pixels[i] = (
+                        DEGRADED_COLOR if self.degraded else DEFAULT_COLOR
+                    )
             else:
                 self.macropad.pixels[i] = 0
                 self.display.set_group_text(i, "")
@@ -186,11 +188,6 @@ class MacropadKeys:
         self.macropad.pixels.show()
         time.sleep(duration)
         self.refresh()
-
-    def _station_color(self, station):
-        if self.degraded:
-            return DEGRADED_COLOR
-        return station.get("color", DEFAULT_COLOR)
 
     def _animate_skeleton(self, force=False):
         now = ticks_ms()
