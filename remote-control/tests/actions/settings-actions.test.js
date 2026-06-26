@@ -89,7 +89,7 @@ describe("settings-actions", () => {
 
     await actions.sync();
     expect(onPlayerSelected).toHaveBeenCalledWith(PLAYER);
-    expect(onRegistryStatus).toHaveBeenLastCalledWith("ok");
+    expect(onRegistryStatus).toHaveBeenLastCalledWith({ level: "ok" });
 
     onPlayerSelected.mockClear();
     onRegistryStatus.mockClear();
@@ -105,8 +105,10 @@ describe("settings-actions", () => {
     expect(discoverPlayer).not.toHaveBeenCalled();
     expect(prefs.setOptions).not.toHaveBeenCalledWith("playerId", []);
     expect(onRegistryStatus).toHaveBeenLastCalledWith(
-      "warning",
-      "Registry unavailable. Using last known selections.",
+      expect.objectContaining({
+        level: "warning",
+        summary: "Registry unavailable. Using last known selections.",
+      }),
     );
   });
 });

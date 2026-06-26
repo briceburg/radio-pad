@@ -16,8 +16,24 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { authStore, controlStore, listenStore, patchStore } from "../store.js";
+import {
+  applyRetainedStatus,
+  authStore,
+  controlStore,
+  listenStore,
+  patchStore,
+} from "../store.js";
 import { toastWarning } from "../notifications.js";
+
+const STATION_CATALOG_OK_STATUS = {
+  scope: "station_catalog",
+  level: "ok",
+};
+const STATION_CATALOG_UNAVAILABLE_STATUS = {
+  scope: "station_catalog",
+  level: "warning",
+  summary: "Station catalog unavailable.",
+};
 
 export function createControlActions({ control, listen }) {
   const getTabStore = (tabName) =>
@@ -34,50 +50,12 @@ export function createControlActions({ control, listen }) {
     }
   }
 
-  function updateRetainedStatus(statuses = {}, scope, level, summary = null) {
-    const nextStatuses = { ...statuses };
-    if (level === "ok") {
-      delete nextStatuses[scope];
-    } else {
-      nextStatuses[scope] = {
-        level,
-        summary: typeof summary === "string" ? summary : null,
-      };
-    }
-    return nextStatuses;
-  }
-
-  function setPlayerStatus(scope, level, summary = null) {
-    if (!scope) return;
-
+  function setStatusMap(statusMap, status) {
+    if (!(status?.scope && status?.level)) return;
     const controlState = controlStore.get();
-    const playerStatuses = updateRetainedStatus(
-      controlState.playerStatuses,
-      scope,
-      level,
-      summary,
-    );
-
-    updateTab("control", { playerStatuses });
-  }
-
-  function setResourceStatus(scope, level, summary = null) {
-    if (!scope) return;
-
-    const controlState = controlStore.get();
-    const resourceStatuses = updateRetainedStatus(
-      controlState.resourceStatuses,
-      scope,
-      level,
-      summary,
-    );
-
-    updateTab("control", { resourceStatuses });
-  }
-
-  function updatePlayerStatus(status) {
-    const { scope, level, summary } = status.detail || {};
-    setPlayerStatus(scope, level, summary);
+    updateTab("control", {
+      [statusMap]: applyRetainedStatus(controlState[statusMap], status),
+    });
   }
 
   async function loadStationCatalog(url, tabName = "control") {
@@ -106,7 +84,9 @@ export function createControlActions({ control, listen }) {
 
       if (tabName === "listen") listen.setStationCatalog(stationCatalog);
 
-      if (tabName === "control") setResourceStatus("station_catalog", "ok");
+      if (tabName === "control") {
+        setStatusMap("resourceStatuses", STATION_CATALOG_OK_STATUS);
+      }
 
       updateTab(tabName, { stationCatalog, loading: false });
       requestControllers[tabName] = null;
@@ -122,11 +102,7 @@ export function createControlActions({ control, listen }) {
       requestControllers[tabName] = null;
       updateTab(tabName, { loading: false });
       if (tabName === "control") {
-        setResourceStatus(
-          "station_catalog",
-          "warning",
-          "Station catalog unavailable.",
-        );
+        setStatusMap("resourceStatuses", STATION_CATALOG_UNAVAILABLE_STATUS);
       }
       toastWarning("Failed loading station catalog.", error);
       return null;
@@ -163,7 +139,9 @@ export function createControlActions({ control, listen }) {
       playerConnected: connected,
     });
   });
-  control.addEventListener("playerstatus", updatePlayerStatus);
+  control.addEventListener("playerstatus", (event) =>
+    setStatusMap("playerStatuses", event.detail),
+  );
 
   let lastAuthToken = authStore.get()?.registryBearerToken;
   authStore.subscribe((authState) => {
@@ -183,8 +161,11 @@ export function createControlActions({ control, listen }) {
   });
 
   return {
-    setRegistryStatus(level, summary = null) {
-      setResourceStatus("registry", level, summary);
+    setRegistryStatus(status = {}) {
+      setStatusMap("resourceStatuses", {
+        ...status,
+        scope: "registry",
+      });
     },
 
     async selectPlayer(player) {

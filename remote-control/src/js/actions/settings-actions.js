@@ -25,8 +25,11 @@ import {
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { toastDanger, toastRegistryFailure } from "../notifications.js";
 
-const REGISTRY_UNAVAILABLE_SUMMARY =
-  "Registry unavailable. Using last known selections.";
+const REGISTRY_OK_STATUS = { level: "ok" };
+const REGISTRY_UNAVAILABLE_STATUS = {
+  level: "warning",
+  summary: "Registry unavailable. Using last known selections.",
+};
 
 export function createSettingsActions({
   prefs,
@@ -130,14 +133,14 @@ export function createSettingsActions({
         hasSyncedOnce = true;
 
         if (registryFailure) {
-          onRegistryStatus("warning", REGISTRY_UNAVAILABLE_SUMMARY);
+          onRegistryStatus(REGISTRY_UNAVAILABLE_STATUS);
           toastRegistryFailure(failureReason, registryFailure, options);
         } else {
-          onRegistryStatus("ok");
+          onRegistryStatus(REGISTRY_OK_STATUS);
         }
       } catch (error) {
         if (error.name !== "AbortError") {
-          onRegistryStatus("warning", REGISTRY_UNAVAILABLE_SUMMARY);
+          onRegistryStatus(REGISTRY_UNAVAILABLE_STATUS);
           toastRegistryFailure(failureReason, error, options);
           if (!registryFailure) registryFailure = error;
         }

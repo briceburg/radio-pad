@@ -12,14 +12,8 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     preset_id = "functional-test-preset"
     preset_data = {
         "name": "Functional Test Preset",
-        "stations": [
-            {"name": "No Color Station", "url": "https://no-color.com"},
-            {
-                "name": "Color Station",
-                "url": "https://color.com",
-                "color": "#123456",
-            },
-        ],
+        "description": "Visible description",
+        "stations": [{"name": "Test Station", "url": "https://station.example/stream"}],
     }
 
     # Use httpx to make a real HTTP request to the running server
@@ -31,6 +25,5 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     assert response.status_code == 200
     data = response.json()
 
-    # The crucial assertion: the 'color' key should be missing for the first station
-    assert "color" not in data["stations"][0]
-    assert data["stations"][1]["color"] == "#123456"
+    assert data["description"] == "Visible description"
+    assert "category" not in data

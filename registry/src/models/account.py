@@ -18,8 +18,6 @@ class AccountBase(BaseModel):
 class AccountCreate(AccountBase):
     """Request body model for creating/updating an account via the PUT endpoint."""
 
-    pass
-
 
 class AccountSummary(BaseModel):
     """Abbreviated account model for list endpoints."""
