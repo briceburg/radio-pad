@@ -220,25 +220,7 @@ class MacropadClient(RadioPadClient):
             status = self._status_by_scope.get(status_scope)
             if not status:
                 continue
-            await self._send_status(
-                status_scope,
-                status["level"],
-                status["summary"],
-            )
-
-    async def _send_status(self, scope, level, summary):
-        await self._send(
-            json.dumps(
-                {
-                    "event": "player_status",
-                    "data": {
-                        "scope": scope,
-                        "level": level,
-                        "summary": summary,
-                    },
-                }
-            )
-        )
+            await self._send(json.dumps({"event": "player_status", "data": status}))
 
     async def _handle_station_catalog_request(self, event):
         station_names = [station.name for station in self.player.config.stations]

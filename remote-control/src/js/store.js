@@ -80,6 +80,26 @@ export function patchStore(store, patch) {
   }));
 }
 
+export function applyRetainedStatus(statuses = {}, status = {}) {
+  const { scope, level, summary = null } = status;
+  if (!(scope && level)) return statuses;
+
+  const nextStatuses = { ...statuses };
+  if (level === "ok") {
+    delete nextStatuses[scope];
+  } else {
+    nextStatuses[scope] = {
+      level,
+      summary: typeof summary === "string" ? summary : null,
+    };
+  }
+  return nextStatuses;
+}
+
+export function isDegradedStatus(status) {
+  return ["warning", "error"].includes(status?.level);
+}
+
 if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
   import("@nanostores/logger").then(({ logger }) => {
     logger({

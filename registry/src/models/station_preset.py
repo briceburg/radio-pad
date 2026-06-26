@@ -8,11 +8,6 @@ class Station(BaseModel):
 
     name: str = Field(..., json_schema_extra={"example": "WWOZ"})
     url: HttpUrl = Field(..., json_schema_extra={"example": "https://www.wwoz.org/listen/hi"})
-    color: str | None = Field(
-        default=None,
-        pattern=r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
-        json_schema_extra={"example": "#FF5733"},
-    )
 
 
 class StationPresetBase(BaseModel):
@@ -45,13 +40,9 @@ class StationPresetBase(BaseModel):
 class GlobalStationPresetCreate(StationPresetBase):
     """Request body model for creating a global station preset."""
 
-    pass
-
 
 class AccountStationPresetCreate(StationPresetBase):
     """Request body model for creating an account station preset."""
-
-    pass
 
 
 class GlobalStationPresetSummary(BaseModel):

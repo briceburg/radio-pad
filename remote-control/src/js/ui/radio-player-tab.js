@@ -19,7 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 import { html } from "lit";
 import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
-import { controlStore, listenStore } from "../store.js";
+import { controlStore, isDegradedStatus, listenStore } from "../store.js";
 
 const PLAYER_DEGRADED_SCOPES = ["stations", "switchboard"];
 const RESOURCE_DEGRADED_SCOPES = ["registry", "station_catalog"];
@@ -30,10 +30,6 @@ const STATUS_SUMMARY_ORDER = [
   ["resourceStatuses", "registry"],
   ["playerStatuses", "switchboard"],
 ];
-
-function isDegradedStatus(status) {
-  return ["warning", "error"].includes(status?.level);
-}
 
 function hasDegradedStatus(statuses = {}, scopes = []) {
   return scopes.some((scope) => isDegradedStatus(statuses[scope]));
