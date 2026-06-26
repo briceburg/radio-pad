@@ -88,10 +88,19 @@ async def make(
         raise ConfigError(
             "Failed fetching station catalog", status_summary="Stations unavailable"
         )
+    stations = (
+        station_catalog.get("stations") if isinstance(station_catalog, dict) else None
+    )
     if (
         not isinstance(station_catalog, dict)
-        or "name" not in station_catalog
-        or "stations" not in station_catalog
+        or not isinstance(station_catalog.get("name"), str)
+        or not isinstance(stations, list)
+        or any(
+            not isinstance(station, dict)
+            or not isinstance(station.get("name"), str)
+            or not isinstance(station.get("url"), str)
+            for station in stations
+        )
     ):
         raise ConfigError(
             'Station catalog URL must return \'{"name": str, "stations": [{...}]}\'',
@@ -101,10 +110,7 @@ async def make(
     # Create config object
     return RadioPadPlayerConfig(
         id=player,
-        stations=[
-            RadioPadStation(name=s["name"], url=s["url"])
-            for s in station_catalog["stations"]
-        ],
+        stations=[RadioPadStation(name=s["name"], url=s["url"]) for s in stations],
         stations_url=stations_url,
         registry_url=registry_url,
         switchboard_url=switchboard_url,
