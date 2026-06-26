@@ -158,18 +158,18 @@ export class RadioPlayerTab extends RadioElement {
     const shouldRenderSkeleton =
       s.loading ||
       (visualState === "warning" &&
-        !s.stationsData &&
+        !s.stationCatalog &&
         this.tabName === "control" &&
         s.player?.id);
 
     let content;
     if (shouldRenderSkeleton) {
       content = renderSkeleton(visualState);
-    } else if (!s.stationsData) {
+    } else if (!s.stationCatalog) {
       content = this.renderEmptyState();
     } else {
       content = this.renderStationButtons(
-        s.stationsData.stations,
+        s.stationCatalog.stations,
         s.currentStation,
         visualState,
       );
@@ -177,8 +177,8 @@ export class RadioPlayerTab extends RadioElement {
 
     const titleName =
       this.tabName === "control"
-        ? s.player?.name || s.stationsData?.name || ""
-        : s.stationsData?.name || "";
+        ? s.player?.name || s.stationCatalog?.name || ""
+        : s.stationCatalog?.name || "";
     const nowPlaying =
       s.currentStation ||
       (s.loading

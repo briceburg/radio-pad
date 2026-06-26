@@ -145,8 +145,8 @@ export class RadioListen {
     this.stations = new Map();
   }
 
-  setStations(stationsPayload = {}) {
-    const { stations = [] } = stationsPayload;
+  setStationCatalog(stationCatalog = {}) {
+    const { stations = [] } = stationCatalog;
     this.stations = new Map(stations.map(({ name, url }) => [name, url]));
   }
 

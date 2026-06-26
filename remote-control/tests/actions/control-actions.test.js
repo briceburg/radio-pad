@@ -22,7 +22,7 @@ describe("control-actions", () => {
         stations_url: null,
         switchboard_url: null,
       },
-      stationsData: null,
+      stationCatalog: null,
       currentStation: null,
       loading: false,
       connectionState: "idle",
@@ -31,7 +31,7 @@ describe("control-actions", () => {
       statusText: "",
     });
     listenStore.set({
-      stationsData: null,
+      stationCatalog: null,
       currentStation: null,
       loading: false,
     });
@@ -39,7 +39,7 @@ describe("control-actions", () => {
 
   it("selects a player, connects, and loads its station catalog", async () => {
     const control = createMockControl();
-    const listen = { setStations: vi.fn(), play: vi.fn(), stop: vi.fn() };
+    const listen = { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
     const stationCatalog = {
       name: "Casa Briceburg",
       stations: [{ name: "KEXP" }],
@@ -66,14 +66,14 @@ describe("control-actions", () => {
     );
     expect(controlStore.get()).toMatchObject({
       player,
-      stationsData: stationCatalog,
+      stationCatalog,
       loading: false,
     });
   });
 
   it("dispatches explicit playback commands for control stations", async () => {
     const control = createMockControl();
-    const listen = { setStations: vi.fn(), play: vi.fn(), stop: vi.fn() };
+    const listen = { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
     const actions = createControlActions({ control, listen });
 
     await actions.clickStation("control", "KEXP");

@@ -45,7 +45,7 @@ export const settingsUiStore = atom({
 
 export const controlStore = atom({
   player: EMPTY_PLAYER,
-  stationsData: null,
+  stationCatalog: null,
   currentStation: null,
   loading: false,
   connectionState: "idle",
@@ -55,7 +55,7 @@ export const controlStore = atom({
 });
 
 export const listenStore = atom({
-  stationsData: null,
+  stationCatalog: null,
   currentStation: null,
   loading: false,
 });
