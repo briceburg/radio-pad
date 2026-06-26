@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 from httpx import Response
@@ -106,7 +107,7 @@ def _with_account_owner(account_id: str, email: str) -> Callable[[AuthzStore], N
 
 
 def _put_fresh_global_preset(client: TestClient, headers: dict[str, str] | None = None) -> Response:
-    return client.put("presets/fresh", headers=headers or {}, json=FRESH_PRESET)
+    return cast(Response, client.put("presets/fresh", headers=headers or {}, json=FRESH_PRESET))
 
 
 def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:

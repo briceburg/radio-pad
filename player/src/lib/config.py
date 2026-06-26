@@ -18,15 +18,13 @@ def _infer_switchboard_url(registry_url: str, account_id: str, player_id: str) -
         switchboard_path = f"{api_path[:-4]}/switchboard"
     else:
         switchboard_path = f"{api_path}/switchboard"
-    return urlunsplit(
-        (scheme, parsed.netloc, f"{switchboard_path}/{account_id}/{player_id}", "", "")
-    )
+    return urlunsplit((scheme, parsed.netloc, f"{switchboard_path}/{account_id}/{player_id}", "", ""))
 
 
 def http_client_headers(custom_headers=None):
     """Return HTTP client headers with RadioPad user agent, merged with any custom headers"""
     defaults = {
-        "User-Agent": f"RadioPad/1.0 (Linux; Player) Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko)",
+        "User-Agent": "RadioPad/1.0 (Linux; Player) Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko)",
     }
     if custom_headers is None:
         return defaults
@@ -36,9 +34,7 @@ def http_client_headers(custom_headers=None):
 async def fetch_json_url(url, timeout=12, retries=3):
     """Fetch JSON from URL with retries"""
     headers = http_client_headers({"Accept": "application/json"})
-    async with httpx.AsyncClient(
-        timeout=timeout, headers=headers, follow_redirects=True
-    ) as client:
+    async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
         for attempt in range(retries):
             try:
                 response = await client.get(url)
@@ -70,9 +66,7 @@ async def make(
     If enable_discovery is True, attempt to discover missing configuration from the registry.
     """
     if enable_discovery:
-        stations_url, switchboard_url = await discover_config(
-            player, registry_url, stations_url, switchboard_url
-        )
+        stations_url, switchboard_url = await discover_config(player, registry_url, stations_url, switchboard_url)
 
     if not stations_url:
         raise ConfigError(
@@ -85,12 +79,8 @@ async def make(
 
     station_catalog = await fetch_json_url(stations_url)
     if not station_catalog:
-        raise ConfigError(
-            "Failed fetching station catalog", status_summary="Stations unavailable"
-        )
-    stations = (
-        station_catalog.get("stations") if isinstance(station_catalog, dict) else None
-    )
+        raise ConfigError("Failed fetching station catalog", status_summary="Stations unavailable")
+    stations = station_catalog.get("stations") if isinstance(station_catalog, dict) else None
     if (
         not isinstance(station_catalog, dict)
         or not isinstance(station_catalog.get("name"), str)
@@ -117,9 +107,7 @@ async def make(
     )
 
 
-async def discover_config(
-    player, registry_url, stations_url=None, switchboard_url=None
-):
+async def discover_config(player, registry_url, stations_url=None, switchboard_url=None):
     """Discover missing player configuration from the registry."""
 
     if stations_url and switchboard_url:

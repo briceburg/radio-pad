@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, cast
 
 from pydantic import BaseModel
 from starlette.testclient import TestClient
@@ -72,7 +72,7 @@ def get_json(client: TestClient, path: str, expected: int = 200, params: Paginat
 def get_response(client: TestClient, path: str, expected: int = 200) -> _ResponseLike:
     resp = client.get(_request_path(path))
     assert resp.status_code == expected, f"GET {path} expected {expected} got {resp.status_code}: {resp.text}"
-    return resp
+    return cast(_ResponseLike, resp)
 
 
 def assert_paginated(payload: JsonDoc) -> None:

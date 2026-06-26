@@ -1,6 +1,6 @@
 *
 !/bin
 !/src
-!/requirements.txt
-!/requirements-dev.txt
+!/pyproject.toml
+!/uv.lock
 !/stations.json

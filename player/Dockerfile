@@ -1,20 +1,18 @@
 FROM python:3.13-alpine AS base
+COPY --from=ghcr.io/astral-sh/uv:0.11.24 /uv /uvx /bin/
 
 # TODO: use a backend w/o X/Wayland reqs
-RUN apk add --no-cache bash mpv \
-  && python3 -m venv /venv \
-  && chown -R nobody:nobody /venv
+RUN apk add --no-cache bash mpv
 
 ENV \
   PATH="/venv/bin:$PATH" \
   PYTHONPATH=/app/src \
-  PYTHONPYCACHEPREFIX=/tmp/pycache
+  UV_PROJECT_ENVIRONMENT=/venv
 
 WORKDIR /app
-USER nobody
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev && uv cache clean
 
 HEALTHCHECK --interval=2s --timeout=2s --start-period=8s --retries=5 \
   CMD python3 src/healthcheck.py
@@ -22,8 +20,9 @@ HEALTHCHECK --interval=2s --timeout=2s --start-period=8s --retries=5 \
 CMD ["python3", "src/player.py"]
 
 FROM base AS dev
-COPY requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN uv sync --locked && uv cache clean
+USER nobody
 
 FROM base AS prod
 COPY . .
+USER nobody

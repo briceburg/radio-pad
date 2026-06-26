@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+from typing import Any
 
 import serial.tools.list_ports
 import serial_asyncio
@@ -50,15 +51,13 @@ def _candidate_ports():
 class MacropadClient(RadioPadClient):
     def __init__(self, player: RadioPadPlayer):
         super().__init__(player)
-        self.writer = None
-        self.reader = None
-        self._status_by_scope = {}
+        self.writer: Any | None = None
+        self.reader: Any | None = None
+        self._status_by_scope: dict[str, dict[str, str | None]] = {}
         self._closed = False
 
         # Override station catalog handler for the local serial controller.
-        self.register_event(
-            "station_catalog_request", self._handle_station_catalog_request
-        )
+        self.register_event("station_catalog_request", self._handle_station_catalog_request)
 
     async def run(self):
         self._closed = False
@@ -83,9 +82,7 @@ class MacropadClient(RadioPadClient):
         macropad_ports = _candidate_ports()
 
         if not macropad_ports:
-            logger.debug(
-                "no macropad data port found; continuing without local controller"
-            )
+            logger.debug("no macropad data port found; continuing without local controller")
             return None, None
 
         if len(macropad_ports) > 1:
@@ -98,9 +95,7 @@ class MacropadClient(RadioPadClient):
         macropad_port = macropad_ports[0]
         logger.info("attempting to connect to %s", macropad_port)
         try:
-            reader, writer = await serial_asyncio.open_serial_connection(
-                url=macropad_port, baudrate=115200
-            )
+            reader, writer = await serial_asyncio.open_serial_connection(url=macropad_port, baudrate=115200)
             logger.info("connected to: %s", macropad_port)
             return reader, writer
         except Exception as e:
@@ -128,9 +123,7 @@ class MacropadClient(RadioPadClient):
     async def _run_session(self):
         listen_task = asyncio.create_task(self._listen())
         heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        done, pending = await asyncio.wait(
-            {listen_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED
-        )
+        done, pending = await asyncio.wait({listen_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED)
 
         for task in pending:
             task.cancel()
@@ -139,10 +132,14 @@ class MacropadClient(RadioPadClient):
             task.result()
 
     async def _listen(self):
+        reader = self.reader
+        if reader is None:
+            return
+
         buffer = ""
         while True:
             try:
-                line = await self.reader.readline()
+                line = await reader.readline()
                 if not line:
                     break
                 buffer += line.decode("utf-8")

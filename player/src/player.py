@@ -70,14 +70,10 @@ async def _load_config_with_retry(player, macropad_client, settings, shutdown_ev
             return player_config
         except ConfigError as e:
             logger.error("Configuration error: %s", e)
-            await macropad_client.publish_status(
-                "stations", "warning", e.status_summary
-            )
+            await macropad_client.publish_status("stations", "warning", e.status_summary)
         except Exception as e:
             logger.error("Unexpected configuration error: %s", e, exc_info=True)
-            await macropad_client.publish_status(
-                "stations", "warning", "Registry unavailable"
-            )
+            await macropad_client.publish_status("stations", "warning", "Registry unavailable")
         logger.info("retrying player configuration in %ss...", CONFIG_RETRY_SECONDS)
         try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=CONFIG_RETRY_SECONDS)
@@ -110,9 +106,7 @@ async def main(player, macropad_client, settings, health_path):
     sigterm_handler_installed = _install_sigterm_handler(shutdown_event)
     try:
         await macropad_client.publish_status("stations", "loading", None)
-        player_config = await _load_config_with_retry(
-            player, macropad_client, settings, shutdown_event
-        )
+        player_config = await _load_config_with_retry(player, macropad_client, settings, shutdown_event)
         if shutdown_event.is_set() or not player_config:
             return
 
@@ -173,25 +167,20 @@ if __name__ == "__main__":
     player = None
     try:
         player_id = os.getenv("RADIOPAD_PLAYER", "briceburg/living-room")
-        registry_url = os.getenv(
-            "RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev/api"
-        )
+        registry_url = os.getenv("RADIOPAD_REGISTRY_URL", "https://registry.radiopad.dev/api")
         settings = {
             "player": player_id,
             "registry_url": registry_url,
             "stations_url": os.getenv("RADIOPAD_STATIONS_URL", None),
             "switchboard_url": os.getenv("RADIOPAD_SWITCHBOARD_URL", None),
-            "enable_discovery": os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower()
-            == "true",
+            "enable_discovery": os.getenv("RADIOPAD_ENABLE_DISCOVERY", "true").lower() == "true",
         }
 
         # Initialize player and clients
         player = MpvPlayer(
             _bootstrap_config(player_id, registry_url),
             audio_channels=os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo"),
-            socket_path=os.getenv(
-                "RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"
-            ),
+            socket_path=os.getenv("RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"),
         )
         macropad_client = MacropadClient(player)
 

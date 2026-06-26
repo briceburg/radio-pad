@@ -41,7 +41,7 @@ class MpvPlayer(RadioPadPlayer):
         self.audio_channels = audio_channels
         self.socket_path = socket_path
         self.status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None
-        self.mpv_process = None
+        self.mpv_process: subprocess.Popen[bytes] | None = None
         self.mpv_sock = None
         self.mpv_volume = None
         self.mpv_sock_lock = asyncio.Lock()
@@ -147,9 +147,7 @@ class MpvPlayer(RadioPadPlayer):
             loop = asyncio.get_running_loop()
             for i in range(20):
                 try:
-                    sock = await loop.run_in_executor(
-                        None, lambda: MPV(start_mpv=False, ipc_socket=self.socket_path)
-                    )
+                    sock = await loop.run_in_executor(None, lambda: MPV(start_mpv=False, ipc_socket=self.socket_path))
                     self.mpv_sock = sock
                     self.mpv_volume = sock.volume
                     return sock

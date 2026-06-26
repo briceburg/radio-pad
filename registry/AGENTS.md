@@ -11,21 +11,22 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 ## Runtime and tooling
 
-- The checked-in project target is Python `3.13`, even if the local environment is newer.
-- Run commands from an activated virtual environment: `source venv/bin/activate`.
-- `bin/ci` runs static checks (mypy, ruff) and `pytest`.
+- Python dependencies and tool settings live in `pyproject.toml`.
+- Use `bin/ci` for validation. It runs `uv run mypy`,
+  `uv run ruff format --check`, `uv run ruff check`, and `uv run pytest`.
+- Use `bin/registry` or `uv run python src/registry.py` for local execution.
+- If host Python tooling or cache permissions are unreliable, run the same
+  checks inside the component image with:
+  `docker compose run --rm --build --no-deps --user "$(id -u):$(id -g)" registry ./bin/ci`
+- uv, pytest, Ruff, and mypy caches live under the ignored project-local
+  `tmp/` directory by default. `bin/ci` also places uv's project environment
+  there. A checkout used for development or CI should be writable.
 
 ## Dependency workflow
 
-- Edit runtime dependencies in `requirements-latest.txt` first.
-- Re-freeze runtime dependencies into `requirements.txt`:
-  ```sh
-  python -m venv /tmp/freeze-venv
-  /tmp/freeze-venv/bin/pip install -r requirements-latest.txt
-  /tmp/freeze-venv/bin/pip freeze > requirements.txt
-  rm -rf /tmp/freeze-venv
-  ```
-- Development-only tools belong in `requirements-dev.txt`.
+- Edit runtime and development dependencies in `pyproject.toml`.
+- Regenerate `uv.lock` with `uv lock` after dependency changes.
+- Do not reintroduce component-level `requirements*.txt` files.
 
 ## Datastore and backend conventions
 

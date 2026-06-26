@@ -19,6 +19,7 @@
 import abc
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Optional, TypedDict
 
@@ -106,7 +107,7 @@ class RadioPadClient(abc.ABC):
 
     def __init__(self, player: RadioPadPlayer):
         self._player = player
-        self._event_handlers = {}
+        self._event_handlers: dict[str, Callable[[RadioPadEvent], Awaitable[None]]] = {}
         self.register_event("playback_start", self._handle_playback_start)
         self.register_event("playback_stop", self._handle_playback_stop)
         self.register_event("volume_up", self._handle_volume_up)
@@ -135,11 +136,7 @@ class RadioPadClient(abc.ABC):
     async def broadcast(self, event, data=None, limit_to_self=False):
         """Broadcast an event to clients registered with the player."""
         if event == "playback_state":
-            data = {
-                "station_name": (
-                    self.player.station.name if self.player.station else None
-                )
-            }
+            data = {"station_name": (self.player.station.name if self.player.station else None)}
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
             if limit_to_self and client is not self:
@@ -164,6 +161,8 @@ class RadioPadClient(abc.ABC):
         if not (isinstance(event, dict) and "event" in event):
             raise ValueError("Invalid event structure")
         event_name = event.get("event")
+        if not isinstance(event_name, str):
+            raise ValueError("Invalid event name")
         handler = self._event_handlers.get(event_name, self._handle_unknown)
         await handler(event)
 
@@ -180,9 +179,7 @@ class RadioPadClient(abc.ABC):
             logger.warning("playback_start missing station_name")
             return
 
-        station = next(
-            (s for s in self.player.config.stations if s.name == station_name), None
-        )
+        station = next((s for s in self.player.config.stations if s.name == station_name), None)
         if station:
             await self.player.play(station)
             await self.broadcast("playback_state")

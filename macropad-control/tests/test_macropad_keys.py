@@ -1,5 +1,5 @@
 from lib import macropad_keys
-from lib.macropad_keys import MacropadKeys, SKELETON_ANIMATION_TIMEOUT_MS
+from lib.macropad_keys import SKELETON_ANIMATION_TIMEOUT_MS, MacropadKeys
 
 
 class FakePixels:
