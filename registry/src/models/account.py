@@ -1,11 +1,13 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from lib.types import Descriptor, Slug
 from lib.validators import trim_name
 
 
-class AccountBase(BaseModel):
-    """Base model for accounts, containing common fields."""
+class AccountSpec(BaseModel):
+    """Writable account specification without its path-derived identity."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: Descriptor = Field(..., json_schema_extra={"example": "brice b"})
 
@@ -15,18 +17,7 @@ class AccountBase(BaseModel):
         return trim_name(v)
 
 
-class AccountCreate(AccountBase):
-    """Request body model for creating/updating an account via the PUT endpoint."""
-
-
-class AccountSummary(BaseModel):
-    """Abbreviated account model for list endpoints."""
-
-    id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
-    name: Descriptor = Field(..., json_schema_extra={"example": "brice b"})
-
-
-class Account(AccountBase):
+class Account(AccountSpec):
     """The full account model as stored and returned by the API."""
 
     id: Slug = Field(..., json_schema_extra={"example": "briceburg"})

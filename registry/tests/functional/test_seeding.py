@@ -12,7 +12,7 @@ from tests.functional.conftest import FunctionalTestBed
 
 @pytest.mark.functional
 def test_seeded_resources_are_loaded(functional_client: httpx.Client) -> None:
-    """Verify default seed data for accounts, players, and global presets loads on startup."""
+    """Verify default account, player, Station, and RadioDial seeds load on startup."""
     # Accounts
     accounts_resp = functional_client.get("accounts")
     assert accounts_resp.status_code == 200
@@ -25,11 +25,12 @@ def test_seeded_resources_are_loaded(functional_client: httpx.Client) -> None:
     players = players_resp.json()
     assert "living-room" in [item["id"] for item in players["items"]]
 
-    # Global Presets
-    presets_resp = functional_client.get("presets")
-    assert presets_resp.status_code == 200
-    presets = presets_resp.json()
-    assert "briceburg" in [item["id"] for item in presets["items"]]
+    station = functional_client.get("accounts/community/stations/WWOZ")
+    assert station.status_code == 200
+
+    radio_dial = functional_client.get("accounts/community/radio-dials/briceburg")
+    assert radio_dial.status_code == 200
+    assert radio_dial.json()["stations"][0]["call_sign"] == "WWOZ"
 
 
 @pytest.mark.functional
@@ -37,7 +38,6 @@ def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None
     """Start app with custom seed dir, verify copy then idempotent on restart."""
     # Create custom seed data
     functional_test_bed.create_seed_account("acct-seeded", "Seeded Account")
-    functional_test_bed.create_seed_global_preset("jazz", "Jazz")
     functional_test_bed.configure_env()
 
     # Create the app to trigger the initial seed

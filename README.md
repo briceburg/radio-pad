@@ -6,9 +6,9 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 ## Overview
 
-* The radio-pad [player](./player/) runs on a host (such as a Raspberry Pi) connected to a stereo/speakers.
-* Controllers — a USB-connected [macropad](./macropad-control/) or a [remote control](./remote-control/) app (web/mobile) — request the station to play.
-* Stations are managed as [station presets](./registry/seed-data/store/presets/) in the registry.
+* The [player](./player/) streams internet radio through a host's audio output and owns playback and volume.
+* Controllers — a USB [macropad](./macropad-control/) or the web/mobile [remote control](./remote-control/) — tell a player what to play.
+* The [registry](./registry/) assigns players curated, shareable [RadioDials](./registry/seed-data/store/accounts/community/radio-dials/) of account-owned Stations.
 
 ### Local control
 
@@ -31,10 +31,10 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 | Component | Description |
 |-----------|-------------|
-| [player](./player/) | Runs on a host and plays stations from a [station preset](./player/README.md#registry-discovery). |
-| [macropad-control](./macropad-control/) | USB-connected macropad controller. |
-| [registry](./registry/) | API + switchboard service. Manages accounts, players, station presets, and WebSocket routing. |
-| [remote-control](./remote-control/) | Web and mobile remote control for the player. |
+| [player](./player/) | Audio runtime that loads its assigned RadioDial, streams the selected Station, and reports playback status. |
+| [macropad-control](./macropad-control/) | Physical USB controller for Station selection, stop, and volume. |
+| [registry](./registry/) | Stores accounts, Stations, RadioDials, and player assignments; serves the API and switchboard. |
+| [remote-control](./remote-control/) | Web/mobile controller for discovering players, selecting Stations, and viewing status. |
 
 <p align="center" width="100%">
   <img src="./shared/assets/icon-fancy-bg.svg" />

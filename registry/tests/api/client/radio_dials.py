@@ -1,0 +1,45 @@
+from starlette.testclient import TestClient
+
+from api.models.pagination import PaginationParams
+from datastore.types import JsonDoc
+from models import RadioDialSpec
+from tests.api._helpers import get_json, put_json
+
+
+class RadioDialApi:
+    def __init__(self, client: TestClient):
+        self._client = client
+
+    def put(
+        self,
+        account_id: str,
+        radio_dial_id: str,
+        payload: RadioDialSpec,
+        expected_status: int = 200,
+    ) -> JsonDoc:
+        return put_json(
+            self._client,
+            f"accounts/{account_id}/radio-dials/{radio_dial_id}",
+            payload,
+            expected=expected_status,
+        )
+
+    def get(self, account_id: str, radio_dial_id: str, expected_status: int = 200) -> JsonDoc:
+        return get_json(
+            self._client,
+            f"accounts/{account_id}/radio-dials/{radio_dial_id}",
+            expected=expected_status,
+        )
+
+    def list(
+        self,
+        account_id: str,
+        expected_status: int = 200,
+        params: PaginationParams | None = None,
+    ) -> JsonDoc:
+        return get_json(
+            self._client,
+            f"accounts/{account_id}/radio-dials",
+            expected=expected_status,
+            params=params,
+        )

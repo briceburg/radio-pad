@@ -36,7 +36,7 @@ VALID_SLUG_EDGE_CASES = [
     "abc-def-123",
 ]
 
-# Pairs of (account_id, player/preset id) that are valid slugs
+# Pairs of account-scoped resource IDs that are valid slugs
 VALID_ACCOUNT_ITEM_SLUG_PAIRS = [
     ("a", "a"),
     ("abc", "abc-def"),

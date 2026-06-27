@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # API version (GitHub-style date-based versioning)
-API_VERSION = "2026-04-30"
+API_VERSION = "2026-06-27"
 
 # Active service profiles (comma-separated: "api", "switchboard", or both)
 PROFILES = [
@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).parent.parent.parent
 # Slug/ID pattern shared across models and API path params
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
-# Maximum length for descriptor fields (name, category) - allows for GUID strings
+# Maximum length for short display labels
 MAX_DESCRIPTOR_LENGTH = 36
 
 # Maximum items per page

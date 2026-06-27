@@ -4,7 +4,8 @@ import pytest
 
 from datastore.backends import LocalBackend
 from datastore.core import ModelStore
-from models.account import Account, AccountCreate
+from models.account import Account
+from models.player import Player, PlayerSpec
 
 
 def test_template_requires_id_at_end(tmp_path: Path) -> None:
@@ -27,23 +28,24 @@ def test_template_rejects_id_in_dir_portion(tmp_path: Path) -> None:
 
 def test_placeholders_require_path_params(tmp_path: Path) -> None:
     store = LocalBackend(str(tmp_path))
-    repo: ModelStore[Account, AccountCreate] = ModelStore(
-        store, model=Account, path_template="accounts/{account_id}/{id}"
+    repo: ModelStore[Player, PlayerSpec] = ModelStore(
+        store, model=Player, path_template="accounts/{account_id}/players/{id}"
     )
     with pytest.raises(ValueError):
         repo.get("x")
     with pytest.raises(ValueError):
         repo.list()
     with pytest.raises(ValueError):
-        repo.merge_upsert("x", AccountCreate(name="test"))
+        repo.upsert("x", PlayerSpec(name="test"))
 
 
 def test_placeholders_accepted_and_injected(tmp_path: Path) -> None:
     store = LocalBackend(str(tmp_path))
-    repo: ModelStore[Account, AccountCreate] = ModelStore(
-        store, model=Account, path_template="accounts/{account_id}/{id}"
+    repo: ModelStore[Player, PlayerSpec] = ModelStore(
+        store, model=Player, path_template="accounts/{account_id}/players/{id}"
     )
-    repo.merge_upsert("acc1", AccountCreate(name="A"), path_params={"account_id": "acct"})
-    got = repo.get("acc1", path_params={"account_id": "acct"})
+    repo.upsert("player1", PlayerSpec(name="A"), path_params={"account_id": "acct"})
+    got = repo.get("player1", path_params={"account_id": "acct"})
     assert got is not None
-    assert got.id == "acc1"
+    assert got.id == "player1"
+    assert got.account_id == "acct"

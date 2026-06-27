@@ -2,7 +2,7 @@ import pytest
 from fastapi import status
 from starlette.testclient import TestClient
 
-from models.account import AccountCreate
+from models.account import AccountSpec
 from tests.api._helpers import assert_paginated
 from tests.api.client.accounts import AccountApi
 
@@ -10,24 +10,24 @@ from tests.api.client.accounts import AccountApi
 def test_list_accounts(account_api: AccountApi) -> None:
     data = account_api.list()
     assert_paginated(data)
-    assert len(data["items"]) == 2
+    assert len(data["items"]) == 3
     for account in data["items"]:
         assert "id" in account and "name" in account
 
 
 def test_register_account(account_api: AccountApi) -> None:
     """Test that a new account can be created."""
-    account_api.put("new-account", AccountCreate(name="New Account"))
+    account_api.put("new-account", AccountSpec(name="New Account"))
     data = account_api.list()
-    assert len(data["items"]) == 3
+    assert len(data["items"]) == 4
     assert "new-account" in [item["id"] for item in data["items"]]
 
 
 def test_update_account(account_api: AccountApi) -> None:
     """Test that an existing account can be updated."""
-    account_api.put("testuser1", AccountCreate(name="Updated Name"))
+    account_api.put("testuser1", AccountSpec(name="Updated Name"))
     data = account_api.list()
-    assert len(data["items"]) == 2
+    assert len(data["items"]) == 3
     assert any(item["id"] == "testuser1" and item["name"] == "Updated Name" for item in data["items"])
 
 

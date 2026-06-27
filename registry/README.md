@@ -13,6 +13,27 @@ bin/registry
 
 see the swagger API docs by visiting: http://localhost:8000/
 
+## Domain model
+
+A `RadioDial` is a curated, shareable collection of Stations identified by call sign. Stations belong to accounts;
+RadioDials contain ordered, account-qualified Station keys such as `community/WWOZ`, so a stream URL can be updated
+once without rewriting every RadioDial that uses it.
+
+The API uses three model shapes only when they represent different data:
+
+- `*Spec`: writable JSON without path-derived identity
+- unsuffixed models: complete returned resources
+- `*Summary`: reduced list/discovery projections
+
+Player configuration stores a qualified `radio_dial` identity such as `community/briceburg`, not a registry URL.
+`discoverable` tells clients whether to surface a RadioDial during discovery; it is not access control.
+
+Registry resources are account-scoped:
+
+- `/accounts/{account_id}/stations/{call_sign}`
+- `/accounts/{account_id}/radio-dials/{radio_dial_id}`
+- `/accounts/{account_id}/players/{player_id}`
+
 ### Dependency workflow
 
 - Runtime and development dependencies live in `pyproject.toml`.
@@ -94,8 +115,8 @@ The Git backend stores registry data in a normal git checkout and keeps the same
 
 - `accounts/<account>.json`
 - `accounts/<account>/players/<player>.json`
-- `accounts/<account>/presets/<preset>.json`
-- `presets/<preset>.json`
+- `accounts/<account>/stations.json`
+- `accounts/<account>/radio-dials/<radio-dial>.json`
 
 The recommended layout for a dedicated data repository is to keep those directories at the repository root and leave `REGISTRY_BACKEND_PREFIX` unset.
 

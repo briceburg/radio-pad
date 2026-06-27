@@ -7,13 +7,13 @@ from datastore.backends import LocalBackend
 from datastore.core import ModelStore, atomic_write_json_file
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, ValueWithETag
-from models import Account, AccountCreate
+from models import Account, AccountSpec
 
 
-def test_merge_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Simulate a write-write race: merge_upsert should pass stale ETag and raise ConcurrencyError."""
+def test_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate a write-write race: upsert should pass a stale ETag and raise ConcurrencyError."""
     backend = LocalBackend(str(tmp_path))
-    repo: ModelStore[Account, AccountCreate] = ModelStore(backend, model=Account, path_template="accounts/{id}")
+    repo: ModelStore[Account, AccountSpec] = ModelStore(backend, model=Account, path_template="accounts/{id}")
 
     # Seed initial value
     repo.save(Account(id="acct", name="One"))
@@ -36,7 +36,7 @@ def test_merge_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypa
     monkeypatch.setattr(repo._backend, "get", fake_get)
 
     with pytest.raises(ConcurrencyError):
-        repo.merge_upsert("acct", AccountCreate(name="Three"))
+        repo.upsert("acct", AccountSpec(name="Three"))
 
     # Restore real get to keep backend consistent for any subsequent tests
     monkeypatch.setattr(repo._backend, "get", real_get)

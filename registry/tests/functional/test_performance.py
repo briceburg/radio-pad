@@ -8,11 +8,10 @@ import pytest
 
 from datastore import DataStore
 from datastore.backends import LocalBackend, S3Backend
-from models.account import Account
-from models.station_preset import GlobalStationPreset
+from models import AccountSpec, RadioDialSpec
 
 NUM_ACCOUNTS = 5000
-NUM_PRESETS = 1000
+NUM_RADIO_DIALS = 1000
 
 
 @pytest.mark.performance
@@ -26,40 +25,30 @@ def test_pagination_performance(tmp_path: Path) -> None:
     # Seed a large number of accounts
     for i in range(NUM_ACCOUNTS):
         account_id = f"test-account-{i}"
-        account = Account(id=account_id, name=f"Test Account {i}")
-        datastore.accounts.save(account)
+        datastore.accounts.upsert(account_id, AccountSpec(name=f"Test Account {i}"))
 
-    # Seed a large number of global presets
-    for i in range(NUM_PRESETS):
-        preset_id = f"global-preset-{i}"
-        preset = GlobalStationPreset.model_validate(
-            {
-                "id": preset_id,
-                "name": f"Global Preset {i}",
-                "stations": [
-                    {
-                        "name": f"Station {i}",
-                        "url": f"http://example.com/stream-{i}",
-                    }
-                ],
-            }
+    # Seed a large number of account-scoped RadioDials.
+    for i in range(NUM_RADIO_DIALS):
+        datastore.radio_dials.upsert(
+            f"radio-dial-{i}",
+            RadioDialSpec(name=f"RadioDial {i}", stations=[]),
+            path_params={"account_id": "performance"},
         )
-        datastore.global_presets.save(preset)
 
     start_time = time.perf_counter()
     paged_accounts = datastore.accounts.list(page=1, per_page=100)
-    paged_presets = datastore.global_presets.list(page=1, per_page=100)
+    paged_radio_dials = datastore.radio_dials.list(path_params={"account_id": "performance"}, page=1, per_page=100)
     duration = time.perf_counter() - start_time
 
     logging.info(
-        "\nLocal pagination for 100-item first pages with %s accounts and %s presets took %.4f seconds.",
+        "\nLocal pagination for 100-item first pages with %s accounts and %s RadioDials took %.4f seconds.",
         NUM_ACCOUNTS,
-        NUM_PRESETS,
+        NUM_RADIO_DIALS,
         duration,
     )
 
     assert len(paged_accounts) == 100
-    assert len(paged_presets) == 100
+    assert len(paged_radio_dials) == 100
 
 
 @pytest.fixture

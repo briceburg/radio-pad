@@ -9,7 +9,7 @@ from _pytest.fixtures import SubRequest
 
 from datastore.core import ModelStore, seed_from_path, seedable
 from datastore.core.interfaces import ObjectStore
-from models.account import Account, AccountCreate
+from models.account import Account, AccountSpec
 
 
 @pytest.fixture(params=["json", "s3", "git"], ids=["json", "s3", "git"])
@@ -99,7 +99,7 @@ class TestObjectStoreContract:
         (seed_root / "accounts").mkdir(parents=True)
         (seed_root / "accounts" / "seeded.json").write_text('{\n  "name": "Seeded"\n}\n', encoding="utf-8")
 
-        accounts: ModelStore[Account, AccountCreate] = ModelStore(
+        accounts: ModelStore[Account, AccountSpec] = ModelStore(
             object_store,
             model=Account,
             path_template="accounts/{id}",

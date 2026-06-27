@@ -1,3 +1,4 @@
+import os
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -5,27 +6,64 @@ from pathlib import Path
 import pytest
 from starlette.testclient import TestClient
 
+os.environ["REGISTRY_PROFILES"] = "api"
+
 from datastore import DataStore, LocalBackend
 from lib.constants import BASE_DIR
-from models import Account, GlobalStationPreset, Player, Station
+from models import AccountSpec, PlayerSpec, RadioDialSpec, StationSpec
 from registry import create_app
 
 
 def _seed_store(ds: DataStore) -> None:
     """Pre-populate a DataStore with consistent test data."""
-    ds.accounts.save(Account.model_validate({"id": "testuser1", "name": "Test User 1"}))
-    ds.accounts.save(Account.model_validate({"id": "testuser2", "name": "Test User 2"}))
-    ds.players.save(Player.model_validate({"id": "player1", "account_id": "testuser1", "name": "Player 1"}))
-    ds.players.save(Player.model_validate({"id": "player2", "account_id": "testuser1", "name": "Player 2"}))
-    ds.players.save(Player.model_validate({"id": "player3", "account_id": "testuser2", "name": "Player 3"}))
-    ds.global_presets.save(
-        GlobalStationPreset.model_validate(
+    ds.accounts.upsert("testuser1", AccountSpec(name="Test User 1"))
+    ds.accounts.upsert("testuser2", AccountSpec(name="Test User 2"))
+    ds.accounts.upsert("community", AccountSpec(name="RadioPad Community"))
+    ds.stations.upsert(
+        "community",
+        "WWOZ",
+        StationSpec.model_validate({"display_name": "WWOZ 90.7 FM", "stream_url": "https://www.wwoz.org/listen/hi"}),
+    )
+    ds.stations.upsert(
+        "community",
+        "KEXP",
+        StationSpec.model_validate({"stream_url": "https://kexp.example/stream"}),
+    )
+    ds.radio_dials.upsert(
+        "briceburg",
+        RadioDialSpec.model_validate(
             {
-                "id": "briceburg",
-                "name": "Briceburg",
-                "stations": [Station.model_validate({"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"})],
+                "name": "Casa Briceburg",
+                "discoverable": True,
+                "stations": ["community/WWOZ", "community/KEXP"],
             }
-        )
+        ),
+        path_params={"account_id": "community"},
+    )
+    ds.players.upsert(
+        "player1",
+        PlayerSpec.model_validate(
+            {
+                "name": "Player 1",
+                "radio_dial": "community/briceburg",
+            }
+        ),
+        path_params={"account_id": "testuser1"},
+    )
+    ds.players.upsert(
+        "player2",
+        PlayerSpec.model_validate(
+            {
+                "name": "Player 2",
+                "radio_dial": "community/briceburg",
+            }
+        ),
+        path_params={"account_id": "testuser1"},
+    )
+    ds.players.upsert(
+        "player3",
+        PlayerSpec(name="Player 3"),
+        path_params={"account_id": "testuser2"},
     )
 
 
@@ -46,11 +84,13 @@ def _build_store(data_dir: Path, *, seed: bool = False) -> DataStore:
 def _build_client(store: DataStore) -> TestClient:
     app = create_app()
 
+    from api.auth import AuthServices
     from api.types import get_store
     from lib.constants import API_PREFIX
 
     app.dependency_overrides[get_store] = lambda: store
     app.state.store = store
+    app.state.auth = AuthServices(authenticate_user=None, authz_store=None)
     return TestClient(app, raise_server_exceptions=False, base_url=f"http://testserver{API_PREFIX}/")
 
 
@@ -88,7 +128,10 @@ def seeded_store(mock_store: DataStore) -> DataStore:
 
 
 @pytest.fixture(scope="session")
-def client(mock_store: DataStore) -> Generator[TestClient]:
+def client(mock_store: DataStore, session_monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
+    from lib import constants
+
+    session_monkeypatch.setattr(constants, "PROFILES", ["api"])
     with _build_client(mock_store) as test_client:
         yield test_client
 
@@ -102,8 +145,11 @@ def ro_mock_store(unit_tests_root: Path) -> Generator[DataStore]:
 
 
 @pytest.fixture(scope="session")
-def ro_client(ro_mock_store: DataStore) -> Generator[TestClient]:
+def ro_client(ro_mock_store: DataStore, session_monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     """Session-scoped TestClient bound to the read-only store."""
+    from lib import constants
+
+    session_monkeypatch.setattr(constants, "PROFILES", ["api"])
     with _build_client(ro_mock_store) as test_client:
         yield test_client
 

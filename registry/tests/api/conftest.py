@@ -3,7 +3,8 @@ from starlette.testclient import TestClient
 
 from tests.api.client.accounts import AccountApi
 from tests.api.client.players import PlayerApi
-from tests.api.client.presets import PresetApi
+from tests.api.client.radio_dials import RadioDialApi
+from tests.api.client.stations import StationApi
 
 
 @pytest.fixture
@@ -17,5 +18,10 @@ def player_api(client: TestClient) -> PlayerApi:
 
 
 @pytest.fixture
-def preset_api(client: TestClient) -> PresetApi:
-    return PresetApi(client)
+def station_api(client: TestClient) -> StationApi:
+    return StationApi(client)
+
+
+@pytest.fixture
+def radio_dial_api(client: TestClient) -> RadioDialApi:
+    return RadioDialApi(client)

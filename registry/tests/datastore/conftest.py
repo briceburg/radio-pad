@@ -25,7 +25,12 @@ class SeedCreator:
         accounts_dir.mkdir(parents=True, exist_ok=True)
         (accounts_dir / f"{account_id}.json").write_text(json.dumps({"name": name}))
 
-    def create_global_preset(self, preset_id: str, name: str, stations: list[JsonDoc] | None = None) -> None:
-        presets_dir = self.root / "presets"
-        presets_dir.mkdir(parents=True, exist_ok=True)
-        (presets_dir / f"{preset_id}.json").write_text(json.dumps({"name": name, "stations": stations or []}))
+    def create_stations(self, account_id: str, stations: JsonDoc) -> None:
+        account_dir = self.root / "accounts" / account_id
+        account_dir.mkdir(parents=True, exist_ok=True)
+        (account_dir / "stations.json").write_text(json.dumps(stations))
+
+    def create_radio_dial(self, account_id: str, radio_dial_id: str, name: str, stations: list[str]) -> None:
+        radio_dials_dir = self.root / "accounts" / account_id / "radio-dials"
+        radio_dials_dir.mkdir(parents=True, exist_ok=True)
+        (radio_dials_dir / f"{radio_dial_id}.json").write_text(json.dumps({"name": name, "stations": stations}))

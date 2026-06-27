@@ -8,6 +8,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from datastore.types import JsonDoc
+from lib import constants
 from lib.constants import API_PREFIX
 from registry import create_app
 
@@ -26,6 +27,7 @@ class FunctionalTestBed:
         self.data_dir = self.tmp_path / "data"
 
     def configure_env(self) -> None:
+        self.monkeypatch.setattr(constants, "PROFILES", ["api"])
         self.monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(self.data_dir))
         self.monkeypatch.setenv("REGISTRY_SEED_DATA_PATH", str(self.seed_root))
 
@@ -37,8 +39,14 @@ class FunctionalTestBed:
     def create_seed_account(self, account_id: str, name: str) -> None:
         self._write_seed_file(f"accounts/{account_id}.json", {"name": name})
 
-    def create_seed_global_preset(self, preset_id: str, name: str, stations: list[JsonDoc] | None = None) -> None:
-        self._write_seed_file(f"presets/{preset_id}.json", {"name": name, "stations": stations or []})
+    def create_seed_stations(self, account_id: str, stations: JsonDoc) -> None:
+        self._write_seed_file(f"accounts/{account_id}/stations.json", stations)
+
+    def create_seed_radio_dial(self, account_id: str, radio_dial_id: str, name: str, stations: list[str]) -> None:
+        self._write_seed_file(
+            f"accounts/{account_id}/radio-dials/{radio_dial_id}.json",
+            {"name": name, "stations": stations},
+        )
 
 
 @pytest.fixture(scope="function")
@@ -59,6 +67,7 @@ def functional_client(
     Session-scoped client that uses the default seed data from `seed-data/store/`.
     """
     session_monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(tmp_path_factory.mktemp("data-session")))
+    session_monkeypatch.setattr(constants, "PROFILES", ["api"])
     # REGISTRY_SEED_DATA_PATH is NOT set, so the default `seed-data/store/` is used.
 
     app = create_app()

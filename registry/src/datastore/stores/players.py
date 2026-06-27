@@ -1,8 +1,8 @@
 from datastore.core import ModelStore, ObjectStore
-from models.player import Player, PlayerCreate
+from models.player import Player, PlayerSpec
 
 
-class Players(ModelStore[Player, PlayerCreate]):
+class Players(ModelStore[Player, PlayerSpec]):
     """A data store for managing an account's players (accounts/<account_id>/players/<id>.json)."""
 
     def __init__(self, backend: ObjectStore):
