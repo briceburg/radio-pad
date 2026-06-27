@@ -99,7 +99,7 @@ export class RadioControl extends EventTarget {
 
     this.dispatchEvent(
       new CustomEvent("error", {
-        detail: "WebSocket not connected. Cannot send command.",
+        detail: `WebSocket not connected. Cannot send ${event} command.`,
       }),
     );
   }
