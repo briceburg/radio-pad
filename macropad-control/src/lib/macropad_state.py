@@ -27,7 +27,7 @@ class MacropadState:
     def __init__(self):
         self.player_available = False
         self.has_stations = False
-        self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}  # type: dict
+        self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}  # type: dict[str, tuple[str, str | None] | None]
 
     @property
     def needs_stations(self):
