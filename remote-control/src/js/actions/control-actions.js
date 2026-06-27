@@ -40,13 +40,13 @@ export function createControlActions({ control, listen }) {
     tabName === "listen" ? listenStore : controlStore;
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
 
-  const requestControllers = { control: null, listen: null };
+  const stationCatalogLoads = { control: null, listen: null };
 
   function abortStationCatalogLoad(tabName) {
-    const controller = requestControllers[tabName];
-    if (controller) {
-      controller.abort();
-      requestControllers[tabName] = null;
+    const load = stationCatalogLoads[tabName];
+    if (load) {
+      load.controller.abort();
+      stationCatalogLoads[tabName] = null;
     }
   }
 
@@ -69,9 +69,12 @@ export function createControlActions({ control, listen }) {
       return null;
     }
 
+    if (stationCatalogLoads[tabName]?.url === url) return null;
+
     abortStationCatalogLoad(tabName);
     const controller = new AbortController();
-    requestControllers[tabName] = controller;
+    const load = { url, controller };
+    stationCatalogLoads[tabName] = load;
     updateTab(tabName, { loading: true });
 
     try {
@@ -80,7 +83,7 @@ export function createControlActions({ control, listen }) {
 
       const stationCatalog = await response.json();
 
-      if (requestControllers[tabName] !== controller) return null;
+      if (stationCatalogLoads[tabName] !== load) return null;
 
       if (tabName === "listen") listen.setStationCatalog(stationCatalog);
 
@@ -89,17 +92,17 @@ export function createControlActions({ control, listen }) {
       }
 
       updateTab(tabName, { stationCatalog, loading: false });
-      requestControllers[tabName] = null;
+      stationCatalogLoads[tabName] = null;
       return stationCatalog;
     } catch (error) {
       if (
         error?.name === "AbortError" ||
-        requestControllers[tabName] !== controller
+        stationCatalogLoads[tabName] !== load
       ) {
         return null;
       }
 
-      requestControllers[tabName] = null;
+      stationCatalogLoads[tabName] = null;
       updateTab(tabName, { loading: false });
       if (tabName === "control") {
         setStatusMap("resourceStatuses", STATION_CATALOG_UNAVAILABLE_STATUS);

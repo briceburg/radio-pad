@@ -99,6 +99,30 @@ describe("control-actions", () => {
     });
   });
 
+  it("reuses an in-flight station catalog load for a retained URL", async () => {
+    const control = createMockControl();
+    const actions = createControlActions({
+      control,
+      listen: createMockListen(),
+    });
+    let resolveFetch;
+    global.fetch.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const selection = actions.selectPlayer(PLAYER);
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledOnce());
+    control.dispatchEvent(
+      new CustomEvent("stationcatalogurl", { detail: PLAYER.stations_url }),
+    );
+
+    expect(global.fetch).toHaveBeenCalledOnce();
+    resolveFetch({ ok: true, json: async () => ({ stations: [] }) });
+    await selection;
+  });
+
   it("dispatches explicit playback commands for control stations", async () => {
     const control = createMockControl();
     const listen = createMockListen();

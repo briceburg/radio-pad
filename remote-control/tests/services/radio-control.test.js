@@ -110,7 +110,12 @@ describe("RadioControl", () => {
 
     rc.startPlayback("WXXI");
 
-    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail:
+          "WebSocket not connected. Cannot send playback_start command.",
+      }),
+    );
   });
 
   it("emits playback state and station catalog URL events", () => {
