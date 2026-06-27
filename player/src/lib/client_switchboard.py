@@ -89,7 +89,9 @@ class SwitchboardClient(RadioPadClient):
                 continue
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("failed to connect to %s: %s", self.url, e)
-                logger.warning("If this is the wrong URL, please set the SWITCHBOARD_URL environment variable.")
+                logger.warning(
+                    "If this is the wrong URL, please set the RADIOPAD_SWITCHBOARD_URL environment variable."
+                )
                 await self._report_status("warning", self._status_summary(e))
                 continue
             finally:
