@@ -64,13 +64,13 @@ class RegistryAPI(FastAPI):
             from lib.constants import API_PREFIX
 
             from .responses import ERROR_404
-            from .routes import accounts, players, presets_account, presets_global
+            from .routes import accounts, players, radio_dials, stations
 
             router = APIRouter(responses=ERROR_404)
             router.include_router(accounts.router, tags=["accounts"])
             router.include_router(players.router, tags=["players"])
-            router.include_router(presets_account.router, tags=["station presets"])
-            router.include_router(presets_global.router, tags=["station presets"])
+            router.include_router(stations.router, tags=["stations"])
+            router.include_router(radio_dials.router, tags=["radio dials"])
             self.include_router(router, prefix=API_PREFIX)
 
         if "switchboard" in profiles:

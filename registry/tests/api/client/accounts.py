@@ -2,7 +2,7 @@ from starlette.testclient import TestClient
 
 from api.models.pagination import PaginationParams
 from datastore.types import JsonDoc
-from models.account import AccountCreate
+from models.account import AccountSpec
 from tests.api._helpers import get_json, put_json
 
 
@@ -10,7 +10,7 @@ class AccountApi:
     def __init__(self, client: TestClient):
         self._client = client
 
-    def put(self, account_id: str, payload: AccountCreate, expected_status: int = 200) -> JsonDoc:
+    def put(self, account_id: str, payload: AccountSpec, expected_status: int = 200) -> JsonDoc:
         return put_json(
             self._client,
             f"accounts/{account_id}",

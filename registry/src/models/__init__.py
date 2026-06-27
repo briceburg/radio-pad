@@ -1,27 +1,23 @@
-from .account import Account, AccountCreate, AccountSummary
-from .player import Player, PlayerCreate, PlayerSummary
-from .station_preset import (
-    AccountStationPreset,
-    AccountStationPresetCreate,
-    AccountStationPresetSummary,
-    GlobalStationPreset,
-    GlobalStationPresetCreate,
-    GlobalStationPresetSummary,
-    Station,
-)
+"""Registry domain model naming.
+
+Specs are writable resource specifications without path-derived identity. Unsuffixed models are complete returned
+resources. Summaries are reduced representations used only by list and discovery endpoints.
+"""
+
+from .account import Account, AccountSpec
+from .player import Player, PlayerSpec, PlayerSummary
+from .radio_dial import RadioDial, RadioDialSpec, RadioDialSummary
+from .station import Station, StationSpec
 
 __all__ = [
     "Account",
-    "AccountCreate",
-    "AccountStationPreset",
-    "AccountStationPresetCreate",
-    "AccountStationPresetSummary",
-    "AccountSummary",
-    "GlobalStationPreset",
-    "GlobalStationPresetCreate",
-    "GlobalStationPresetSummary",
+    "AccountSpec",
     "Player",
-    "PlayerCreate",
+    "PlayerSpec",
     "PlayerSummary",
+    "RadioDial",
+    "RadioDialSpec",
+    "RadioDialSummary",
     "Station",
+    "StationSpec",
 ]

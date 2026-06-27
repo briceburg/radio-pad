@@ -15,6 +15,7 @@ from fastapi import WebSocket
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from lib import constants
 from registry import create_app
 from switchboard.switchboard import (
     ACTIVE_PLAYER_CONNECTIONS,
@@ -30,8 +31,9 @@ PLAYER_HEADERS = {"User-Agent": PLAYER_UA, "RadioPad-Stations-Url": PLAYER_STATI
 
 
 @pytest.fixture()
-def switchboard_client() -> Generator[TestClient]:
+def switchboard_client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     """TestClient wired up with switchboard profile."""
+    monkeypatch.setattr(constants, "PROFILES", ["switchboard"])
     app = create_app()
     with TestClient(app) as client:
         yield client

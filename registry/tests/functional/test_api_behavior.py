@@ -9,21 +9,20 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     from the JSON response, which confirms `response_model_exclude_none=True`
     is working as expected.
     """
-    preset_id = "functional-test-preset"
-    preset_data = {
-        "name": "Functional Test Preset",
+    radio_dial_data = {
+        "name": "Functional Test RadioDial",
         "description": "Visible description",
-        "stations": [{"name": "Test Station", "url": "https://station.example/stream"}],
+        "stations": ["community/WWOZ"],
     }
 
     # Use httpx to make a real HTTP request to the running server
     response = functional_client.put(
-        f"accounts/testuser1/presets/{preset_id}",
-        json=preset_data,
+        "accounts/testuser1/radio-dials/functional-test",
+        json=radio_dial_data,
     )
 
     assert response.status_code == 200
     data = response.json()
 
     assert data["description"] == "Visible description"
-    assert "category" not in data
+    assert "display_name" not in data["stations"][0]

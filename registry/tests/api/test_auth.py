@@ -11,10 +11,8 @@ from starlette.testclient import TestClient
 from api.auth import AuthServices
 from auth import AccountAccess, AuthzStore, GlobalAdmins, RegistryIDToken
 from datastore import DataStore, LocalBackend
-from models import Account, GlobalStationPreset, Player, Station
+from models import AccountSpec, PlayerSpec, RadioDialSpec, StationSpec
 from registry import create_app
-
-FRESH_PRESET = {"name": "Fresh", "stations": [{"name": "A", "url": "https://a.example/stream"}]}
 
 
 def _token(*, subject: str, email: str | None = None, email_verified: bool = False) -> RegistryIDToken:
@@ -41,24 +39,31 @@ class StubAuthenticator:
 
 
 def _seed_store(ds: DataStore) -> None:
-    ds.accounts.save(Account.model_validate({"id": "testuser1", "name": "Test User 1"}))
-    ds.accounts.save(Account.model_validate({"id": "testuser2", "name": "Test User 2"}))
-    ds.players.save(Player.model_validate({"id": "player1", "account_id": "testuser1", "name": "Player 1"}))
-    ds.global_presets.save(
-        GlobalStationPreset.model_validate(
-            {
-                "id": "briceburg",
-                "name": "Briceburg",
-                "stations": [Station.model_validate({"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"})],
-            }
-        )
+    ds.accounts.upsert("testuser1", AccountSpec(name="Test User 1"))
+    ds.accounts.upsert("testuser2", AccountSpec(name="Test User 2"))
+    ds.stations.upsert(
+        "testuser1",
+        "WWOZ",
+        StationSpec.model_validate({"stream_url": "https://example.com/wwoz"}),
+    )
+    ds.radio_dials.upsert(
+        "primary",
+        RadioDialSpec(name="Primary", stations=["testuser1/WWOZ"]),
+        path_params={"account_id": "testuser1"},
+    )
+    ds.players.upsert(
+        "player1",
+        PlayerSpec(name="Player 1", radio_dial="testuser1/primary"),
+        path_params={"account_id": "testuser1"},
     )
 
 
 def _build_client(tmp_path: Path, auth_services: AuthServices) -> TestClient:
+    from lib import constants
+
+    constants.PROFILES = ["api"]
     data_store = DataStore(backend=LocalBackend(base_path=str(tmp_path / "data"), prefix="registry-v1"))
     _seed_store(data_store)
-
     app = create_app()
 
     from api.types import get_store
@@ -78,13 +83,9 @@ def _auth_client(
     authz_store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
     if configure_authz:
         configure_authz(authz_store)
-
     return _build_client(
         tmp_path,
-        AuthServices(
-            authenticate_user=StubAuthenticator(identities or {}),
-            authz_store=authz_store,
-        ),
+        AuthServices(authenticate_user=StubAuthenticator(identities or {}), authz_store=authz_store),
     )
 
 
@@ -106,95 +107,78 @@ def _with_account_owner(account_id: str, email: str) -> Callable[[AuthzStore], N
     return configure_authz
 
 
-def _put_fresh_global_preset(client: TestClient, headers: dict[str, str] | None = None) -> Response:
-    return cast(Response, client.put("presets/fresh", headers=headers or {}, json=FRESH_PRESET))
+def _put_station(client: TestClient, account_id: str, headers: dict[str, str] | None = None) -> Response:
+    return cast(
+        Response,
+        client.put(
+            f"accounts/{account_id}/stations/KEXP",
+            headers=headers or {},
+            json={"stream_url": "https://example.com/kexp"},
+        ),
+    )
 
 
 def test_public_reads_remain_open_when_auth_enabled(tmp_path: Path) -> None:
     client = _auth_client(tmp_path)
 
     with client:
-        # All read endpoints must remain public even when auth is enabled
-        assert client.get("presets/briceburg").status_code == 200
         assert client.get("accounts/testuser1").status_code == 200
+        assert client.get("accounts/testuser1/stations/WWOZ").status_code == 200
+        assert client.get("accounts/testuser1/radio-dials/primary").status_code == 200
         assert client.get("accounts/testuser1/players/player1").status_code == 200
-        assert client.get("accounts/testuser1/players").status_code == 200
 
 
 @pytest.mark.parametrize(
     "headers",
-    [
-        None,
-        {"Authorization": "Basic not-a-bearer-token"},
-        {"Authorization": "Bearer    "},
-    ],
+    [None, {"Authorization": "Basic invalid"}, {"Authorization": "Bearer    "}],
     ids=["missing", "wrong-scheme", "empty-bearer"],
 )
-def test_global_preset_write_requires_bearer_token(tmp_path: Path, headers: dict[str, str] | None) -> None:
+def test_account_write_requires_bearer_token(tmp_path: Path, headers: dict[str, str] | None) -> None:
     client = _auth_client(tmp_path)
 
     with client:
-        response = _put_fresh_global_preset(client, headers)
+        response = _put_station(client, "testuser1", headers)
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Bearer token required"
 
 
-def test_global_preset_write_requires_admin_access(tmp_path: Path) -> None:
-    client = _auth_client(tmp_path, {"owner-token": _token(subject="owner-123")})
-
-    with client:
-        response = _put_fresh_global_preset(client, _bearer("owner-token"))
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Admin access required"
-
-
-def test_admin_can_write_global_preset(tmp_path: Path) -> None:
+def test_account_owner_can_write_owned_resource(tmp_path: Path) -> None:
     client = _auth_client(
         tmp_path,
-        {"admin-token": _token(subject="admin-123", email="briceburg@gmail.com", email_verified=True)},
-        _with_global_admin("briceburg@gmail.com"),
-    )
-
-    with client:
-        response = _put_fresh_global_preset(client, _bearer("admin-token"))
-
-    assert response.status_code == 200
-    assert response.json()["id"] == "fresh"
-
-
-def test_account_owner_can_update_owned_account(tmp_path: Path) -> None:
-    client = _auth_client(
-        tmp_path,
-        {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)},
+        {"owner": _token(subject="owner", email="owner@example.com", email_verified=True)},
         _with_account_owner("testuser1", "owner@example.com"),
     )
 
     with client:
-        response = client.put(
-            "accounts/testuser1",
-            headers=_bearer("owner-token"),
-            json={"name": "Updated User 1"},
-        )
+        response = _put_station(client, "testuser1", _bearer("owner"))
 
     assert response.status_code == 200
-    assert response.json()["name"] == "Updated User 1"
+    assert response.json()["call_sign"] == "KEXP"
 
 
-def test_account_owner_cannot_update_other_account(tmp_path: Path) -> None:
+def test_account_owner_cannot_write_other_account(tmp_path: Path) -> None:
     client = _auth_client(
         tmp_path,
-        {"owner-token": _token(subject="owner-123", email="owner@example.com", email_verified=True)},
+        {"owner": _token(subject="owner", email="owner@example.com", email_verified=True)},
         _with_account_owner("testuser1", "owner@example.com"),
     )
 
     with client:
-        response = client.put(
-            "accounts/testuser2",
-            headers=_bearer("owner-token"),
-            json={"name": "Updated User 2"},
-        )
+        response = _put_station(client, "testuser2", _bearer("owner"))
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Account owner or admin access required"
+
+
+def test_global_admin_can_write_any_account(tmp_path: Path) -> None:
+    client = _auth_client(
+        tmp_path,
+        {"admin": _token(subject="admin", email="admin@example.com", email_verified=True)},
+        _with_global_admin("admin@example.com"),
+    )
+
+    with client:
+        response = _put_station(client, "testuser2", _bearer("admin"))
+
+    assert response.status_code == 200

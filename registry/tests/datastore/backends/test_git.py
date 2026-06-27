@@ -192,23 +192,23 @@ def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path)
     _init_repo(repo_path)
 
     backend = _backend(repo_path)
-    backend.save("fresh", {"name": "Fresh", "stations": [{"url": "https://example.com", "name": "Example"}]}, "presets")
+    backend.save(
+        "fresh",
+        {"name": "Fresh", "stations": ["community/WWOZ"]},
+        "accounts",
+        "community",
+        "radio-dials",
+    )
 
-    assert (repo_path / "presets" / "fresh.json").read_text(encoding="utf-8") == (
-        "{\n"
-        '  "name": "Fresh",\n'
-        '  "stations": [\n'
-        "    {\n"
-        '      "name": "Example",\n'
-        '      "url": "https://example.com"\n'
-        "    }\n"
-        "  ]\n"
-        "}\n"
+    assert (repo_path / "accounts" / "community" / "radio-dials" / "fresh.json").read_text(encoding="utf-8") == (
+        '{\n  "name": "Fresh",\n  "stations": [\n    "community/WWOZ"\n  ]\n}\n'
     )
 
     repo = Repo(str(repo_path))
     commit = cast(Commit, repo[repo.head()])
-    assert commit.message == (b"radio-pad-registry: update global preset fresh\n\nGenerated-by: radio-pad-registry")
+    assert commit.message == (
+        b"radio-pad-registry: update radio dial community/fresh\n\nGenerated-by: radio-pad-registry"
+    )
 
 
 def test_git_backend_detects_stale_if_match_after_remote_change(tmp_path: Path) -> None:
@@ -250,9 +250,13 @@ def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     seed_dir = tmp_path / "seed"
     (seed_dir / "accounts").mkdir(parents=True, exist_ok=True)
     (seed_dir / "accounts" / "acct1.json").write_text(json.dumps({"name": "Account One"}), encoding="utf-8")
-    (seed_dir / "presets").mkdir(parents=True, exist_ok=True)
-    (seed_dir / "presets" / "rock.json").write_text(
-        json.dumps({"name": "Rock", "stations": []}),
+    (seed_dir / "accounts" / "acct1" / "radio-dials").mkdir(parents=True, exist_ok=True)
+    (seed_dir / "accounts" / "acct1" / "stations.json").write_text(
+        json.dumps({"WWOZ": {"stream_url": "https://example.com/wwoz"}}),
+        encoding="utf-8",
+    )
+    (seed_dir / "accounts" / "acct1" / "radio-dials" / "radio.json").write_text(
+        json.dumps({"name": "Radio", "stations": ["acct1/WWOZ"]}),
         encoding="utf-8",
     )
 
@@ -266,7 +270,8 @@ def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     assert account is not None
     assert account.name == "Account One"
     assert (repo_path / "accounts" / "acct1.json").exists()
-    assert (repo_path / "presets" / "rock.json").exists()
+    assert (repo_path / "accounts" / "acct1" / "stations.json").exists()
+    assert (repo_path / "accounts" / "acct1" / "radio-dials" / "radio.json").exists()
 
 
 def test_git_backend_repoints_head_to_configured_branch(tmp_path: Path) -> None:

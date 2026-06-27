@@ -12,8 +12,8 @@ def test_datastore_initialization() -> None:
     real_store = DataStore(backend=LocalBackend(base_path="/tmp/fake"))
     assert real_store.accounts is not None
     assert real_store.players is not None
-    assert real_store.global_presets is not None
-    assert real_store.account_presets is not None
+    assert real_store.stations is not None
+    assert real_store.radio_dials is not None
 
 
 def test_datastore_isolation(tmp_path: Path) -> None:
@@ -38,7 +38,8 @@ def test_seed_copies_json_and_is_idempotent(tmp_path: Path) -> None:
     # Create seed files using the helper
     seeder = SeedCreator(seed_dir)
     seeder.create_account("acct1", "Account One")
-    seeder.create_global_preset("rock", "Rock")
+    seeder.create_stations("acct1", {"WWOZ": {"stream_url": "https://example.com/wwoz"}})
+    seeder.create_radio_dial("acct1", "radio", "Radio", ["acct1/WWOZ"])
 
     backend = LocalBackend(base_path=str(data_dir))
     ds = DataStore(backend=backend, seed_path=str(seed_dir))
@@ -48,7 +49,8 @@ def test_seed_copies_json_and_is_idempotent(tmp_path: Path) -> None:
     seeded_acct = ds.accounts.get("acct1")
     assert seeded_acct is not None
     assert seeded_acct.name == "Account One"
-    assert ds.global_presets.get("rock") is not None
+    assert ds.stations.get("acct1", "WWOZ") is not None
+    assert ds.radio_dials.get("radio", path_params={"account_id": "acct1"}) is not None
 
     # Mutate the account to ensure seed does not overwrite existing data
     modified_acct = Account(id="acct1", name="Modified")
@@ -67,7 +69,7 @@ def test_seed_is_safe_under_concurrent_startup(tmp_path: Path) -> None:
 
     seeder = SeedCreator(seed_dir)
     seeder.create_account("acct1", "Account One")
-    seeder.create_global_preset("rock", "Rock")
+    seeder.create_stations("acct1", {"WWOZ": {"stream_url": "https://example.com/wwoz"}})
 
     backend = LocalBackend(base_path=str(data_dir))
 

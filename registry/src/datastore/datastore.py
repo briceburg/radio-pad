@@ -6,7 +6,7 @@ from lib.logging import logger
 
 from .backends import GitBackend, LocalBackend, S3Backend
 from .core import ObjectStore, SeedableStore, seed_from_path, seedable
-from .stores import AccountPresets, Accounts, GlobalPresets, Players
+from .stores import Accounts, Players, RadioDials, Stations
 
 
 class DataStore:
@@ -42,8 +42,8 @@ class DataStore:
 
         self.accounts = Accounts(self.backend)
         self.players = Players(self.backend)
-        self.global_presets = GlobalPresets(self.backend)
-        self.account_presets = AccountPresets(self.backend)
+        self.stations = Stations(self.backend)
+        self.radio_dials = RadioDials(self.backend)
 
     def seed(self) -> None:
         """
@@ -75,6 +75,6 @@ class DataStore:
         return [
             seedable(self.accounts),
             seedable(self.players),
-            seedable(self.global_presets),
-            seedable(self.account_presets),
+            self.stations,
+            seedable(self.radio_dials),
         ]

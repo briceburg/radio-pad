@@ -11,23 +11,23 @@ from ..types import PagedResult, PathParams
 from .interfaces import ModelWithId
 
 
-class ModelStore[Entity: ModelWithId, Create: BaseModel]:
+class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
     """
     Minimal, hierarchical repository backed by an ObjectStore (e.g., local fs, s3fs).
 
     path_template must end with the `{id}` placeholder.
-    - Example: "accounts/{account_id}/presets/{id}"
+    - Example: "accounts/{account_id}/radio-dials/{id}"
 
     placeholders other than `{id}` in the path_template are passed as `path_params`.
-    - Example: "accounts/{account_id}/presets/{id}", path_params={"account_id": "123"}
+    - Example: "accounts/{account_id}/radio-dials/{id}", path_params={"account_id": "123"}
 
     Examples:
     - Flat collection:
       ModelStore(backend, model=Station, path_template="stations/{id}")
 
     - Account-scoped:
-      ModelStore(backend, model=Preset, path_template="accounts/{account_id}/presets/{id}")
-      store.get("preset-1", path_params={"account_id": "acct-123"})
+      ModelStore(backend, model=RadioDial, path_template="accounts/{account_id}/radio-dials/{id}")
+      store.get("morning", path_params={"account_id": "acct-123"})
 
     Notes:
     - save() will infer path params from model fields if not provided.
@@ -121,12 +121,11 @@ class ModelStore[Entity: ModelWithId, Create: BaseModel]:
 
         return models
 
-    def merge_upsert(self, object_id: str, partial: Create, *, path_params: PathParams | None = None) -> Entity:
-        """Merge a partial payload and upsert with OCC.
+    def upsert(self, object_id: str, spec: Spec, *, path_params: PathParams | None = None) -> Entity:
+        """Replace a writable resource spec or create it, using OCC for existing resources.
 
-        If the object exists, merges the provided partial into current data and
-        performs a conditional save using the backend version (ETag). If it does not
-        exist, creates the object.
+        This implements PUT semantics: omitted optional fields take their Spec defaults
+        rather than retaining values from an existing resource.
 
         This is used by PUT methods in the API.
 
@@ -141,11 +140,7 @@ class ModelStore[Entity: ModelWithId, Create: BaseModel]:
         base: dict[str, object] = {"id": object_id}
         if path_params:
             base.update({k: path_params[k] for k in self._required_keys})
-        merged = {
-            **({} if current is None else current),
-            **partial.model_dump(exclude_unset=True),
-        }
-        payload = self._strip_reserved(merged)
+        payload = self._strip_reserved(spec.model_dump(mode="json"))
         model = self._model.model_validate({**base, **payload})
         data = self._strip_reserved(model.model_dump(mode="json"))
         try:

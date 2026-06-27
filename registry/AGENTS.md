@@ -35,8 +35,13 @@ Guidance for coding agents working in `radio-pad/registry`.
 - The Git-backed data repository should keep the same logical layout used by the registry API:
   - `accounts/<account>.json`
   - `accounts/<account>/players/<player>.json`
-  - `accounts/<account>/presets/<preset>.json`
-  - `presets/<preset>.json`
+  - `accounts/<account>/stations.json`
+  - `accounts/<account>/radio-dials/<radio-dial>.json`
+- A Station call sign is canonical uppercase and unique within an account. RadioDials use qualified Station keys
+  (`<account>/<CALL_SIGN>`) and may not repeat a call sign, even across Station-owning accounts.
+- `*Spec` models are writable persisted shapes without path identity; unsuffixed models are complete resources;
+  `*Summary` models exist only for genuinely reduced list/discovery projections.
+- Player `radio_dial` values are qualified RadioDial identities, not URLs or backend paths.
 - For Git-backed storage, prefer leaving `REGISTRY_BACKEND_PREFIX` unset so data lives at the repository root.
 - `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY` is a deployment secret used by Fly deploy setup; the runtime env var table documents `REGISTRY_BACKEND_GIT_SSH_KEY_PATH` for file-based key usage.
 

@@ -14,13 +14,13 @@ from .interfaces import ModelWithId, SeedableStore
 from .model_store import ModelStore
 
 
-class _SeedingView[Entity: ModelWithId, Create: BaseModel](SeedableStore):
+class _SeedingView[Entity: ModelWithId, Spec: BaseModel](SeedableStore):
     """Adapter exposing only the seeding-related surface for a ModelStore.
 
     This keeps seeding concerns out of the main ModelStore's public API.
     """
 
-    def __init__(self, store: ModelStore[Entity, Create]) -> None:
+    def __init__(self, store: ModelStore[Entity, Spec]) -> None:
         self._store = store
 
     def match(self, path: str) -> dict[str, str] | None:
@@ -38,8 +38,8 @@ class _SeedingView[Entity: ModelWithId, Create: BaseModel](SeedableStore):
         self._store.save(model, path_params=path_params)
 
 
-def seedable[Entity: ModelWithId, Create: BaseModel](
-    store: ModelStore[Entity, Create],
+def seedable[Entity: ModelWithId, Spec: BaseModel](
+    store: ModelStore[Entity, Spec],
 ) -> SeedableStore:
     """Return a SeedableStore view for the given ModelStore."""
     return _SeedingView(store)

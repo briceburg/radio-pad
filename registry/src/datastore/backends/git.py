@@ -325,10 +325,10 @@ class GitBackend:
             return f"account {Path(parts[1]).stem}"
         if len(parts) == 4 and parts[0] == "accounts" and parts[2] == "players":
             return f"player {parts[1]}/{Path(parts[3]).stem}"
-        if len(parts) == 4 and parts[0] == "accounts" and parts[2] == "presets":
-            return f"account preset {parts[1]}/{Path(parts[3]).stem}"
-        if len(parts) == 2 and parts[0] == "presets":
-            return f"global preset {Path(parts[1]).stem}"
+        if len(parts) == 3 and parts[0] == "accounts" and parts[2] == "stations.json":
+            return f"stations {parts[1]}"
+        if len(parts) == 4 and parts[0] == "accounts" and parts[2] == "radio-dials":
+            return f"radio dial {parts[1]}/{Path(parts[3]).stem}"
         return rel_path
 
     def _remote_location(self, repo: Repo) -> str | None:

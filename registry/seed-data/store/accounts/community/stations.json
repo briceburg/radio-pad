@@ -1,0 +1,50 @@
+{
+  "WWOZ": {
+    "stream_url": "https://www.wwoz.org/listen/hi"
+  },
+  "WMSE": {
+    "stream_url": "https://wmse.streamguys1.com/wmselivemp3"
+  },
+  "GMCR": {
+    "stream_url": "http://stream.gmcr.org:8000/gmcr"
+  },
+  "KUNM": {
+    "stream_url": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUNMFM_128.mp3"
+  },
+  "KMKB": {
+    "stream_url": "http://50.19.66.66:8000/kmkb"
+  },
+  "KMRD": {
+    "stream_url": "https://kmrd.broadcasttool.stream/listen"
+  },
+  "KKFI": {
+    "stream_url": "https://stream.pacificaservice.org:9000/kkfi_128"
+  },
+  "WQXR": {
+    "stream_url": "https://stream.wqxr.org/wqxr-web?nyprBrowserId="
+  },
+  "KBOO": {
+    "stream_url": "https://live.kboo.fm:8443/high"
+  },
+  "WXNA": {
+    "stream_url": "http://listen.wxnafm.org:8000/stream"
+  },
+  "KEXP": {
+    "stream_url": "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"
+  },
+  "GD.NET": {
+    "stream_url": "http://108.163.245.230:8100/listen.pls"
+  },
+  "KSUT": {
+    "stream_url": "https://ksut.streamguys1.com/kute"
+  },
+  "KKCR": {
+    "stream_url": "https://s8.phx.icastcenter.com:9000/stream"
+  },
+  "WTJU": {
+    "stream_url": "https://streams.wtju.net/wtju-live.mp3"
+  },
+  "LOFI": {
+    "stream_url": "https://www.youtube.com/watch?v=jfKfPfyJRdk"
+  }
+}

@@ -1,19 +1,21 @@
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from lib.types import Descriptor, Slug, WsUrl
+from lib.types import Descriptor, RadioDialKey, Slug, WsUrl
 from lib.validators import trim_name
 
 
-class PlayerBase(BaseModel):
-    """Base model for players, containing common fields."""
+class PlayerSpec(BaseModel):
+    """Writable player specification without its path-derived identity."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: Descriptor = Field(..., json_schema_extra={"example": "Living Room"})
-    stations_url: HttpUrl | None = Field(
-        None,
-        json_schema_extra={"example": "https://registry.radiopad.dev/api/presets/briceburg"},
+    radio_dial: RadioDialKey | None = Field(
+        default=None,
+        json_schema_extra={"example": "community/briceburg"},
     )
     switchboard_url: WsUrl | None = Field(
-        None,
+        default=None,
         json_schema_extra={"example": "wss://switchboard.radiopad.dev/briceburg/custom-player"},
     )
 
@@ -23,22 +25,15 @@ class PlayerBase(BaseModel):
         return trim_name(v)
 
 
-class PlayerCreate(PlayerBase):
-    """
-    Request body model for creating/updating a player via the PUT endpoint.
-    The Player validator provides default station and switchboard URLs.
-    """
-
-
 class PlayerSummary(BaseModel):
-    """Abbreviated player model for list endpoints."""
+    """Reduced player representation returned by list endpoints."""
 
     id: Slug = Field(..., json_schema_extra={"example": "living-room"})
     account_id: Slug = Field(..., json_schema_extra={"example": "briceburg"})
     name: Descriptor = Field(..., json_schema_extra={"example": "Living Room"})
 
 
-class Player(PlayerBase):
+class Player(PlayerSpec):
     """The full player model as stored and returned by the API."""
 
     id: Slug = Field(..., json_schema_extra={"example": "living-room"})
