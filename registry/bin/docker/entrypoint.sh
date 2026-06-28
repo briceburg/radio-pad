@@ -3,12 +3,16 @@ set -e
 
 if [ "${REGISTRY_BACKEND:-}" = "git" ] && [ -n "${REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY:-}" ]; then
     KEY_PATH="${REGISTRY_BACKEND_GIT_SSH_KEY_PATH:-/tmp/.ssh_deploy_key}"
+    KNOWN_HOSTS_PATH="/tmp/.ssh/known_hosts"
     umask 077
     mkdir -p "$(dirname "$KEY_PATH")"
+    mkdir -p "$(dirname "$KNOWN_HOSTS_PATH")"
     printf '%s\n' "$REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" > "$KEY_PATH"
+    touch "$KNOWN_HOSTS_PATH"
     chmod 600 "$KEY_PATH"
+    chmod 600 "$KNOWN_HOSTS_PATH"
     export REGISTRY_BACKEND_GIT_SSH_KEY_PATH="$KEY_PATH"
-    export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o StrictHostKeyChecking=accept-new"
+    export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o UserKnownHostsFile=$KNOWN_HOSTS_PATH -o StrictHostKeyChecking=accept-new"
 fi
 
 CPU_COUNT=$(bin/docker/get_cpus.sh)
