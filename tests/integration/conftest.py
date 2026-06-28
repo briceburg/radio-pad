@@ -1,6 +1,6 @@
 import os
 
-import httpx
+import httpx2
 import pytest
 
 
@@ -21,6 +21,6 @@ def remote_control_url():
 
 @pytest.fixture(scope="session")
 def http():
-    """Shared httpx client that follows redirects (handles FastAPI slash redirects)."""
-    with httpx.Client(follow_redirects=True) as client:
+    """Shared HTTP client that follows redirects (handles FastAPI slash redirects)."""
+    with httpx2.Client(follow_redirects=True) as client:
         yield client

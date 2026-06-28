@@ -29,9 +29,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     broadcast: Broadcast | None = None
     http_client = None
     if "switchboard" in profiles:
-        import httpx
+        import httpx2
 
-        http_client = httpx.AsyncClient(timeout=5.0)
+        http_client = httpx2.AsyncClient(timeout=5.0)
         app.state.http_client = http_client
 
         broadcast = Broadcast()

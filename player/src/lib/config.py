@@ -2,7 +2,7 @@ import asyncio
 import logging
 from urllib.parse import urlsplit, urlunsplit
 
-import httpx
+import httpx2
 
 from lib.exceptions import ConfigError
 from lib.interfaces import RadioPadPlayerConfig, RadioPadStation
@@ -45,7 +45,7 @@ def http_client_headers(custom_headers=None):
 async def fetch_json_url(url, timeout=12, retries=3):
     """Fetch JSON from URL with retries"""
     headers = http_client_headers({"Accept": "application/json"})
-    async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
+    async with httpx2.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
         for attempt in range(retries):
             try:
                 response = await client.get(url)

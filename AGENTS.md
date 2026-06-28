@@ -76,7 +76,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Tests live in `tests/integration/` and run inside a container built from `tests/integration/Dockerfile`.
 - `tests/integration/bin/ci` runs static checks and collection; root `bin/ci`
   runs the tests against a Compose topology.
-- They use `httpx` for HTTP and `websockets` + `pytest-asyncio` for WebSocket tests.
+- They use `httpx2` for HTTP and `websockets` + `pytest-asyncio` for WebSocket tests.
 - Environment variables (`REGISTRY_URL`, `SWITCHBOARD_URL`, `REMOTE_CONTROL_URL`) are injected by compose.
 - Tests cover cross-service behavior that unit tests cannot: message routing through the broadcaster, auth enforcement in the running stack, and service reachability.
 
