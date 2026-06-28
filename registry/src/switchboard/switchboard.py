@@ -10,8 +10,8 @@ from switchboard.broadcast import Broadcast
 router = APIRouter()
 logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
-RETAINED_EVENTS = {"station_catalog_url", "player_presence", "playback_state"}
-PLAYER_STATUS_SCOPES = {"stations", "switchboard", "playback"}
+RETAINED_EVENTS = {"radio_dial_url", "player_presence", "playback_state"}
+PLAYER_STATUS_SCOPES = {"radio_dial", "switchboard", "playback"}
 PLAYER_COMMAND_EVENTS = {
     "playback_start",
     "playback_stop",
@@ -22,27 +22,7 @@ PLAYER_STATE_EVENTS = {
     "playback_state",
     "player_status",
 }
-ACTIVE_PLAYER_CONNECTIONS: dict[str, set[int]] = {}
-
-
-def _register_player_connection(player_key: str, websocket: WebSocket) -> bool:
-    connections = ACTIVE_PLAYER_CONNECTIONS.setdefault(player_key, set())
-    was_empty = not connections
-    connections.add(id(websocket))
-    return was_empty
-
-
-def _unregister_player_connection(player_key: str, websocket: WebSocket) -> bool:
-    connections = ACTIVE_PLAYER_CONNECTIONS.get(player_key)
-    if not connections:
-        return True
-
-    connections.discard(id(websocket))
-    if connections:
-        return False
-
-    ACTIVE_PLAYER_CONNECTIONS.pop(player_key, None)
-    return True
+ACTIVE_PLAYER_CONNECTIONS: set[str] = set()
 
 
 def _state_key(event: str, data: object) -> str | None:
@@ -128,7 +108,7 @@ async def websocket_endpoint(
     user_agent = websocket.headers.get("User-Agent", "")
     is_player = user_agent.startswith(PLAYER_USER_AGENT_PREFIX)
     player_key = f"{account_id}/{player_id}"
-    stations_url: str | None = None
+    radio_dial_url: str | None = None
 
     # Authenticate controllers
     if not is_player:
@@ -146,9 +126,9 @@ async def websocket_endpoint(
             await websocket.close(code=1011, reason="Validation internal error")
             return
     else:
-        stations_url = websocket.headers.get("RadioPad-Stations-Url")
-        if not stations_url:
-            await websocket.close(code=4000, reason="RadioPad-Stations-Url header required")
+        radio_dial_url = websocket.headers.get("RadioPad-Radio-Dial-Url")
+        if not radio_dial_url:
+            await websocket.close(code=4000, reason="RadioPad-Radio-Dial-Url header required")
             return
 
     await websocket.accept()
@@ -159,27 +139,30 @@ async def websocket_endpoint(
         await websocket.close()
         return
 
-    registered_player = False
     if is_player:
-        registered_player = True
-        _register_player_connection(player_key, websocket)
-        await publish_event(
-            broadcast,
-            player_key,
-            "player_presence",
-            {"connected": True},
-        )
-        await publish_event(
-            broadcast,
-            player_key,
-            "station_catalog_url",
-            {"url": stations_url},
-        )
+        if player_key in ACTIVE_PLAYER_CONNECTIONS:
+            await websocket.close(code=4002, reason="Player already connected")
+            return
+        ACTIVE_PLAYER_CONNECTIONS.add(player_key)
 
     try:
+        if is_player:
+            await publish_event(
+                broadcast,
+                player_key,
+                "player_presence",
+                {"connected": True},
+            )
+            await publish_event(
+                broadcast,
+                player_key,
+                "radio_dial_url",
+                radio_dial_url,
+            )
         await _run_loop(websocket, broadcast, player_key, is_player=is_player)
     finally:
-        if registered_player and _unregister_player_connection(player_key, websocket):
+        if is_player:
+            ACTIVE_PLAYER_CONNECTIONS.discard(player_key)
             broadcast.clear_state(player_key)
             await publish_event(
                 broadcast,
@@ -191,5 +174,5 @@ async def websocket_endpoint(
                 broadcast,
                 player_key,
                 "playback_state",
-                {"station_name": None},
+                {"call_sign": None},
             )

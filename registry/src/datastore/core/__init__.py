@@ -4,10 +4,9 @@ from .helpers import (
     construct_storage_path,
     deconstruct_storage_path,
     extract_object_id_from_path,
-    normalize_etag,
     storage_json,
     strip_id,
-    validate_if_match,
+    validate_write_preconditions,
 )
 from .interfaces import ModelWithId, ObjectStore, SeedableStore
 from .model_store import ModelStore
@@ -23,10 +22,9 @@ __all__ = [
     "construct_storage_path",
     "deconstruct_storage_path",
     "extract_object_id_from_path",
-    "normalize_etag",
     "seed_from_path",
     "seedable",
     "storage_json",
     "strip_id",
-    "validate_if_match",
+    "validate_write_preconditions",
 ]

@@ -112,9 +112,9 @@ const DEFAULT_PREFERENCES = {
     options: [],
     group: "radio-control",
   },
-  presetId: {
+  radioDial: {
     type: "select",
-    label: "Station Preset",
+    label: "RadioDial",
     options: [],
     group: "radio-listen",
   },

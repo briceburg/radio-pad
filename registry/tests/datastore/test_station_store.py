@@ -45,3 +45,8 @@ def test_station_seed_preserves_id_as_a_call_sign(tmp_path: Path) -> None:
     station = stations.get("account", "ID")
     assert station is not None
     assert station.call_sign == "ID"
+
+
+def test_station_seed_rejects_invalid_account_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        _store(tmp_path).seed({}, path_params={"account_id": "Invalid Account"})

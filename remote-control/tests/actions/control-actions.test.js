@@ -4,7 +4,7 @@ import { authStore, controlStore, listenStore } from "../../src/js/store.js";
 
 function createMockControl() {
   const control = new EventTarget();
-  control.connect = vi.fn(async () => {});
+  control.connect = vi.fn();
   control.disconnect = vi.fn();
   control.startPlayback = vi.fn();
   control.stopPlayback = vi.fn();
@@ -12,13 +12,13 @@ function createMockControl() {
 }
 
 function createMockListen() {
-  return { setStationCatalog: vi.fn(), play: vi.fn(), stop: vi.fn() };
+  return { play: vi.fn(), stop: vi.fn() };
 }
 
 const PLAYER = {
   id: "living-room",
   name: "Living Room",
-  stations_url: "https://example.test/stations.json",
+  configured_radio_dial_url: "https://example.test/radio-dial.json",
   switchboard_url: "wss://example.test/switchboard/briceburg/living-room",
 };
 
@@ -27,13 +27,8 @@ describe("control-actions", () => {
     global.fetch = vi.fn();
     authStore.set({ registryBearerToken: null });
     controlStore.set({
-      player: {
-        id: null,
-        name: null,
-        stations_url: null,
-        switchboard_url: null,
-      },
-      stationCatalog: null,
+      player: null,
+      radioDial: null,
       currentStation: null,
       loading: false,
       connectionState: "idle",
@@ -42,22 +37,24 @@ describe("control-actions", () => {
       resourceStatuses: {},
     });
     listenStore.set({
-      stationCatalog: null,
+      radioDial: null,
       currentStation: null,
       loading: false,
     });
   });
 
-  it("selects a player, connects, and loads its station catalog", async () => {
+  it("selects a player, connects, and loads its RadioDial", async () => {
     const control = createMockControl();
     const listen = createMockListen();
-    const stationCatalog = {
+    const radioDial = {
       name: "Casa Briceburg",
-      stations: [{ name: "KEXP" }],
+      stations: [
+        { call_sign: "KEXP", stream_url: "https://example.test/kexp" },
+      ],
     };
     global.fetch.mockResolvedValue({
       ok: true,
-      json: async () => stationCatalog,
+      json: async () => radioDial,
     });
 
     const actions = createControlActions({ control, listen });
@@ -66,40 +63,49 @@ describe("control-actions", () => {
 
     expect(control.connect).toHaveBeenCalledWith(PLAYER.switchboard_url, null);
     expect(global.fetch).toHaveBeenCalledWith(
-      PLAYER.stations_url,
+      PLAYER.configured_radio_dial_url,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(controlStore.get()).toMatchObject({
       player: PLAYER,
-      stationCatalog,
+      radioDial,
       loading: false,
     });
   });
 
-  it("retains a degraded station state when station catalog loading fails", async () => {
+  it("rejects RadioDials with ambiguous call signs", async () => {
     const control = createMockControl();
     const actions = createControlActions({
       control,
       listen: createMockListen(),
     });
-    global.fetch.mockRejectedValue(new Error("Failed to fetch"));
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        name: "Ambiguous",
+        stations: [
+          { call_sign: "KEXP", stream_url: "https://example.test/one" },
+          { call_sign: "KEXP", stream_url: "https://example.test/two" },
+        ],
+      }),
+    });
 
     await actions.selectPlayer(PLAYER);
 
     expect(controlStore.get()).toMatchObject({
       player: PLAYER,
-      stationCatalog: null,
+      radioDial: null,
       loading: false,
       resourceStatuses: {
-        station_catalog: {
+        radio_dial: {
           level: "warning",
-          summary: "Station catalog unavailable.",
+          summary: "RadioDial unavailable.",
         },
       },
     });
   });
 
-  it("reuses an in-flight station catalog load for a retained URL", async () => {
+  it("reuses an in-flight RadioDial load for a retained URL", async () => {
     const control = createMockControl();
     const actions = createControlActions({
       control,
@@ -115,11 +121,16 @@ describe("control-actions", () => {
     const selection = actions.selectPlayer(PLAYER);
     await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledOnce());
     control.dispatchEvent(
-      new CustomEvent("stationcatalogurl", { detail: PLAYER.stations_url }),
+      new CustomEvent("radiodialurl", {
+        detail: PLAYER.configured_radio_dial_url,
+      }),
     );
 
     expect(global.fetch).toHaveBeenCalledOnce();
-    resolveFetch({ ok: true, json: async () => ({ stations: [] }) });
+    resolveFetch({
+      ok: true,
+      json: async () => ({ name: "Empty", stations: [] }),
+    });
     await selection;
   });
 
@@ -133,5 +144,24 @@ describe("control-actions", () => {
 
     expect(control.startPlayback).toHaveBeenCalledWith("KEXP");
     expect(control.stopPlayback).toHaveBeenCalled();
+  });
+
+  it("resolves listen stations from the loaded RadioDial", async () => {
+    const station = {
+      call_sign: "KEXP",
+      stream_url: "https://example.test/kexp",
+    };
+    const listen = createMockListen();
+    listen.play.mockResolvedValue(true);
+    listenStore.set({ radioDial: { stations: [station] } });
+    const actions = createControlActions({
+      control: createMockControl(),
+      listen,
+    });
+
+    await actions.clickStation("listen", "KEXP");
+
+    expect(listen.play).toHaveBeenCalledWith(station);
+    expect(listenStore.get().currentStation).toBe("KEXP");
   });
 });

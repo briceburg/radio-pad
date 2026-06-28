@@ -34,7 +34,7 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 | [player](./player/) | Audio runtime that loads its assigned RadioDial, streams the selected Station, and reports playback status. |
 | [macropad-control](./macropad-control/) | Physical USB controller for Station selection, stop, and volume. |
 | [registry](./registry/) | Stores accounts, Stations, RadioDials, and player assignments; serves the API and switchboard. |
-| [remote-control](./remote-control/) | Web/mobile controller for discovering players, selecting Stations, and viewing status. |
+| [remote-control](./remote-control/) | Web/mobile controller for discovering players and RadioDials, selecting Stations, and viewing status. |
 
 <p align="center" width="100%">
   <img src="./shared/assets/icon-fancy-bg.svg" />

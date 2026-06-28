@@ -7,7 +7,9 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 * connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
   * remote controls publish playback commands and listen for playback state
   * players listen for playback commands and publish current playback and status state
-* loads available players and station catalogs from the [registry](../registry/)
+* discovers players and RadioDials from the [registry](../registry/)
+  * RadioDial choices include the selected account and discoverable community dials
+  * the saved selection is a qualified RadioDial identity, not a registry URL
   * sign in when you need to control managed players
 
 ## Usage
@@ -20,6 +22,7 @@ cp .env.example .env
 ```
 
 The registry URL defaults to `https://registry.radiopad.dev/api/`. Override it only if you are targeting a different registry or local registry instance.
+An explicit player `switchboard_url` takes precedence; otherwise the remote infers a same-origin `/switchboard/{account}/{player}` URL before applying the web-only `VITE_SWITCHBOARD_URL` override.
 
 Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 

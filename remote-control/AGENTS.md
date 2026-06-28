@@ -32,7 +32,10 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - `remote-control/.env.example` is the checked-in template.
 - `VITE_SWITCHBOARD_URL` is a web-only override for switchboard testing.
   - Web preserves the player-specific path from the registry `switchboard_url`.
-  - Native must keep using the registry-provided `switchboard_url`.
+  - Native must not apply the web override; it uses the explicit or inferred
+    URL from player discovery.
+- Player discovery preserves an explicit `switchboard_url` and otherwise infers
+  the same-origin switchboard path from the registry URL.
 
 ## Testing/debugging preferences
 
@@ -44,4 +47,9 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - Keep platform-specific behavior explicit only where the plugin or native project metadata requires it.
 - Prefer small helpers over broad auth rewrites; the shared Google sign-in path should stay easy to reason about.
 - Preserve the grouped Settings UI structure (`ion-item-group` + `ion-item-divider`) when adjusting auth/settings presentation.
+- Persist qualified RadioDial identities in preferences and derive resource URLs
+  from the current registry URL. Do not persist URLs as RadioDial identity.
+- Treat `radio_dial_url` as the source URL reported by a running player.
+  `configured_radio_dial_url` is the remote's initial URL derived from registry
+  configuration; a running player's report may supersede it.
 - Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.

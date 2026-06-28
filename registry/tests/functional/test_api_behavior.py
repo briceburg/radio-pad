@@ -11,7 +11,6 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     """
     radio_dial_data = {
         "name": "Functional Test RadioDial",
-        "description": "Visible description",
         "stations": ["community/WWOZ"],
     }
 
@@ -24,5 +23,4 @@ def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
     assert response.status_code == 200
     data = response.json()
 
-    assert data["description"] == "Visible description"
-    assert "display_name" not in data["stations"][0]
+    assert "description" not in data

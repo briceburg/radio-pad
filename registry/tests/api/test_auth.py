@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
+from unittest.mock import patch
 
 import pytest
 from httpx import Response
@@ -61,10 +62,10 @@ def _seed_store(ds: DataStore) -> None:
 def _build_client(tmp_path: Path, auth_services: AuthServices) -> TestClient:
     from lib import constants
 
-    constants.PROFILES = ["api"]
     data_store = DataStore(backend=LocalBackend(base_path=str(tmp_path / "data"), prefix="registry-v1"))
     _seed_store(data_store)
-    app = create_app()
+    with patch.object(constants, "PROFILES", ["api"]):
+        app = create_app()
 
     from api.types import get_store
     from lib.constants import API_PREFIX

@@ -7,10 +7,10 @@ def test_healthz(http, registry_url):
     assert resp.status_code == 204
 
 
-def test_list_presets(http, registry_url):
-    resp = http.get(f"{registry_url}/presets")
+def test_list_community_radio_dials(http, registry_url):
+    resp = http.get(f"{registry_url}/accounts/community/radio-dials")
     assert resp.status_code == 200
-    assert len(resp.json()["items"]) > 0
+    assert any(item["key"] == "community/briceburg" for item in resp.json()["items"])
 
 
 def test_get_account(http, registry_url):

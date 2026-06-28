@@ -19,7 +19,14 @@ class ObjectStore(Protocol):
 
     def list(self, *path: str, page: int = 1, per_page: int = 10) -> PagedResult[JsonDoc]: ...
 
-    def save(self, object_id: str, data: JsonDoc, *path: str, if_match: str | None = None) -> None: ...
+    def save(
+        self,
+        object_id: str,
+        data: JsonDoc,
+        *path: str,
+        if_match: str | None = None,
+        if_none_match: bool = False,
+    ) -> None: ...
 
     def delete(self, object_id: str, *path: str) -> bool: ...
 

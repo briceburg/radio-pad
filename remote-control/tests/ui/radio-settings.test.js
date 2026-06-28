@@ -8,7 +8,7 @@ describe("radio-settings helpers", () => {
   it("groups preference definitions by group and preserves their keys", () => {
     const grouped = groupPreferencesByGroup({
       accountId: { label: "Account", group: "radio-account" },
-      presetId: { label: "Preset", group: "radio-listen" },
+      radioDial: { label: "RadioDial", group: "radio-listen" },
       unnamed: { label: "Fallback" },
     });
 
@@ -16,7 +16,7 @@ describe("radio-settings helpers", () => {
       { key: "accountId", label: "Account", group: "radio-account" },
     ]);
     expect(grouped["radio-listen"]).toEqual([
-      { key: "presetId", label: "Preset", group: "radio-listen" },
+      { key: "radioDial", label: "RadioDial", group: "radio-listen" },
     ]);
     expect(grouped.default).toEqual([{ key: "unnamed", label: "Fallback" }]);
   });
@@ -27,7 +27,7 @@ describe("radio-settings helpers", () => {
       { key: "accountId", type: "select", options: [{ value: "only" }] },
       { key: "playerId", type: "select", options: [] },
       {
-        key: "presetId",
+        key: "radioDial",
         type: "select",
         options: [{ value: "a" }, { value: "b" }],
       },
@@ -36,7 +36,7 @@ describe("radio-settings helpers", () => {
     expect(visiblePrefs).toEqual([
       { key: "registryUrl", type: "text" },
       {
-        key: "presetId",
+        key: "radioDial",
         type: "select",
         options: [{ value: "a" }, { value: "b" }],
       },

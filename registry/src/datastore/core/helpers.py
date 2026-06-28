@@ -38,15 +38,16 @@ def strip_id(data: JsonDoc) -> JsonDoc:
     return {k: v for k, v in data.items() if k != "id"}
 
 
-def normalize_etag(token: str | None) -> str | None:
-    """Strips leading/trailing quotes from an ETag string."""
-    if token and token.startswith('"') and token.endswith('"'):
-        return token[1:-1]
-    return token
-
-
-def validate_if_match(if_match: str | None, current_version: str | None) -> None:
-    """Raise when a conditional-write token does not match the current version."""
+def validate_write_preconditions(
+    if_match: str | None,
+    if_none_match: bool,
+    current_version: str | None,
+) -> None:
+    """Validate optimistic-concurrency preconditions against the current version."""
+    if if_match is not None and if_none_match:
+        raise ValueError("if_match and if_none_match are mutually exclusive")
+    if if_none_match and current_version is not None:
+        raise ConcurrencyError("Object already exists")
     if if_match is not None and if_match != current_version:
         raise ConcurrencyError("ETag mismatch")
 
@@ -56,8 +57,8 @@ def extract_object_id_from_path(path: str) -> str:
     return Path(path).stem
 
 
-def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
-    """Writes a JSON file atomically by writing to a temp file and then renaming."""
+def atomic_write_json_file(path: Path, data: JsonDoc, *, overwrite: bool = True) -> None:
+    """Write JSON atomically, optionally requiring the destination not to exist."""
     tmp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -70,7 +71,13 @@ def atomic_write_json_file(path: Path, data: JsonDoc) -> None:
         ) as f:
             tmp_path = Path(f.name)
             f.write(storage_json(data))
-        os.replace(tmp_path, path)
+        if overwrite:
+            os.replace(tmp_path, path)
+        else:
+            try:
+                os.link(tmp_path, path)
+            except FileExistsError as error:
+                raise ConcurrencyError("Object already exists") from error
     finally:
         if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()

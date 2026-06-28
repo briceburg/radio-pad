@@ -4,14 +4,14 @@ from lib.macropad_state import MacropadState
 
 class FakeKeys:
     def __init__(self):
-        self.station_catalogs = []
+        self.station_updates = []
         self.playing_stations = []
 
     def set_visual_state(self, degraded, visual_mode, title_override, force=False):
         pass
 
     def set_stations(self, stations, refresh=True):
-        self.station_catalogs.append((stations, refresh))
+        self.station_updates.append((stations, refresh))
 
     def set_playing_station(self, station):
         self.playing_stations.append(station)
@@ -36,11 +36,8 @@ def player_status(scope, level, summary=None):
     }
 
 
-def station_catalog(*stations):
-    return {
-        "event": "station_catalog",
-        "data": {"stations": [{"name": station} for station in stations]},
-    }
+def station_menu(*call_signs):
+    return {"event": "station_menu", "data": list(call_signs)}
 
 
 def test_state_flows_from_waiting_to_loading_to_ready():
@@ -49,11 +46,11 @@ def test_state_flows_from_waiting_to_loading_to_ready():
     assert_view(state, False, VISUAL_MODE_WAITING, "Waiting for Player")
 
     assert state.mark_player_available()
-    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
+    assert_view(state, False, VISUAL_MODE_LOADING, "Loading RadioDial")
 
-    state.handle_event(station_catalog("KEXP"), keys)
-    assert state.has_stations
-    assert keys.station_catalogs[-1] == ([{"name": "KEXP"}], False)
+    state.handle_event(station_menu("KEXP"), keys)
+    assert state.station_menu_loaded
+    assert keys.station_updates[-1] == (["KEXP"], False)
     assert_view(state, False, None, None)
 
 
@@ -63,7 +60,7 @@ def test_switchboard_warning_degrades_ready_stations_without_taking_title_line()
     state.handle_event(player_status("switchboard", "warning", "Switchboard down"), keys)
     assert_view(state, True, VISUAL_MODE_LOADING, "Switchboard down")
 
-    state.handle_event(station_catalog("KEXP"), keys)
+    state.handle_event(station_menu("KEXP"), keys)
     assert_view(state, True, None, None)
 
 
@@ -72,7 +69,7 @@ def test_switchboard_warning_without_summary_still_degrades_keys():
 
     state.handle_event(player_status("switchboard", "warning"), keys)
 
-    assert_view(state, True, VISUAL_MODE_LOADING, "Loading stations")
+    assert_view(state, True, VISUAL_MODE_LOADING, "Loading RadioDial")
 
 
 def test_ok_status_clears_degraded_state():
@@ -82,24 +79,33 @@ def test_ok_status_clears_degraded_state():
     state.handle_event(player_status("switchboard", "ok"), keys)
 
     assert not state.has_status
-    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
+    assert_view(state, False, VISUAL_MODE_LOADING, "Loading RadioDial")
 
 
-def test_empty_station_catalog_keeps_loading_state():
+def test_empty_station_menu_is_loaded():
     state, keys = state_keys(available=True)
 
-    state.handle_event(station_catalog(), keys)
+    state.handle_event(station_menu(), keys)
 
-    assert not state.has_stations
-    assert keys.station_catalogs[-1] == ([], False)
-    assert_view(state, False, VISUAL_MODE_LOADING, "Loading stations")
+    assert state.station_menu_loaded
+    assert keys.station_updates[-1] == ([], False)
+    assert_view(state, False, None, None)
+
+
+def test_invalid_station_menu_is_ignored():
+    state, keys = state_keys(available=True)
+
+    state.handle_event({"event": "station_menu", "data": ["KEXP", None]}, keys)
+
+    assert not state.station_menu_loaded
+    assert keys.station_updates == []
 
 
 def test_playback_state_event_updates_keys():
     state, keys = state_keys()
 
     state.handle_event(
-        {"event": "playback_state", "data": {"station_name": "KEXP"}},
+        {"event": "playback_state", "data": {"call_sign": "KEXP"}},
         keys,
     )
 
@@ -110,11 +116,11 @@ def test_unavailable_player_clears_session_state():
     state, keys = state_keys(available=True)
 
     state.handle_event(player_status("switchboard", "warning", "Switchboard down"), keys)
-    state.handle_event(station_catalog("KEXP"), keys)
+    state.handle_event(station_menu("KEXP"), keys)
 
     assert state.mark_player_unavailable()
     assert not state.player_available
-    assert not state.has_stations
+    assert not state.station_menu_loaded
     assert not state.has_status
 
     assert_view(state, False, VISUAL_MODE_WAITING, "Waiting for Player")

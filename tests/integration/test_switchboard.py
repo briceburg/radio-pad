@@ -12,7 +12,7 @@ import websockets
 
 PLAYER_HEADERS = {
     "User-Agent": "RadioPad/1.0 (integration-test)",
-    "RadioPad-Stations-Url": "http://example.com/stations.json",
+    "RadioPad-Radio-Dial-Url": "http://example.com/radio-dial.json",
 }
 
 
@@ -31,31 +31,3 @@ async def test_controller_rejected_without_token(switchboard_url):
     with pytest.raises(Exception):
         async with websockets.connect(f"{switchboard_url}/test-acct/player1") as ws:
             await asyncio.wait_for(ws.recv(), timeout=3)
-
-
-@pytest.mark.asyncio
-async def test_player_playback_state_broadcast(switchboard_url):
-    """Player publishes playback_state, a second player connection receives it.
-
-    Uses two player connections to the same room to verify the broadcast
-    path works end-to-end through the broadcaster, without needing an
-    authenticated controller token.
-    """
-    room = f"{switchboard_url}/test-acct/broadcast-test"
-
-    async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player1:
-        async with websockets.connect(room, additional_headers=PLAYER_HEADERS) as player2:
-            # player1 sends playback_state
-            await player1.send(
-                json.dumps(
-                    {
-                        "event": "playback_state",
-                        "data": {"station_name": "Test FM"},
-                    }
-                )
-            )
-
-            # player2 should receive the broadcast
-            msg = json.loads(await asyncio.wait_for(player2.recv(), timeout=5))
-            assert msg["event"] == "playback_state"
-            assert msg["data"]["station_name"] == "Test FM"

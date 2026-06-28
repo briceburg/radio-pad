@@ -20,30 +20,28 @@ import abc
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
-from typing import Optional, TypedDict
+from dataclasses import dataclass
+from typing import TypedDict
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class RadioPadStation:
-    name: str
-    url: str
+    call_sign: str
+    stream_url: str
 
 
 @dataclass
 class RadioPadPlayerConfig:
-    id: str
-    stations_url: str | None
-    stations: list[RadioPadStation] = field(default_factory=list)
-    registry_url: Optional[str] = None
-    switchboard_url: Optional[str] = None
+    radio_dial_url: str
+    stations: list[RadioPadStation]
+    switchboard_url: str | None = None
 
 
 class RadioPadEvent(TypedDict, total=False):
     event: str
-    data: Optional[object]
+    data: object | None
 
 
 class RadioPadPlayer(abc.ABC):
@@ -51,13 +49,13 @@ class RadioPadPlayer(abc.ABC):
     Interface for RadioPad player implementations.
     """
 
-    def __init__(self, config: RadioPadPlayerConfig):
-        self._station: Optional[RadioPadStation] = None
-        self._config: RadioPadPlayerConfig = config
+    def __init__(self, config: RadioPadPlayerConfig | None = None):
+        self._station: RadioPadStation | None = None
+        self._config = config
         self._clients: list[RadioPadClient] = []
 
     @property
-    def config(self) -> RadioPadPlayerConfig:
+    def config(self) -> RadioPadPlayerConfig | None:
         """Get the player configuration."""
         return self._config
 
@@ -66,12 +64,12 @@ class RadioPadPlayer(abc.ABC):
         self._config = config
 
     @property
-    def station(self) -> Optional[RadioPadStation]:
+    def station(self) -> RadioPadStation | None:
         """Get or set the currently playing station."""
         return self._station
 
     @station.setter
-    def station(self, value: Optional[RadioPadStation]):
+    def station(self, value: RadioPadStation | None):
         self._station = value
 
     @property
@@ -115,12 +113,8 @@ class RadioPadClient(abc.ABC):
         # Ignored events
         for ignored in (
             "playback_state",
-            "client_count",
             "player_presence",
             "player_status",
-            "player_heartbeat",
-            "station_catalog",
-            "station_catalog_url",
         ):
             self.register_event(ignored, self._handle_ignored)
 
@@ -136,7 +130,7 @@ class RadioPadClient(abc.ABC):
     async def broadcast(self, event, data=None, limit_to_self=False):
         """Broadcast an event to clients registered with the player."""
         if event == "playback_state":
-            data = {"station_name": (self.player.station.name if self.player.station else None)}
+            data = {"call_sign": (self.player.station.call_sign if self.player.station else None)}
         message = json.dumps({"event": event, "data": data})
         for client in self.player.clients:
             if limit_to_self and client is not self:
@@ -174,18 +168,23 @@ class RadioPadClient(abc.ABC):
 
     async def _handle_playback_start(self, event):
         data = event.get("data")
-        station_name = data.get("station_name") if isinstance(data, dict) else None
-        if not station_name:
-            logger.warning("playback_start missing station_name")
+        call_sign = data.get("call_sign") if isinstance(data, dict) else None
+        if not call_sign:
+            logger.warning("playback_start missing call_sign")
             return
 
-        station = next((s for s in self.player.config.stations if s.name == station_name), None)
+        config = self.player.config
+        if config is None:
+            logger.warning("playback_start received before player configuration loaded")
+            return
+
+        station = next((station for station in config.stations if station.call_sign == call_sign), None)
         if station:
             await self.player.play(station)
             await self.broadcast("playback_state")
             return
 
-        logger.warning("Station '%s' not found in RADIO_STATIONS.", station_name)
+        logger.warning("Station %r is not on the loaded RadioDial", call_sign)
 
     async def _handle_playback_stop(self, event):
         await self.player.stop()

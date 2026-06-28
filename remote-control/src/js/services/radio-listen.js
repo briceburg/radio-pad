@@ -82,12 +82,10 @@ const createNativeAudioPlayer = () => {
     initialized = false;
   };
 
-  const ensureInitialized = async (url, stationName) => {
+  const ensureInitialized = async (url, title) => {
     if (initialized) {
       await AudioPlayer.changeAudioSource(audioRef({ source: url }));
-      await AudioPlayer.changeMetadata(
-        audioRef({ friendlyTitle: stationName }),
-      );
+      await AudioPlayer.changeMetadata(audioRef({ friendlyTitle: title }));
       await AudioPlayer.play(audioRef());
       return;
     }
@@ -95,7 +93,7 @@ const createNativeAudioPlayer = () => {
     await AudioPlayer.create({
       audioId: AUDIO_ID,
       audioSource: url,
-      friendlyTitle: stationName,
+      friendlyTitle: title,
       useForNotification: true,
       isBackgroundMusic: false,
       loop: false,
@@ -115,10 +113,10 @@ const createNativeAudioPlayer = () => {
   };
 
   return {
-    async play(url, stationName) {
+    async play(url, title) {
       if (!url) return;
       try {
-        await ensureInitialized(url, stationName);
+        await ensureInitialized(url, title);
       } catch (error) {
         console.error("Native audio playback error:", error);
       }
@@ -142,26 +140,16 @@ export class RadioListen {
     this.player = Capacitor.isNativePlatform()
       ? createNativeAudioPlayer()
       : createWebAudioPlayer();
-    this.stations = new Map();
   }
 
-  setStationCatalog(stationCatalog = {}) {
-    const { stations = [] } = stationCatalog;
-    this.stations = new Map(stations.map(({ name, url }) => [name, url]));
-  }
+  async play(station) {
+    if (!station?.stream_url) return false;
 
-  async play(stationName) {
-    const url = this.stations.get(stationName);
-    if (!url) {
-      return false;
-    }
-
-    await this.player.play(url, stationName);
+    await this.player.play(station.stream_url, station.call_sign);
     return true;
   }
 
   async stop() {
     await this.player.stop();
-    return true;
   }
 }

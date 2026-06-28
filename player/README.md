@@ -40,19 +40,19 @@ fi
 name | description | default
 --- | --- | ---
 `RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
-`RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on RADIOPAD_PLAYER_ID. Anything other than "true" will disable. | `true`
+`RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on `RADIOPAD_PLAYER`. Anything other than "true" disables it. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
 `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready`
 `RADIOPAD_MACROPAD_PORT` | Explicit macropad CDC2 serial device. | `auto-detected`
 `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
 `RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api`
-`RADIOPAD_STATIONS_URL` | URL returning a station preset JSON object. Discovered from the registry if not set. | `None`
+`RADIOPAD_RADIO_DIAL_URL` | URL returning a complete RadioDial resource. Derived from the registry player configuration if not set. | `None`
 `RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control syncing. Discovered from the registry if not set. | `None`
 
 ### Registry Discovery
 
-The player discovers its station preset and switchboard URL from the [registry](../registry/) using the `RADIOPAD_PLAYER` environment variable.
-The USB macropad client starts before registry discovery completes, so a headless player can still report loading or degraded startup state to the macropad when registry or station preset fetches fail.
+The player discovers its RadioDial and switchboard URL from the [registry](../registry/) using `RADIOPAD_PLAYER`.
+The USB macropad client starts before discovery completes, so a headless player can report loading or degraded startup state when the registry or RadioDial is unavailable.
 
 For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 
@@ -60,20 +60,25 @@ For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 https://registry.radiopad.dev/api/accounts/briceburg/players/living-room
 ```
 
-The registry returns the `stations_url` (pointing to a station preset) and `switchboard_url` for this player. The station preset contains the named list of stations the player will offer.
+The registry player resource contains a qualified `radio_dial` identity such as `community/briceburg`. The player combines that identity with `RADIOPAD_REGISTRY_URL` to load the complete RadioDial; `switchboard_url` remains an independently configured endpoint.
 
 #### Editing Stations
 
-Stations are defined in station presets stored in the registry. To modify them, use the registry API or edit the seed data directly — e.g. the [briceburg station preset](../registry/seed-data/store/presets/briceburg.json).
+Stations are account-owned registry resources. RadioDials contain ordered Station keys, so changing a Station's stream URL updates every RadioDial that references it. Use the registry API or edit the [community seed data](../registry/seed-data/store/accounts/community/) during development.
 
-To bypass registry discovery entirely, set `RADIOPAD_STATIONS_URL` to any URL that returns a station preset JSON object:
+To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a complete RadioDial resource:
 
 ```json
 {
+  "key": "community/briceburg",
   "name": "Casa Briceburg",
+  "discoverable": true,
   "stations": [
-    {"name": "WWOZ", "url": "https://www.wwoz.org/listen/hi"},
-    {"name": "KEXP", "url": "https://kexp.org/stream"}
+    {
+      "key": "community/WWOZ",
+      "call_sign": "WWOZ",
+      "stream_url": "https://www.wwoz.org/listen/hi"
+    }
   ]
 }
 ```

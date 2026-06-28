@@ -14,8 +14,7 @@ class FakePlayer(RadioPadPlayer):
         self.kgut = RadioPadStation("KGUT", "https://example.test/kgut")
         super().__init__(
             RadioPadPlayerConfig(
-                id="test-player",
-                stations_url="https://example.test/stations",
+                radio_dial_url="https://example.test/radio-dial",
                 stations=[self.kexp, self.kgut],
             )
         )
@@ -118,27 +117,24 @@ def test_candidate_ports_filters_and_sorts_cdc2_ports():
 
 def test_listen_handles_serial_playback_start():
     player, client, writer = client_with_writer(register=True)
-    client.reader = FakeReader([b'{"event":"playback_start","data":{"station_name":"KEXP"}}\n', b""])
+    client.reader = FakeReader([b'{"event":"playback_start","data":{"call_sign":"KEXP"}}\n', b""])
 
     asyncio.run(client._listen())
 
     assert player.played == [player.kexp]
-    assert written_events(writer) == [event("playback_state", {"station_name": "KEXP"})]
+    assert written_events(writer) == [event("playback_state", {"call_sign": "KEXP"})]
     assert writer.drains == 1
 
 
-def test_station_catalog_request_writes_stations_and_current_station():
+def test_station_menu_request_writes_call_signs_and_current_station():
     player, client, writer = client_with_writer(register=True)
     player.station = player.kgut
 
-    asyncio.run(client.handle_message('{"event":"station_catalog_request"}'))
+    asyncio.run(client.handle_message('{"event":"station_menu_request"}'))
 
     assert written_events(writer) == [
-        event(
-            "station_catalog",
-            {"stations": [{"name": "KEXP"}, {"name": "KGUT"}]},
-        ),
-        event("playback_state", {"station_name": "KGUT"}),
+        event("station_menu", ["KEXP", "KGUT"]),
+        event("playback_state", {"call_sign": "KGUT"}),
     ]
     assert writer.drains == 2
 
@@ -165,19 +161,16 @@ def test_publish_ok_status_clears_retained_status_after_sending():
     assert written_events(writer) == []
 
 
-def test_station_catalog_request_replays_status_after_stations():
+def test_station_menu_request_replays_status_after_stations():
     _, client, writer = client_with_writer(register=True)
     asyncio.run(client.publish_status("switchboard", "warning", "Switchboard down"))
     writer.writes.clear()
 
-    asyncio.run(client.handle_message('{"event":"station_catalog_request"}'))
+    asyncio.run(client.handle_message('{"event":"station_menu_request"}'))
 
     assert written_events(writer) == [
-        event(
-            "station_catalog",
-            {"stations": [{"name": "KEXP"}, {"name": "KGUT"}]},
-        ),
-        event("playback_state", {"station_name": None}),
+        event("station_menu", ["KEXP", "KGUT"]),
+        event("playback_state", {"call_sign": None}),
         player_status("switchboard", "warning", "Switchboard down"),
     ]
 

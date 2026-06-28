@@ -9,7 +9,7 @@ from datastore.core import (
     construct_storage_path,
     extract_object_id_from_path,
     strip_id,
-    validate_if_match,
+    validate_write_preconditions,
 )
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
@@ -72,7 +72,14 @@ class LocalBackend:
             items.append(data)
         return items
 
-    def save(self, object_id: str, data: JsonDoc, *path_parts: str, if_match: str | None = None) -> None:
+    def save(
+        self,
+        object_id: str,
+        data: JsonDoc,
+        *path_parts: str,
+        if_match: str | None = None,
+        if_none_match: bool = False,
+    ) -> None:
         """
         Saves a JSON object by its ID to a specified path.
         Keeps any explicit 'id' field provided by caller.
@@ -87,13 +94,13 @@ class LocalBackend:
             with file_path.open("r", encoding="utf-8") as f:
                 current = json.load(f)
             current_etag = compute_etag(current)
-            validate_if_match(if_match, current_etag)
+        validate_write_preconditions(if_match, if_none_match, current_etag)
         # Never persist the 'id' field in the JSON content
         to_write = strip_id(data)
         # If content hash matches existing, no-op to avoid churn
         if current_etag is not None and compute_etag(to_write) == current_etag:
             return
-        atomic_write_json_file(file_path, to_write)
+        atomic_write_json_file(file_path, to_write, overwrite=not if_none_match)
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
         """

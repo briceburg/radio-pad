@@ -15,31 +15,28 @@ def test_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypatch: p
     backend = LocalBackend(str(tmp_path))
     repo: ModelStore[Account, AccountSpec] = ModelStore(backend, model=Account, path_template="accounts/{id}")
 
-    # Seed initial value
     repo.save(Account(id="acct", name="One"))
-
-    # Snapshot stale state (data, etag)
     stale_data, stale_version = backend.get("acct", "accounts")
     assert stale_version is not None
-
-    # Concurrent writer updates the document
     backend.save("acct", {"name": "Two"}, "accounts")
-
-    # Monkeypatch repo backend.get to return stale snapshot to simulate TOCTOU race
-    real_get = backend.get
 
     def fake_get(object_id: str, *path: str) -> ValueWithETag[JsonDoc]:
         return stale_data, stale_version
 
-    # Swap in fake get just for this call
-    monkeypatch.setattr(repo, "_backend", backend)
-    monkeypatch.setattr(repo._backend, "get", fake_get)
+    monkeypatch.setattr(backend, "get", fake_get)
 
     with pytest.raises(ConcurrencyError):
         repo.upsert("acct", AccountSpec(name="Three"))
 
-    # Restore real get to keep backend consistent for any subsequent tests
-    monkeypatch.setattr(repo._backend, "get", real_get)
+
+def test_upsert_create_conflict_raises_concurrency_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = LocalBackend(str(tmp_path))
+    repo: ModelStore[Account, AccountSpec] = ModelStore(backend, model=Account, path_template="accounts/{id}")
+    backend.save("acct", {"name": "Concurrent"}, "accounts")
+    monkeypatch.setattr(backend, "get", lambda *args: (None, None))
+
+    with pytest.raises(ConcurrencyError):
+        repo.upsert("acct", AccountSpec(name="Requested"))
 
 
 def test_atomic_write_json_file_uses_unique_temp_files_under_concurrency(tmp_path: Path) -> None:

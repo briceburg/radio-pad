@@ -39,7 +39,11 @@ class SwitchboardClient(RadioPadClient):
         status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
-        self.url = player.config.switchboard_url
+        config = player.config
+        if config is None:
+            raise RuntimeError("SwitchboardClient requires loaded player configuration")
+
+        self.url = config.switchboard_url
         self.ws: Any | None = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
@@ -47,7 +51,7 @@ class SwitchboardClient(RadioPadClient):
         self._connected = False
         self._closing = False
 
-        self.http_headers = http_client_headers({"RadioPad-Stations-Url": player.config.stations_url})
+        self.http_headers = http_client_headers({"RadioPad-Radio-Dial-Url": config.radio_dial_url})
 
     async def run(self):
         if not self.url:

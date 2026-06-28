@@ -25,28 +25,50 @@ import {
 } from "../store.js";
 import { toastWarning } from "../notifications.js";
 
-const STATION_CATALOG_OK_STATUS = {
-  scope: "station_catalog",
+const RADIO_DIAL_OK_STATUS = {
+  scope: "radio_dial",
   level: "ok",
 };
-const STATION_CATALOG_UNAVAILABLE_STATUS = {
-  scope: "station_catalog",
+const RADIO_DIAL_UNAVAILABLE_STATUS = {
+  scope: "radio_dial",
   level: "warning",
-  summary: "Station catalog unavailable.",
+  summary: "RadioDial unavailable.",
 };
+
+function isPlayableStation(station) {
+  return [station?.call_sign, station?.stream_url].every(
+    (value) => typeof value === "string" && value.length > 0,
+  );
+}
+
+function parseRadioDial(value) {
+  const stations = value?.stations;
+  const callSigns = Array.isArray(stations)
+    ? stations.map((station) => station.call_sign)
+    : [];
+  if (
+    typeof value?.name !== "string" ||
+    !Array.isArray(stations) ||
+    !stations.every(isPlayableStation) ||
+    new Set(callSigns).size !== callSigns.length
+  ) {
+    throw new Error("Invalid RadioDial response");
+  }
+  return value;
+}
 
 export function createControlActions({ control, listen }) {
   const getTabStore = (tabName) =>
     tabName === "listen" ? listenStore : controlStore;
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
 
-  const stationCatalogLoads = { control: null, listen: null };
+  const radioDialLoads = { control: null, listen: null };
 
-  function abortStationCatalogLoad(tabName) {
-    const load = stationCatalogLoads[tabName];
+  function abortRadioDialLoad(tabName) {
+    const load = radioDialLoads[tabName];
     if (load) {
       load.controller.abort();
-      stationCatalogLoads[tabName] = null;
+      radioDialLoads[tabName] = null;
     }
   }
 
@@ -58,56 +80,51 @@ export function createControlActions({ control, listen }) {
     });
   }
 
-  async function loadStationCatalog(url, tabName = "control") {
+  async function loadRadioDial(url, tabName = "control") {
     if (!url) {
-      abortStationCatalogLoad(tabName);
+      abortRadioDialLoad(tabName);
       updateTab(tabName, {
-        stationCatalog: null,
+        radioDial: null,
         currentStation: null,
         loading: false,
       });
       return null;
     }
 
-    if (stationCatalogLoads[tabName]?.url === url) return null;
+    if (radioDialLoads[tabName]?.url === url) return null;
 
-    abortStationCatalogLoad(tabName);
+    abortRadioDialLoad(tabName);
     const controller = new AbortController();
     const load = { url, controller };
-    stationCatalogLoads[tabName] = load;
+    radioDialLoads[tabName] = load;
     updateTab(tabName, { loading: true });
 
     try {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
 
-      const stationCatalog = await response.json();
+      const radioDial = parseRadioDial(await response.json());
 
-      if (stationCatalogLoads[tabName] !== load) return null;
-
-      if (tabName === "listen") listen.setStationCatalog(stationCatalog);
+      if (radioDialLoads[tabName] !== load) return null;
 
       if (tabName === "control") {
-        setStatusMap("resourceStatuses", STATION_CATALOG_OK_STATUS);
+        setStatusMap("resourceStatuses", RADIO_DIAL_OK_STATUS);
       }
 
-      updateTab(tabName, { stationCatalog, loading: false });
-      stationCatalogLoads[tabName] = null;
-      return stationCatalog;
+      updateTab(tabName, { radioDial, loading: false });
+      radioDialLoads[tabName] = null;
+      return radioDial;
     } catch (error) {
-      if (
-        error?.name === "AbortError" ||
-        stationCatalogLoads[tabName] !== load
-      ) {
+      if (error?.name === "AbortError" || radioDialLoads[tabName] !== load) {
         return null;
       }
 
-      stationCatalogLoads[tabName] = null;
+      radioDialLoads[tabName] = null;
       updateTab(tabName, { loading: false });
       if (tabName === "control") {
-        setStatusMap("resourceStatuses", STATION_CATALOG_UNAVAILABLE_STATUS);
+        setStatusMap("resourceStatuses", RADIO_DIAL_UNAVAILABLE_STATUS);
       }
-      toastWarning("Failed loading station catalog.", error);
+      toastWarning("Failed loading RadioDial.", error);
       return null;
     }
   }
@@ -133,8 +150,8 @@ export function createControlActions({ control, listen }) {
   control.addEventListener("playbackstate", (event) =>
     updateTab("control", { currentStation: event.detail }),
   );
-  control.addEventListener("stationcatalogurl", (event) =>
-    loadStationCatalog(event.detail, "control"),
+  control.addEventListener("radiodialurl", (event) =>
+    loadRadioDial(event.detail, "control"),
   );
   control.addEventListener("playerpresence", (event) => {
     const connected = event.detail?.connected === true;
@@ -174,7 +191,7 @@ export function createControlActions({ control, listen }) {
     async selectPlayer(player) {
       updateTab("control", {
         player,
-        stationCatalog: null,
+        radioDial: null,
         currentStation: null,
         connectionState: player ? "connecting" : "idle",
         playerConnected: null,
@@ -183,27 +200,32 @@ export function createControlActions({ control, listen }) {
         loading: player ? true : false,
       });
       if (!player) {
-        abortStationCatalogLoad("control");
+        abortRadioDialLoad("control");
         control.disconnect();
         return;
       }
       const token = authStore.get()?.registryBearerToken || null;
-      await control.connect(player.switchboard_url, token);
-      await loadStationCatalog(player.stations_url, "control");
+      control.connect(player.switchboard_url, token);
+      await loadRadioDial(player.configured_radio_dial_url, "control");
     },
 
-    async selectPreset(presetId) {
-      return loadStationCatalog(presetId, "listen");
+    selectRadioDial(url) {
+      return loadRadioDial(url, "listen");
     },
 
-    async clickStation(tabName, station) {
+    async clickStation(tabName, callSign) {
       if (tabName === "listen") {
+        const station = listenStore
+          .get()
+          .radioDial?.stations?.find(
+            (candidate) => candidate.call_sign === callSign,
+          );
         const started = await listen.play(station);
         if (!started)
           return toastWarning("⚠️ Failed starting station playback.");
-        return updateTab("listen", { currentStation: station });
+        return updateTab("listen", { currentStation: callSign });
       }
-      control.startPlayback(station);
+      control.startPlayback(callSign);
     },
 
     async stopStation(tabName) {

@@ -45,6 +45,21 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Python components keep uv environments and tool caches under ignored
   project-local `tmp/` paths. A checkout used for development or CI should be
   writable.
+- Keep PR descriptions durable: describe behavior and breaking changes, but
+  omit transient validation results and test counts.
+
+## Domain conventions
+
+- A `RadioDial` is a complete, curated collection of resolved Stations. Registry
+  players may store its qualified identity (`account/radio-dial`); running players
+  expose the source `radio_dial_url` from which they loaded it.
+- A Station's qualified `key` is its resource identity. Its `call_sign` is the
+  account-local identifier, playback selector, and current UI text. Account,
+  player, and RadioDial names remain display labels. The Macropad `station_menu`
+  is an ordered call-sign projection, not another RadioDial.
+- Coordinate protocol changes across player, switchboard, remote control,
+  Macropad, and integration tests. Do not retain legacy event or field aliases
+  while the project remains in active development.
 
 ## Compose conventions
 

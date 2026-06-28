@@ -19,19 +19,19 @@
 from lib.macropad_keys import VISUAL_MODE_LOADING, VISUAL_MODE_WAITING
 
 PLAYER_STATUS_LEVELS = ("ok", "loading", "warning", "error")
-PLAYER_STATUS_SCOPES = ("stations", "switchboard", "playback")
+PLAYER_STATUS_SCOPES = ("radio_dial", "switchboard", "playback")
 DEGRADED_STATUS_LEVELS = ("warning", "error")
 
 
 class MacropadState:
     def __init__(self):
         self.player_available = False
-        self.has_stations = False
+        self.station_menu_loaded = False
         self.status_by_scope = {scope: None for scope in PLAYER_STATUS_SCOPES}  # type: dict[str, tuple[str, str | None] | None]
 
     @property
-    def needs_stations(self):
-        return self.player_available and not self.has_stations
+    def needs_station_menu(self):
+        return self.player_available and not self.station_menu_loaded
 
     def mark_player_available(self):
         if self.player_available:
@@ -40,9 +40,9 @@ class MacropadState:
         return True
 
     def mark_player_unavailable(self):
-        changed = self.player_available or self.has_stations or self.has_status
+        changed = self.player_available or self.station_menu_loaded or self.has_status
         self.player_available = False
-        self.has_stations = False
+        self.station_menu_loaded = False
         self.clear_statuses()
         return changed
 
@@ -61,8 +61,8 @@ class MacropadState:
         event_name = event.get("event")
         data = event.get("data")
 
-        if event_name == "station_catalog":
-            self.set_station_catalog(data, keys)
+        if event_name == "station_menu":
+            self.set_station_menu(data, keys)
         elif event_name == "playback_state":
             self.set_playback_state(data, keys)
         elif event_name == "player_status":
@@ -71,30 +71,22 @@ class MacropadState:
         elif event_name != "player_heartbeat":
             print(f"Unknown event: {event}")
 
-    def set_station_catalog(self, data, keys):
-        if not isinstance(data, dict):
-            print(f"Unexpected station_catalog payload: {data}")
+    def set_station_menu(self, stations, keys):
+        if not isinstance(stations, list) or not all(
+            isinstance(call_sign, str) and call_sign for call_sign in stations
+        ):
+            print(f"Unexpected station_menu payload: {stations}")
             return
 
-        stations = data.get("stations")
-        if not isinstance(stations, list):
-            print(f"Unexpected station_catalog stations: {stations}")
-            return
-
-        station_items = []
-        for station in stations:
-            if isinstance(station, dict) and isinstance(station.get("name"), str):
-                station_items.append({"name": station["name"]})
-
-        self.has_stations = bool(station_items)
-        keys.set_stations(station_items, refresh=False)
+        self.station_menu_loaded = True
+        keys.set_stations(stations, refresh=False)
         self.apply(keys, force=True)
 
     def set_playback_state(self, data, keys):
         if not isinstance(data, dict):
             print(f"Unexpected playback_state payload: {data}")
             return
-        keys.set_playing_station(data.get("station_name"))
+        keys.set_playing_station(data.get("call_sign"))
 
     def update_status(self, data):
         if not isinstance(data, dict):
@@ -127,16 +119,16 @@ class MacropadState:
         if not self.player_available:
             return False, VISUAL_MODE_WAITING, "Waiting for Player"
 
-        stations_level, stations_summary = self._status("stations")
+        radio_dial_level, radio_dial_summary = self._status("radio_dial")
         switchboard_level, switchboard_summary = self._status("switchboard")
         _, playback_summary = self._status("playback")
-        degraded = stations_level in DEGRADED_STATUS_LEVELS or switchboard_level in DEGRADED_STATUS_LEVELS
+        degraded = radio_dial_level in DEGRADED_STATUS_LEVELS or switchboard_level in DEGRADED_STATUS_LEVELS
 
-        if not self.has_stations:
+        if not self.station_menu_loaded:
             return (
                 degraded,
                 VISUAL_MODE_LOADING,
-                playback_summary or stations_summary or switchboard_summary or "Loading stations",
+                playback_summary or radio_dial_summary or switchboard_summary or "Loading RadioDial",
             )
 
         return degraded, None, playback_summary
