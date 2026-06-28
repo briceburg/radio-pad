@@ -16,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "hypothesis",
+  "httpx2",
   "moto[s3]",
   "mypy",
   "pytest",

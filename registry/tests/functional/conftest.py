@@ -3,7 +3,6 @@ from collections.abc import Generator
 from pathlib import Path
 
 import boto3
-import httpx
 import pytest
 from starlette.testclient import TestClient
 
@@ -62,7 +61,7 @@ def functional_test_bed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Func
 def functional_client(
     session_monkeypatch: pytest.MonkeyPatch,
     tmp_path_factory: pytest.TempPathFactory,
-) -> Generator[httpx.Client]:
+) -> Generator[TestClient]:
     """
     Session-scoped client that uses the default seed data from `seed-data/store/`.
     """
