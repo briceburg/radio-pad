@@ -13,7 +13,7 @@ FROM base AS builder
 COPY . .
 RUN npm run build
 
-FROM caddy:alpine AS prod
+FROM caddy:2-alpine AS prod
 RUN printf ':80 {\n\troot * /srv\n\ttry_files {path} /index.html\n\tfile_server\n}\n' > /etc/caddy/Caddyfile
 COPY --from=builder /app/dist /srv
 EXPOSE 80
