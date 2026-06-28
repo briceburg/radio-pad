@@ -16,7 +16,12 @@ def main() -> None:
     assert key.exists(), f"SSH key not written: {key}"
     cmd = os.environ.get("GIT_SSH_COMMAND", "")
     assert str(key) in cmd, f"GIT_SSH_COMMAND missing key: {cmd}"
+    assert "UserKnownHostsFile=" in cmd, f"GIT_SSH_COMMAND missing known-hosts path: {cmd}"
     assert "StrictHostKeyChecking" in cmd, f"GIT_SSH_COMMAND missing host check: {cmd}"
+    known_hosts = pathlib.Path(
+        next(arg.split("=", 1)[1] for arg in cmd.split() if arg.startswith("UserKnownHostsFile="))
+    )
+    assert known_hosts.exists(), f"SSH known-hosts file not created: {known_hosts}"
     print(f"entrypoint: ok  (GIT_SSH_COMMAND={cmd})")
 
     # -- dulwich native extensions load --
