@@ -57,7 +57,7 @@ export class RadioControl extends EventTarget {
     this._lastToken = null;
   }
 
-  async connect(url = null, token = null) {
+  connect(url = null, token = null) {
     const nextUrl = url ? resolvePlayerSwitchboardUrl(url) : this._lastUrl;
     const nextToken = token !== undefined ? token : this._lastToken;
     this.disconnect();
@@ -104,8 +104,8 @@ export class RadioControl extends EventTarget {
     );
   }
 
-  startPlayback(stationName) {
-    this.sendCommand("playback_start", { station_name: stationName });
+  startPlayback(callSign) {
+    this.sendCommand("playback_start", { call_sign: callSign });
   }
 
   stopPlayback() {
@@ -173,15 +173,15 @@ export class RadioControl extends EventTarget {
               new CustomEvent("playbackstate", {
                 detail:
                   data && typeof data === "object"
-                    ? data.station_name || null
+                    ? data.call_sign || null
                     : null,
               }),
             );
             break;
-          case "station_catalog_url":
-            if (data && typeof data === "object" && data.url) {
+          case "radio_dial_url":
+            if (typeof data === "string" && data) {
               this.dispatchEvent(
-                new CustomEvent("stationcatalogurl", { detail: data.url }),
+                new CustomEvent("radiodialurl", { detail: data }),
               );
             }
             break;

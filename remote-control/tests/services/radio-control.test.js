@@ -88,7 +88,7 @@ describe("RadioControl", () => {
     [
       "playback_start",
       (rc) => rc.startPlayback("WXXI"),
-      { event: "playback_start", data: { station_name: "WXXI" } },
+      { event: "playback_start", data: { call_sign: "WXXI" } },
     ],
     [
       "playback_stop",
@@ -112,31 +112,28 @@ describe("RadioControl", () => {
 
     expect(errorSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        detail:
-          "WebSocket not connected. Cannot send playback_start command.",
+        detail: "WebSocket not connected. Cannot send playback_start command.",
       }),
     );
   });
 
-  it("emits playback state and station catalog URL events", () => {
+  it("emits playback state and RadioDial URL events", () => {
     const rc = new RadioControl();
     const playbackSpy = vi.fn();
-    const catalogSpy = vi.fn();
+    const radioDialSpy = vi.fn();
     rc.addEventListener("playbackstate", playbackSpy);
-    rc.addEventListener("stationcatalogurl", catalogSpy);
+    rc.addEventListener("radiodialurl", radioDialSpy);
     rc.connect("ws://example.com/");
 
-    receiveEvent(rc, "playback_state", { station_name: "WXXI" });
-    receiveEvent(rc, "station_catalog_url", {
-      url: "https://example.test/stations.json",
-    });
+    receiveEvent(rc, "playback_state", { call_sign: "WXXI" });
+    receiveEvent(rc, "radio_dial_url", "https://example.test/radio-dial.json");
 
     expect(playbackSpy).toHaveBeenCalledWith(
       expect.objectContaining({ detail: "WXXI" }),
     );
-    expect(catalogSpy).toHaveBeenCalledWith(
+    expect(radioDialSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        detail: "https://example.test/stations.json",
+        detail: "https://example.test/radio-dial.json",
       }),
     );
   });

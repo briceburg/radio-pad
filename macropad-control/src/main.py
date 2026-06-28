@@ -57,8 +57,8 @@ while True:
     if state.mark_player_available():
         state.apply(keys, force=True)
 
-    if state.needs_stations:
-        player.request_station_catalog()
+    if state.needs_station_menu:
+        player.request_station_menu()
         state.apply(keys)
 
     # --- Encoder Rotation ---
@@ -70,7 +70,7 @@ while True:
             else:
                 player.volume_down()
         else:
-            num_pages = len(keys.pages)
+            num_pages = keys.page_count
             if position > last_position:
                 keys.switch_page((keys.current_page_index + 1) % num_pages)
             else:
@@ -87,7 +87,7 @@ while True:
     last_encoder_switch = pressed
 
     # --- Key Events ---
-    last_pressed_station = None
+    last_pressed_call_sign = None
     while True:
         # Drain keypad event queue so simultaneous presses resolve to the "last" press.
         key_event = macropad.keys.events.get()
@@ -97,13 +97,13 @@ while True:
             continue
 
         key_number = key_event.key_number
-        station_name = keys.get_station_name(key_number)
-        if station_name:
+        call_sign = keys.get_call_sign(key_number)
+        if call_sign:
             keys.set_key_color(key_number, PRESSED_COLOR)
-            last_pressed_station = station_name
+            last_pressed_call_sign = call_sign
 
-    if last_pressed_station:
-        player.start_playback(last_pressed_station)
+    if last_pressed_call_sign:
+        player.start_playback(last_pressed_call_sign)
 
     keys.tick()
     time.sleep(0.01)

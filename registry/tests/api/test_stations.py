@@ -6,13 +6,12 @@ def test_station_create_normalizes_call_sign(station_api: StationApi) -> None:
     station = station_api.put(
         "testuser1",
         "wxna",
-        StationSpec.model_validate({"display_name": " WXNA 101.5 FM ", "stream_url": "https://wxna.example/stream"}),
+        StationSpec.model_validate({"stream_url": "https://wxna.example/stream"}),
     )
 
     assert station == {
         "key": "testuser1/WXNA",
         "call_sign": "WXNA",
-        "display_name": "WXNA 101.5 FM",
         "stream_url": "https://wxna.example/stream",
     }
     assert station_api.get("testuser1", "WXNA") == station

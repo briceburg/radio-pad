@@ -20,7 +20,8 @@ import {
   discoverAccounts,
   discoverPlayer,
   discoverPlayers,
-  discoverPresets,
+  discoverRadioDials,
+  radioDialUrl,
 } from "../services/registry-discovery.js";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { toastDanger, toastRegistryFailure } from "../notifications.js";
@@ -31,15 +32,20 @@ const REGISTRY_UNAVAILABLE_STATUS = {
   summary: "Registry unavailable. Using last known selections.",
 };
 
+function resolveSelection(value, options) {
+  const available =
+    !value || options === null || options.some((item) => item.value === value);
+  return available ? value : null;
+}
+
 export function createSettingsActions({
   prefs,
   auth,
   onPlayerSelected,
-  onPresetSelected,
+  onRadioDialSelected,
   onRegistryStatus = () => {},
 }) {
-  let lastPlayerId = null;
-  let lastPresetId = null;
+  let lastPlayerSelection = null;
   let hasSyncedOnce = false;
 
   let syncPromise = null;
@@ -54,13 +60,13 @@ export function createSettingsActions({
       };
 
       try {
-        const url = await prefs.get("registryUrl");
-        if (!url) return;
+        const registryUrl = await prefs.get("registryUrl");
+        if (!registryUrl) return;
 
         // null means discovery failed; [] means the registry was reachable and returned no items.
         let accounts = null;
         try {
-          accounts = await discoverAccounts(url, auth, options);
+          accounts = await discoverAccounts(registryUrl, auth, options);
         } catch (err) {
           noteRegistryFailure("Failed to discover accounts", err);
         }
@@ -72,39 +78,43 @@ export function createSettingsActions({
 
         // Discover APIs natively handle null accountId safely
         const results = await Promise.allSettled([
-          discoverPlayers(accountId, prefs, auth, options),
-          discoverPresets(accountId, prefs, auth, options),
+          discoverPlayers(accountId, registryUrl, auth, options),
+          discoverRadioDials(accountId, registryUrl, auth, options),
         ]);
         const players =
           results[0].status === "fulfilled" ? results[0].value : null;
-        const presets =
+        const radioDials =
           results[1].status === "fulfilled" ? results[1].value : null;
 
         if (results[0].status === "rejected") {
           noteRegistryFailure("Failed to discover players", results[0].reason);
         }
         if (results[1].status === "rejected") {
-          noteRegistryFailure("Failed to discover presets", results[1].reason);
+          noteRegistryFailure(
+            "Failed to discover RadioDials",
+            results[1].reason,
+          );
         }
 
         if (players !== null) await prefs.setOptions("playerId", players);
-        if (presets !== null) await prefs.setOptions("presetId", presets);
+        if (radioDials !== null)
+          await prefs.setOptions("radioDial", radioDials);
 
         const playerId = (await prefs.get("playerId")) || null;
         // Validate against available options, clear if no longer available (e.g. signed out)
-        const isPlayerValid =
-          !playerId ||
-          players === null ||
-          players.some((p) => p.value === playerId);
-        const resolvedPlayerId = isPlayerValid ? playerId : null;
+        const resolvedPlayerId = resolveSelection(playerId, players);
+        const playerSelection = resolvedPlayerId
+          ? `${registryUrl} ${accountId}/${resolvedPlayerId}`
+          : null;
 
         if (resolvedPlayerId) {
-          if (resolvedPlayerId !== lastPlayerId || !hasSyncedOnce) {
+          if (playerSelection !== lastPlayerSelection || !hasSyncedOnce) {
             let player = null;
             try {
               player = await discoverPlayer(
+                accountId,
                 resolvedPlayerId,
-                prefs,
+                registryUrl,
                 auth,
                 options,
               );
@@ -114,22 +124,23 @@ export function createSettingsActions({
 
             if (player) {
               await onPlayerSelected(player);
-              lastPlayerId = resolvedPlayerId;
+              lastPlayerSelection = playerSelection;
             } else if (!registryFailure) {
               await onPlayerSelected(null);
-              lastPlayerId = null;
+              lastPlayerSelection = null;
             }
           }
-        } else if (lastPlayerId !== null || !hasSyncedOnce) {
+        } else if (lastPlayerSelection !== null || !hasSyncedOnce) {
           await onPlayerSelected(null);
-          lastPlayerId = null;
+          lastPlayerSelection = null;
         }
 
-        const presetId = (await prefs.get("presetId")) || null;
-        if (presetId !== lastPresetId || !hasSyncedOnce) {
-          await onPresetSelected(presetId || null);
-          lastPresetId = presetId;
-        }
+        const radioDialKey = (await prefs.get("radioDial")) || null;
+        const resolvedRadioDialKey = resolveSelection(radioDialKey, radioDials);
+        const selectedRadioDialUrl = resolvedRadioDialKey
+          ? radioDialUrl(resolvedRadioDialKey, registryUrl)
+          : null;
+        await onRadioDialSelected(selectedRadioDialUrl);
         hasSyncedOnce = true;
 
         if (registryFailure) {
@@ -147,7 +158,7 @@ export function createSettingsActions({
       } finally {
         if (!hasSyncedOnce && !registryFailure) {
           await onPlayerSelected(null);
-          await onPresetSelected(null);
+          await onRadioDialSelected(null);
           hasSyncedOnce = true;
         }
         preferencesStore.set({ definitions: prefs.getSnapshot() });
@@ -169,7 +180,7 @@ export function createSettingsActions({
       return isOauthCallback;
     },
 
-    sync: () => sync(),
+    sync,
 
     async save(settingsMap) {
       settingsUiStore.set({ saveState: "saving" });
@@ -197,11 +208,11 @@ export function createSettingsActions({
       }
     },
 
-    async refreshAccountsForCurrentRegistry(
+    refreshAccountsForCurrentRegistry(
       failureReason = "accounts",
       options = {},
     ) {
-      await sync(failureReason, options);
+      return sync(failureReason, options);
     },
   };
 }

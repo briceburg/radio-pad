@@ -33,7 +33,7 @@ logger = logging.getLogger("PLAYER")
 class MpvPlayer(RadioPadPlayer):
     def __init__(
         self,
-        config: RadioPadPlayerConfig,
+        config: RadioPadPlayerConfig | None = None,
         audio_channels: str = "stereo",
         socket_path: str = "/tmp/radio-pad-mpv.sock",
     ):
@@ -49,7 +49,7 @@ class MpvPlayer(RadioPadPlayer):
     async def play(self, station: RadioPadStation):
         """Play a radio station."""
 
-        logger.info("playing station %s (%s)", station.name, station.url)
+        logger.info("playing station %s (%s)", station.call_sign, station.stream_url)
         try:
             # Stop any existing playback
             await self.stop()
@@ -57,7 +57,7 @@ class MpvPlayer(RadioPadPlayer):
             self.mpv_process = subprocess.Popen(
                 [
                     "mpv",
-                    station.url,
+                    station.stream_url,
                     "--no-osc",
                     "--no-osd-bar",
                     "--no-input-default-bindings",

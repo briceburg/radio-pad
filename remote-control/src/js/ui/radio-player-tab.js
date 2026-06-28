@@ -21,12 +21,12 @@ import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
 import { controlStore, isDegradedStatus, listenStore } from "../store.js";
 
-const PLAYER_DEGRADED_SCOPES = ["stations", "switchboard"];
-const RESOURCE_DEGRADED_SCOPES = ["registry", "station_catalog"];
+const PLAYER_DEGRADED_SCOPES = ["radio_dial", "switchboard"];
+const RESOURCE_DEGRADED_SCOPES = ["registry", "radio_dial"];
 const STATUS_SUMMARY_ORDER = [
   ["playerStatuses", "playback"],
-  ["playerStatuses", "stations"],
-  ["resourceStatuses", "station_catalog"],
+  ["playerStatuses", "radio_dial"],
+  ["resourceStatuses", "radio_dial"],
   ["resourceStatuses", "registry"],
   ["playerStatuses", "switchboard"],
 ];
@@ -132,8 +132,8 @@ export class RadioPlayerTab extends RadioElement {
       : this.controlController.value;
   }
 
-  _onSelectStation(stationName) {
-    this._emit("station-click", { tabName: this.tabName, stationName });
+  _onSelectStation(callSign) {
+    this._emit("station-click", { tabName: this.tabName, callSign });
   }
 
   _onStopStation() {
@@ -141,7 +141,7 @@ export class RadioPlayerTab extends RadioElement {
   }
 
   renderEmptyState() {
-    const noun = this.tabName === "listen" ? "preset" : "player";
+    const noun = this.tabName === "listen" ? "RadioDial" : "player";
     return html`
       <div class="ion-text-center ion-padding ion-margin-top">
         <ion-icon
@@ -180,16 +180,16 @@ export class RadioPlayerTab extends RadioElement {
         (row) => html`
           <ion-row>
             ${row.map((station) => {
-              const isActive = station.name === currentStation;
+              const isActive = station.call_sign === currentStation;
               const color = getStationButtonColor(visualState, isActive);
               return html`
                 <ion-col size="4">
                   <ion-button
                     expand="block"
                     color=${color}
-                    @click=${() => this._onSelectStation(station.name)}
+                    @click=${() => this._onSelectStation(station.call_sign)}
                   >
-                    ${station.name}
+                    ${station.call_sign}
                   </ion-button>
                 </ion-col>
               `;
@@ -208,18 +208,18 @@ export class RadioPlayerTab extends RadioElement {
     const shouldRenderSkeleton =
       s.loading ||
       (visualState === "warning" &&
-        !s.stationCatalog &&
+        !s.radioDial &&
         this.tabName === "control" &&
         s.player?.id);
 
     let content;
     if (shouldRenderSkeleton) {
       content = renderSkeleton(visualState);
-    } else if (!s.stationCatalog) {
+    } else if (!s.radioDial) {
       content = this.renderEmptyState();
     } else {
       content = this.renderStationButtons(
-        s.stationCatalog.stations,
+        s.radioDial.stations,
         s.currentStation,
         visualState,
       );
@@ -227,8 +227,8 @@ export class RadioPlayerTab extends RadioElement {
 
     const titleName =
       this.tabName === "control"
-        ? s.player?.name || s.stationCatalog?.name || ""
-        : s.stationCatalog?.name || "";
+        ? s.player?.name || s.radioDial?.name || ""
+        : s.radioDial?.name || "";
     const nowPlaying =
       s.currentStation ||
       (s.loading
@@ -240,10 +240,7 @@ export class RadioPlayerTab extends RadioElement {
     return html`
       <ion-header>
         <ion-toolbar>
-          <ion-title size="large">
-            <span class="stations-name">${titleName}</span>:
-            <span class="now-playing">${nowPlaying}</span>
-          </ion-title>
+          <ion-title size="large"> ${titleName}: ${nowPlaying} </ion-title>
           <ion-buttons slot="end">
             <ion-button
               shape="round"
@@ -259,8 +256,8 @@ export class RadioPlayerTab extends RadioElement {
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <div class="radio-info ion-text-center">${statusText}</div>
-        <ion-grid class="station-grid">${content}</ion-grid>
+        <div class="ion-text-center">${statusText}</div>
+        <ion-grid>${content}</ion-grid>
       </ion-content>
     `;
   }

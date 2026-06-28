@@ -47,9 +47,9 @@ async function bootstrap() {
   const settingsActions = createSettingsActions({
     prefs,
     auth,
-    onPlayerSelected: (player) => controlActions.selectPlayer(player),
-    onPresetSelected: (presetId) => controlActions.selectPreset(presetId),
-    onRegistryStatus: (status) => controlActions.setRegistryStatus(status),
+    onPlayerSelected: controlActions.selectPlayer,
+    onRadioDialSelected: controlActions.selectRadioDial,
+    onRegistryStatus: controlActions.setRegistryStatus,
   });
   const authActions = createAuthActions({
     auth,
@@ -63,7 +63,7 @@ async function bootstrap() {
   document.addEventListener("auth-copytoken", () => authActions.copyToken());
 
   document.addEventListener("station-click", (e) =>
-    controlActions.clickStation(e.detail.tabName, e.detail.stationName),
+    controlActions.clickStation(e.detail.tabName, e.detail.callSign),
   );
   document.addEventListener("station-stop", (e) =>
     controlActions.stopStation(e.detail.tabName),

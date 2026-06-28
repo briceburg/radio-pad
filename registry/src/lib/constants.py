@@ -22,8 +22,9 @@ BASE_DIR = Path(__file__).parent.parent.parent
 # Slug/ID pattern shared across models and API path params
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
-# Maximum length for short display labels
-MAX_DESCRIPTOR_LENGTH = 36
+# Maximum lengths for identifiers and display names
+MAX_IDENTIFIER_LENGTH = 36
+MAX_NAME_LENGTH = 36
 
 # Maximum items per page
 MAX_PER_PAGE = 100

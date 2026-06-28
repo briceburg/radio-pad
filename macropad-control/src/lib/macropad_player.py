@@ -24,7 +24,7 @@ import usb_cdc
 from lib.macropad_time import ticks_diff, ticks_ms
 
 PLAYER_SESSION_TIMEOUT_MS = 7000
-STATION_CATALOG_REQUEST_INTERVAL_MS = 3000
+STATION_MENU_REQUEST_INTERVAL_MS = 3000
 SERIAL_WRITE_BACKPRESSURE_SECONDS = 0.1
 
 
@@ -34,7 +34,7 @@ class MacropadPlayer:
         if not self.player:
             raise RuntimeError("No USB CDC data port found.")
         self._serial_buffer = ""
-        self._last_station_catalog_request_time = 0
+        self._last_station_menu_request_time = 0
         self._last_player_message_time = 0
         self._connected_since = 0
 
@@ -104,8 +104,8 @@ class MacropadPlayer:
                 print(f"PLAYER: error parsing message: {e}")
         return None
 
-    def start_playback(self, station_name):
-        self.send_command("playback_start", {"station_name": station_name})
+    def start_playback(self, call_sign):
+        self.send_command("playback_start", {"call_sign": call_sign})
 
     def stop_playback(self):
         self.send_command("playback_stop")
@@ -116,11 +116,11 @@ class MacropadPlayer:
     def volume_down(self):
         self.send_command("volume_down")
 
-    def request_station_catalog(self):
+    def request_station_menu(self):
         current_time = ticks_ms()
-        if ticks_diff(current_time, self._last_station_catalog_request_time) >= STATION_CATALOG_REQUEST_INTERVAL_MS:
-            self._last_station_catalog_request_time = current_time
-            self.send_command("station_catalog_request")
+        if ticks_diff(current_time, self._last_station_menu_request_time) >= STATION_MENU_REQUEST_INTERVAL_MS:
+            self._last_station_menu_request_time = current_time
+            self.send_command("station_menu_request")
 
     def flush_buffer(self):
         while self.read_event():
@@ -128,6 +128,6 @@ class MacropadPlayer:
 
     def reset_session(self):
         self._serial_buffer = ""
-        self._last_station_catalog_request_time = 0
+        self._last_station_menu_request_time = 0
         self._last_player_message_time = 0
         self._connected_since = 0

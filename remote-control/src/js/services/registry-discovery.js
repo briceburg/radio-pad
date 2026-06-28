@@ -22,6 +22,29 @@ function resolveRegistryBaseUrl(registryUrl) {
   return new URL(registryUrl, window.location.origin).toString();
 }
 
+export function radioDialUrl(radioDialKey, registryUrl) {
+  const parts = radioDialKey?.split("/") || [];
+  if (parts.length !== 2 || parts.some((part) => !part)) {
+    throw new Error("RadioDial must be in account_id/radio_dial_id format.");
+  }
+  const [accountId, radioDialId] = parts.map(encodeURIComponent);
+  return new URL(
+    `accounts/${accountId}/radio-dials/${radioDialId}`,
+    resolveRegistryBaseUrl(registryUrl),
+  ).toString();
+}
+
+function switchboardUrl(registryUrl, accountId, playerId) {
+  const url = new URL(registryUrl, window.location.origin);
+  const apiPath = url.pathname.replace(/\/$/, "");
+  const basePath = apiPath.endsWith("/api") ? apiPath.slice(0, -4) : apiPath;
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `${basePath}/switchboard/${encodeURIComponent(accountId)}/${encodeURIComponent(playerId)}`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 function buildRequestOptions(auth, signal) {
   const token = auth?.getRegistryBearerToken?.();
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -58,20 +81,6 @@ async function fetchAllPages(
   return items;
 }
 
-const withAuthFallback = async (fallback, promiseCallback) => {
-  try {
-    return await promiseCallback();
-  } catch (error) {
-    if (
-      error instanceof RegistryRequestError &&
-      (error.status === 401 || error.status === 403)
-    ) {
-      return fallback;
-    }
-    throw error;
-  }
-};
-
 export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   if (!registryUrl) return [];
   const items = await fetchAllPages(
@@ -85,91 +94,76 @@ export async function discoverAccounts(registryUrl, auth = null, options = {}) {
 
 export async function discoverPlayers(
   accountId,
-  prefs,
+  registryUrl,
   auth = null,
   options = {},
 ) {
-  if (!accountId) return [];
+  if (!(accountId && registryUrl)) return [];
   if (auth && !auth.signedIn) return [];
 
-  const registryUrl = await prefs.get("registryUrl");
-  if (!registryUrl) return [];
-
-  return withAuthFallback([], async () => {
-    const items = await fetchAllPages(
-      `accounts/${accountId}/players/`,
-      registryUrl,
-      auth,
-      options.signal,
-    );
-    return items.map((i) => ({ value: i.id, label: i.name || i.id }));
-  });
+  const items = await fetchAllPages(
+    `accounts/${accountId}/players/`,
+    registryUrl,
+    auth,
+    options.signal,
+  );
+  return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
-export async function discoverPresets(
+export async function discoverRadioDials(
   accountId,
-  prefs,
+  registryUrl,
   auth = null,
   options = {},
 ) {
-  const registryUrl = await prefs.get("registryUrl");
   if (!registryUrl) return [];
-  const registryBaseUrl = resolveRegistryBaseUrl(registryUrl);
+  const owners = [...new Set([accountId, "community"].filter(Boolean))];
 
-  const presets = [];
-  const paths = [
-    ...(accountId ? [`accounts/${accountId}/presets/`] : []),
-    `presets/`,
-  ];
-
-  await withAuthFallback([], async () => {
-    for (const path of paths) {
+  const discovered = await Promise.all(
+    owners.map(async (owner) => {
       const items = await fetchAllPages(
-        path,
+        `accounts/${owner}/radio-dials/`,
         registryUrl,
         auth,
         options.signal,
       );
-      presets.push(
-        ...items.map((i) => ({
-          value: new URL(`${path}${i.id}`, registryBaseUrl).toString(),
-          label: i.name || i.id,
-        })),
-      );
-    }
-  });
-
-  return presets;
+      return items
+        .filter((item) => owner === accountId || item.discoverable)
+        .map((item) => ({
+          value: item.key,
+          label: `${item.name || item.key} · ${owner}`,
+        }));
+    }),
+  );
+  return discovered.flat();
 }
 
 export async function discoverPlayer(
+  accountId,
   playerId,
-  prefs,
+  registryUrl,
   auth = null,
   options = {},
 ) {
-  if (!playerId) return null;
+  if (!(accountId && playerId && registryUrl)) return null;
   if (auth && !auth.signedIn) return null;
 
-  const [accountId, registryUrl] = await Promise.all([
-    prefs.get("accountId"),
-    prefs.get("registryUrl"),
-  ]);
-
-  if (!(registryUrl && accountId)) return null;
-
-  return withAuthFallback(null, async () => {
-    const url = new URL(
-      `accounts/${accountId}/players/${playerId}`,
-      resolveRegistryBaseUrl(registryUrl),
-    ).toString();
-    const response = await fetch(
-      url,
-      buildRequestOptions(auth, options.signal),
-    );
-    if (!response.ok) {
-      throw new RegistryRequestError({ url, status: response.status });
-    }
-    return await response.json();
-  });
+  const url = new URL(
+    `accounts/${accountId}/players/${playerId}`,
+    resolveRegistryBaseUrl(registryUrl),
+  ).toString();
+  const response = await fetch(url, buildRequestOptions(auth, options.signal));
+  if (!response.ok) {
+    throw new RegistryRequestError({ url, status: response.status });
+  }
+  const player = await response.json();
+  return {
+    ...player,
+    configured_radio_dial_url: player.radio_dial
+      ? radioDialUrl(player.radio_dial, registryUrl)
+      : null,
+    switchboard_url:
+      player.switchboard_url ||
+      switchboardUrl(registryUrl, accountId, playerId),
+  };
 }

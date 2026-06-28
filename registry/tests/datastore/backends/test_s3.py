@@ -10,6 +10,7 @@ from moto import mock_aws
 
 from datastore.backends.s3 import S3Backend
 from datastore.core import storage_json
+from datastore.exceptions import ConcurrencyError
 
 
 @pytest.fixture
@@ -73,3 +74,36 @@ class TestS3BackendListFiltering:
         body = obj["Body"].read().decode("utf-8")
 
         assert body == storage_json(payload)
+
+    def test_conditional_update_rejects_change_after_head(
+        self,
+        s3_backend: S3Backend,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        s3_backend.save("stations", {"KEXP": 1}, "accounts", "community")
+        _, version = s3_backend.get("stations", "accounts", "community")
+        assert version is not None
+
+        real_put = s3_backend.client.put_object
+
+        def concurrent_put(**request: object) -> object:
+            real_put(
+                Bucket=s3_backend.bucket,
+                Key="test/accounts/community/stations.json",
+                Body=storage_json({"WWOZ": 2}),
+            )
+            return real_put(**request)
+
+        monkeypatch.setattr(s3_backend.client, "put_object", concurrent_put)
+
+        with pytest.raises(ConcurrencyError):
+            s3_backend.save(
+                "stations",
+                {"KEXP": 1, "WXNA": 3},
+                "accounts",
+                "community",
+                if_match=version,
+            )
+
+        stored, _ = s3_backend.get("stations", "accounts", "community")
+        assert stored == {"WWOZ": 2}

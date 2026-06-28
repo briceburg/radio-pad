@@ -21,6 +21,17 @@ def _infer_switchboard_url(registry_url: str, account_id: str, player_id: str) -
     return urlunsplit((scheme, parsed.netloc, f"{switchboard_path}/{account_id}/{player_id}", "", ""))
 
 
+def _radio_dial_url(registry_url: str, radio_dial: str) -> str:
+    parts = radio_dial.split("/")
+    if len(parts) != 2 or not all(parts):
+        raise ConfigError(
+            "Player radio_dial must be in 'account_id/radio_dial_id' format",
+            status_summary="RadioDial config error",
+        )
+    account_id, radio_dial_id = parts
+    return f"{registry_url.rstrip('/')}/accounts/{account_id}/radio-dials/{radio_dial_id}"
+
+
 def http_client_headers(custom_headers=None):
     """Return HTTP client headers with RadioPad user agent, merged with any custom headers"""
     defaults = {
@@ -57,7 +68,7 @@ async def fetch_json_url(url, timeout=12, retries=3):
 async def make(
     player,
     registry_url,
-    stations_url=None,
+    radio_dial_url=None,
     switchboard_url=None,
     enable_discovery=True,
 ):
@@ -66,61 +77,66 @@ async def make(
     If enable_discovery is True, attempt to discover missing configuration from the registry.
     """
     if enable_discovery:
-        stations_url, switchboard_url = await discover_config(player, registry_url, stations_url, switchboard_url)
+        radio_dial_url, switchboard_url = await discover_config(player, registry_url, radio_dial_url, switchboard_url)
 
-    if not stations_url:
+    if not radio_dial_url:
         raise ConfigError(
-            "Please set RADIOPAD_STATIONS_URL or enable discovery by providing RADIOPAD_PLAYER.",
-            status_summary="Station config error",
+            "Please set RADIOPAD_RADIO_DIAL_URL or enable discovery by providing RADIOPAD_PLAYER.",
+            status_summary="RadioDial config error",
         )
 
-    logger.info("Using station catalog URL: %s", stations_url)
-    logger.info("Using switchboard_url: %s", switchboard_url)
+    logger.info("Using RadioDial URL: %s", radio_dial_url)
+    logger.info("Using switchboard URL: %s", switchboard_url)
 
-    station_catalog = await fetch_json_url(stations_url)
-    if not station_catalog:
-        raise ConfigError("Failed fetching station catalog", status_summary="Stations unavailable")
-    stations = station_catalog.get("stations") if isinstance(station_catalog, dict) else None
+    radio_dial = await fetch_json_url(radio_dial_url)
+    if not radio_dial:
+        raise ConfigError("Failed fetching RadioDial", status_summary="RadioDial unavailable")
+    stations = radio_dial.get("stations") if isinstance(radio_dial, dict) else None
     if (
-        not isinstance(station_catalog, dict)
-        or not isinstance(station_catalog.get("name"), str)
+        not isinstance(radio_dial, dict)
         or not isinstance(stations, list)
         or any(
             not isinstance(station, dict)
-            or not isinstance(station.get("name"), str)
-            or not isinstance(station.get("url"), str)
+            or not isinstance(station.get("call_sign"), str)
+            or not station["call_sign"]
+            or not isinstance(station.get("stream_url"), str)
+            or not station["stream_url"]
             for station in stations
         )
+        or len({station["call_sign"] for station in stations}) != len(stations)
     ):
         raise ConfigError(
-            'Station catalog URL must return \'{"name": str, "stations": [{...}]}\'',
-            status_summary="Station config error",
+            "RadioDial must contain unique Stations with call_sign and stream_url",
+            status_summary="RadioDial config error",
         )
 
-    # Create config object
     return RadioPadPlayerConfig(
-        id=player,
-        stations=[RadioPadStation(name=s["name"], url=s["url"]) for s in stations],
-        stations_url=stations_url,
-        registry_url=registry_url,
+        stations=[
+            RadioPadStation(
+                call_sign=station["call_sign"],
+                stream_url=station["stream_url"],
+            )
+            for station in stations
+        ],
+        radio_dial_url=radio_dial_url,
         switchboard_url=switchboard_url,
     )
 
 
-async def discover_config(player, registry_url, stations_url=None, switchboard_url=None):
+async def discover_config(player, registry_url, radio_dial_url=None, switchboard_url=None):
     """Discover missing player configuration from the registry."""
 
-    if stations_url and switchboard_url:
+    if radio_dial_url and switchboard_url:
         logger.info("skipping discovery, using provided URLs.")
-        return stations_url, switchboard_url
+        return radio_dial_url, switchboard_url
 
-    try:
-        account_id, player_id = player.split("/", 1)
-    except ValueError:
+    player_parts = player.split("/")
+    if len(player_parts) != 2 or not all(player_parts):
         raise ConfigError(
             "Player must be in 'account_id/player_id' format",
             status_summary="Player config error",
         )
+    account_id, player_id = player_parts
 
     url = f"{registry_url.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     logger.info("Discovering configuration from %s ...", url)
@@ -128,16 +144,11 @@ async def discover_config(player, registry_url, stations_url=None, switchboard_u
     data = await fetch_json_url(url)
 
     if data:
-        stations_url = stations_url or data.get("stations_url")
+        if not radio_dial_url and data.get("radio_dial"):
+            radio_dial_url = _radio_dial_url(registry_url, data["radio_dial"])
         switchboard_url = switchboard_url or data.get("switchboard_url")
 
-    # If the registry didn't provide URLs (e.g. they're omitted on the backend),
-    # infer them locally using the known registry endpoint as a base.
-    if not stations_url:
-        stations_url = f"{registry_url.rstrip('/')}/presets/{account_id}"
-
     if not switchboard_url:
-        # Fallback assumes the switchboard is deployed at the same domain/port as the registry
         switchboard_url = _infer_switchboard_url(registry_url, account_id, player_id)
 
-    return stations_url, switchboard_url
+    return radio_dial_url, switchboard_url

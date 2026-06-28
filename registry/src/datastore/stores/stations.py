@@ -8,10 +8,11 @@ from pydantic import TypeAdapter
 from datastore.core import ObjectStore
 from datastore.types import JsonDoc, PathParams
 from lib.keys import join_key, split_key
-from lib.types import CallSign, StationKey
+from lib.types import CallSign, Slug, StationKey
 from models.station import Station, StationSpec
 
 _CALL_SIGN_ADAPTER: TypeAdapter[str] = TypeAdapter(CallSign)
+_SLUG_ADAPTER: TypeAdapter[str] = TypeAdapter(Slug)
 
 
 class Stations:
@@ -44,6 +45,7 @@ class Stations:
             "accounts",
             account_id,
             if_match=version,
+            if_none_match=version is None,
         )
         return self._station(account_id, canonical_call_sign, spec)
 
@@ -116,4 +118,4 @@ class Stations:
     def _account_id(self, path_params: Mapping[str, str] | None) -> str:
         if not path_params or not isinstance(path_params.get("account_id"), str):
             raise ValueError("account_id path parameter is required for stations")
-        return path_params["account_id"]
+        return _SLUG_ADAPTER.validate_python(path_params["account_id"])

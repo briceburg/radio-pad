@@ -9,11 +9,11 @@ from datastore.core import (
     compute_etag,
     construct_storage_path,
     deconstruct_storage_path,
-    normalize_etag,
     storage_json,
     strip_id,
-    validate_if_match,
+    validate_write_preconditions,
 )
+from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
@@ -23,7 +23,7 @@ class S3Backend:
     Notes:
     - Stores documents under keys like: <prefix>/<path...>/<id>.json
     - Stores a content hash in object metadata as 'rpr-sha256' for cheap identity checks.
-    - For optimistic concurrency we return/compare backend tokens (VersionId if available else ETag).
+    - S3 ETags are opaque optimistic-concurrency tokens and conditional PUT preconditions.
     """
 
     def __init__(self, bucket: str, prefix: str = "", client: BaseClient | None = None) -> None:
@@ -54,8 +54,7 @@ class S3Backend:
             return None, None
         body = resp["Body"].read()
         raw = json.loads(body.decode("utf-8"))
-        # compute returned token: prefer VersionId if present
-        token = normalize_etag(resp.get("VersionId") or resp.get("ETag"))
+        token = cast(str | None, resp.get("ETag"))
         return raw, token
 
     def list(self, *path_parts: str, page: int = 1, per_page: int = 10) -> PagedResult[JsonDoc]:
@@ -91,7 +90,14 @@ class S3Backend:
 
         return items
 
-    def save(self, object_id: str, data: JsonDoc, *path_parts: str, if_match: str | None = None) -> None:
+    def save(
+        self,
+        object_id: str,
+        data: JsonDoc,
+        *path_parts: str,
+        if_match: str | None = None,
+        if_none_match: bool = False,
+    ) -> None:
         storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
         to_write = strip_id(data)
         new_hash = compute_etag(to_write)
@@ -101,15 +107,34 @@ class S3Backend:
         if head is not None:
             # HEAD metadata keys are lowercase in boto3
             current_hash = head.get("Metadata", {}).get("rpr-sha256")
-            current_etag = normalize_etag(head.get("VersionId") or head.get("ETag"))
-            # enforce optimistic concurrency
-            validate_if_match(if_match, current_etag)
-            # no-op if identical content
-            if current_hash == new_hash:
-                return
+            current_etag = cast(str | None, head.get("ETag"))
+        validate_write_preconditions(if_match, if_none_match, current_etag)
+        if current_hash == new_hash:
+            return
         # Never persist the 'id' field in the JSON content
         body = storage_json(to_write).encode("utf-8")
-        self.client.put_object(Bucket=self.bucket, Key=storage_path, Body=body, Metadata={"rpr-sha256": new_hash})
+        request: dict[str, Any] = {
+            "Bucket": self.bucket,
+            "Key": storage_path,
+            "Body": body,
+            "Metadata": {"rpr-sha256": new_hash},
+        }
+        if if_none_match:
+            request["IfNoneMatch"] = "*"
+        if if_match is not None:
+            request["IfMatch"] = if_match
+        try:
+            self.client.put_object(**request)
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if (if_match is not None or if_none_match) and code in {
+                "409",
+                "412",
+                "ConditionalRequestConflict",
+                "PreconditionFailed",
+            }:
+                raise ConcurrencyError("Conditional save failed") from error
+            raise
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
         storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)

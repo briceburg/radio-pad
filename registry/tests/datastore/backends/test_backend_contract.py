@@ -9,6 +9,7 @@ from _pytest.fixtures import SubRequest
 
 from datastore.core import ModelStore, seed_from_path, seedable
 from datastore.core.interfaces import ObjectStore
+from datastore.exceptions import ConcurrencyError
 from models.account import Account, AccountSpec
 
 
@@ -93,6 +94,19 @@ class TestObjectStoreContract:
         object_store.save("same", {"x": 2}, *path)
         _, v3 = object_store.get("same", *path)
         assert v3 != v2
+
+    def test_conditional_write_preconditions(self, object_store: ObjectStore) -> None:
+        path = ("conditional",)
+        object_store.save("item", {"value": 1}, *path)
+        _, stale_version = object_store.get("item", *path)
+        assert stale_version is not None
+
+        with pytest.raises(ConcurrencyError):
+            object_store.save("item", {"value": 2}, *path, if_none_match=True)
+
+        object_store.save("item", {"value": 2}, *path)
+        with pytest.raises(ConcurrencyError):
+            object_store.save("item", {"value": 3}, *path, if_match=stale_version)
 
     def test_seed_from_path_works_across_backends(self, object_store: ObjectStore, tmp_path: Path) -> None:
         seed_root = tmp_path / "seed"

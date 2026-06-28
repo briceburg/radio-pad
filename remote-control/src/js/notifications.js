@@ -54,7 +54,7 @@ function registrySummary(summary, { fromSettingsSave = false } = {}) {
 const REGISTRY_FAILURE_MESSAGES = {
   accounts: "⚠️ Failed refreshing accounts.",
   auth_accounts: "⚠️ Failed refreshing accounts after auth change.",
-  account_choices: "⚠️ Failed refreshing account players/presets.",
+  account_choices: "⚠️ Failed refreshing account players and RadioDials.",
   player: "⚠️ Failed refreshing player info.",
 };
 

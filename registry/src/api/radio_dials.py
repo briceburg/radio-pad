@@ -25,4 +25,4 @@ def summarize_radio_dial(key: RadioDialKey, spec: RadioDialSpec) -> RadioDialSum
 
 
 def _metadata(spec: RadioDialSpec) -> dict[str, object]:
-    return spec.model_dump(include={"name", "description", "discoverable"})
+    return spec.model_dump(exclude={"stations"})

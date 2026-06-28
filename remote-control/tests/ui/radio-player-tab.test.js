@@ -45,13 +45,13 @@ describe("radio-player-tab visual helpers", () => {
         connectionState: "connected",
         player: { name: "Living Room" },
         resourceStatuses: {
-          station_catalog: {
+          radio_dial: {
             level: "warning",
-            summary: "Station catalog unavailable.",
+            summary: "RadioDial unavailable.",
           },
         },
       }),
-    ).toBe("Station catalog unavailable.");
+    ).toBe("RadioDial unavailable.");
   });
 
   it("derives station visual states and button colors", () => {

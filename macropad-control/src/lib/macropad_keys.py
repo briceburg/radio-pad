@@ -55,27 +55,19 @@ class MacropadKeys:
         self._last_animation_tick = 0
         self._visual_mode_started_at = ticks_ms()
         self._static_skeleton_applied = False
-        self.pages = [{"stations": [], "title": "iCEBURG Radio"}]
 
-    def set_stations(self, stations_list, refresh=True):
+    def set_stations(self, stations, refresh=True):
         self.playing_station_index = None
-        self.stations = stations_list
-        self.pages = []
-        if stations_list:
-            for i in range(0, len(stations_list), MACROPAD_KEY_COUNT):
-                self.pages.append(
-                    {
-                        "stations": stations_list[i : i + MACROPAD_KEY_COUNT],
-                        "title": (
-                            "iCEBURG Radio"
-                            if len(stations_list) <= MACROPAD_KEY_COUNT
-                            else f"iCEBURG Radio {int(i / MACROPAD_KEY_COUNT) + 1}"
-                        ),
-                    }
-                )
-        else:
-            self.pages = [{"stations": [], "title": "iCEBURG Radio"}]
+        self.stations = stations
         self.switch_page(0, refresh=refresh)
+
+    @property
+    def page_count(self):
+        return max(1, (len(self.stations) + MACROPAD_KEY_COUNT - 1) // MACROPAD_KEY_COUNT)
+
+    def _page_stations(self):
+        start = self.current_page_index * MACROPAD_KEY_COUNT
+        return self.stations[start : start + MACROPAD_KEY_COUNT]
 
     def switch_page(self, page_index, refresh=True):
         self.current_page_index = page_index
@@ -111,23 +103,22 @@ class MacropadKeys:
             self.refresh()
 
     def refresh(self):
-        page = self.pages[self.current_page_index]
-        stations = page["stations"] if isinstance(page["stations"], list) else []
+        stations = self._page_stations()
 
-        title = self.title_override or page["title"]
+        page_title = "iCEBURG Radio" if self.page_count == 1 else f"iCEBURG Radio {self.current_page_index + 1}"
+        title = self.title_override or page_title
         if self.title_override is None and self.playing_station_index is not None:
             station_page_index = self.get_station_page_index(self.playing_station_index)
             if self.current_page_index == station_page_index:
                 station_index_on_page = self.playing_station_index % MACROPAD_KEY_COUNT
-                title = stations[station_index_on_page].get("name", "?")
+                title = stations[station_index_on_page] or "?"
 
         self.display.set_title(title, False)
 
         for i in range(MACROPAD_KEY_COUNT):
             self.display.unhighlight_group(i)
             if i < len(stations):
-                station = stations[i]
-                self.display.set_group_text(i, station.get("name", ""))
+                self.display.set_group_text(i, stations[i])
 
                 station_global_index = self.current_page_index * MACROPAD_KEY_COUNT + i
                 if station_global_index == self.playing_station_index:
@@ -154,11 +145,11 @@ class MacropadKeys:
             self.macropad.pixels[key_index] = color
             self.macropad.pixels.show()
 
-    def set_playing_station(self, station_name):
+    def set_playing_station(self, call_sign):
         self.playing_station_index = None
-        if station_name:
+        if call_sign:
             for i, station in enumerate(self.stations):
-                if station.get("name") == station_name:
+                if station == call_sign:
                     self.playing_station_index = i
                     break
 
@@ -171,10 +162,10 @@ class MacropadKeys:
     def get_station_page_index(self, station_index):
         return station_index // MACROPAD_KEY_COUNT
 
-    def get_station_name(self, key_number):
-        page = self.pages[self.current_page_index]
-        if key_number < len(page["stations"]):
-            return page["stations"][key_number].get("name")
+    def get_call_sign(self, key_number):
+        station_index = self.current_page_index * MACROPAD_KEY_COUNT + key_number
+        if station_index < len(self.stations):
+            return self.stations[station_index]
         return None
 
     def flash_keys(self, color=0x990909, duration=0.88):

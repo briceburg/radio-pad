@@ -13,14 +13,14 @@ def assert_config_error_status(coro, expected_status):
     assert error.value.status_summary == expected_status
 
 
-def test_missing_station_url_reports_station_config_error():
+def test_missing_radio_dial_url_reports_config_error():
     assert_config_error_status(
         config.make(
             player="briceburg/living-room",
             registry_url="https://registry.example.test/api",
             enable_discovery=False,
         ),
-        "Station config error",
+        "RadioDial config error",
     )
 
 
@@ -38,37 +38,43 @@ def test_unclassified_config_error_defaults_to_registry_unavailable():
     assert ConfigError("unclassified").status_summary == "Registry unavailable"
 
 
-def test_unavailable_station_preset_reports_station_unavailable():
+def test_unavailable_radio_dial_reports_unavailable():
     with patch("lib.config.fetch_json_url", AsyncMock(return_value=None)):
         assert_config_error_status(
             config.make(
                 player="briceburg/living-room",
                 registry_url="https://registry.example.test/api",
-                stations_url="https://stations.example.test/preset.json",
+                radio_dial_url="https://registry.example.test/radio-dial",
                 enable_discovery=False,
             ),
-            "Stations unavailable",
+            "RadioDial unavailable",
         )
 
 
 @pytest.mark.parametrize(
-    "station_catalog",
+    "radio_dial",
     [
-        {"name": "Test", "stations": "invalid"},
-        {"name": "Test", "stations": [None]},
-        {"name": "Test", "stations": [{"name": "Missing URL"}]},
-        {"name": "Test", "stations": [{"name": 7, "url": "https://example.test"}]},
-        {"name": "Test", "stations": [{"name": "Test", "url": 7}]},
+        {"stations": "invalid"},
+        {"stations": [None]},
+        {"stations": [{"call_sign": "KEXP"}]},
+        {"stations": [{"call_sign": "", "stream_url": "https://example.test"}]},
+        {"stations": [{"call_sign": "KEXP", "stream_url": ""}]},
+        {
+            "stations": [
+                {"call_sign": "KEXP", "stream_url": "https://example.test/one"},
+                {"call_sign": "KEXP", "stream_url": "https://example.test/two"},
+            ]
+        },
     ],
 )
-def test_malformed_station_catalog_reports_station_config_error(station_catalog):
-    with patch("lib.config.fetch_json_url", AsyncMock(return_value=station_catalog)):
+def test_malformed_radio_dial_reports_config_error(radio_dial):
+    with patch("lib.config.fetch_json_url", AsyncMock(return_value=radio_dial)):
         assert_config_error_status(
             config.make(
                 player="briceburg/living-room",
                 registry_url="https://registry.example.test/api",
-                stations_url="https://stations.example.test/preset.json",
+                radio_dial_url="https://registry.example.test/radio-dial",
                 enable_discovery=False,
             ),
-            "Station config error",
+            "RadioDial config error",
         )

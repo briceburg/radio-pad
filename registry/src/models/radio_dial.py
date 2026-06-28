@@ -1,13 +1,13 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lib.keys import split_key
-from lib.types import Descriptor, RadioDialKey, StationKey
+from lib.types import Name, RadioDialKey, StationKey
 
 from .station import Station
 
 
 class _RadioDialMetadata(BaseModel):
-    name: Descriptor = Field(..., json_schema_extra={"example": "Casa Briceburg"})
+    name: Name = Field(..., json_schema_extra={"example": "Casa Briceburg"})
     description: str | None = Field(default=None, json_schema_extra={"example": "A community-curated radio dial."})
     discoverable: bool = Field(
         default=False,

@@ -1,7 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from lib.types import Descriptor, Slug
-from lib.validators import trim_name
+from lib.types import Name, Slug
 
 
 class AccountSpec(BaseModel):
@@ -9,12 +8,7 @@ class AccountSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Descriptor = Field(..., json_schema_extra={"example": "brice b"})
-
-    @field_validator("name", mode="before")
-    @classmethod
-    def _trim_name(cls, v: str) -> str:
-        return trim_name(v)
+    name: Name = Field(..., json_schema_extra={"example": "brice b"})
 
 
 class Account(AccountSpec):

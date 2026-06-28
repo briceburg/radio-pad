@@ -1,12 +1,9 @@
-import os
 import shutil
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 from starlette.testclient import TestClient
-
-os.environ["REGISTRY_PROFILES"] = "api"
 
 from datastore import DataStore, LocalBackend
 from lib.constants import BASE_DIR
@@ -22,7 +19,7 @@ def _seed_store(ds: DataStore) -> None:
     ds.stations.upsert(
         "community",
         "WWOZ",
-        StationSpec.model_validate({"display_name": "WWOZ 90.7 FM", "stream_url": "https://www.wwoz.org/listen/hi"}),
+        StationSpec.model_validate({"stream_url": "https://www.wwoz.org/listen/hi"}),
     )
     ds.stations.upsert(
         "community",

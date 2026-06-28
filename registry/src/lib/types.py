@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from pydantic import BeforeValidator, Field
+from pydantic import BeforeValidator, Field, StringConstraints
 
-from lib.constants import MAX_DESCRIPTOR_LENGTH, SLUG_PATTERN
+from lib.constants import MAX_IDENTIFIER_LENGTH, MAX_NAME_LENGTH, SLUG_PATTERN
 from lib.keys import join_key, normalize_call_sign, split_key
 
 _SLUG_PATTERN_BODY = SLUG_PATTERN.removeprefix("^").removesuffix("$")
@@ -24,20 +24,22 @@ type Slug = Annotated[
     Field(
         pattern=SLUG_PATTERN,
         min_length=1,
-        max_length=MAX_DESCRIPTOR_LENGTH,
+        max_length=MAX_IDENTIFIER_LENGTH,
         description="Slug: lowercase letters, numbers, hyphens",
     ),
 ]
 """Lowercase slug: letters, numbers, and single hyphens (no leading/trailing)."""
 
-type Descriptor = Annotated[
+type Name = Annotated[
     str,
-    Field(
-        max_length=MAX_DESCRIPTOR_LENGTH,
-        description="Short display label - max 36 characters",
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=MAX_NAME_LENGTH,
     ),
+    Field(description="Short display label - max 36 characters"),
 ]
-"""Short display label, such as an account, player, RadioDial, or station name."""
+"""Normalized display name for an account, player, or RadioDial."""
 
 type CallSign = Annotated[
     str,
@@ -45,7 +47,7 @@ type CallSign = Annotated[
     Field(
         pattern=r"^[A-Z0-9](?:[A-Z0-9.-]*[A-Z0-9])?$",
         min_length=1,
-        max_length=MAX_DESCRIPTOR_LENGTH,
+        max_length=MAX_IDENTIFIER_LENGTH,
         description="Canonical uppercase radio station call sign",
     ),
 ]
@@ -56,7 +58,7 @@ type StationKey = Annotated[
     BeforeValidator(_normalize_station_key),
     Field(
         pattern=rf"^{_SLUG_PATTERN_BODY}/[A-Z0-9](?:[A-Z0-9.-]*[A-Z0-9])?$",
-        max_length=(MAX_DESCRIPTOR_LENGTH * 2) + 1,
+        max_length=(MAX_IDENTIFIER_LENGTH * 2) + 1,
         description="Qualified station key: <account_id>/<CALL_SIGN>",
     ),
 ]
@@ -67,7 +69,7 @@ type RadioDialKey = Annotated[
     BeforeValidator(_normalize_radio_dial_key),
     Field(
         pattern=rf"^{_SLUG_PATTERN_BODY}/{_SLUG_PATTERN_BODY}$",
-        max_length=(MAX_DESCRIPTOR_LENGTH * 2) + 1,
+        max_length=(MAX_IDENTIFIER_LENGTH * 2) + 1,
         description="Qualified RadioDial key: <account_id>/<radio_dial_id>",
     ),
 ]

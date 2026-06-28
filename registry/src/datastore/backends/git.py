@@ -23,7 +23,7 @@ from datastore.core import (
     construct_storage_path,
     extract_object_id_from_path,
     strip_id,
-    validate_if_match,
+    validate_write_preconditions,
 )
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, PagedResult, ValueWithETag
@@ -102,9 +102,18 @@ class GitBackend:
                 item["id"] = extract_object_id_from_path(file_path.name)
             return items
 
-    def save(self, object_id: str, data: JsonDoc, *path_parts: str, if_match: str | None = None) -> None:
+    def save(
+        self,
+        object_id: str,
+        data: JsonDoc,
+        *path_parts: str,
+        if_match: str | None = None,
+        if_none_match: bool = False,
+    ) -> None:
         with self._operation_lock():
-            self._with_write_retry(lambda: self._save_once(object_id, strip_id(data), path_parts, if_match))
+            self._with_write_retry(
+                lambda: self._save_once(object_id, strip_id(data), path_parts, if_match, if_none_match)
+            )
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
         with self._operation_lock():
@@ -228,10 +237,11 @@ class GitBackend:
         data: JsonDoc,
         path_parts: tuple[str, ...],
         if_match: str | None,
+        if_none_match: bool,
     ) -> None | object:
         file_path = self._get_fs_path(object_id, *path_parts)
         current, current_version = self._read_existing(file_path)
-        validate_if_match(if_match, current_version)
+        validate_write_preconditions(if_match, if_none_match, current_version)
 
         if current is not None and compute_etag(data) == current_version:
             return None

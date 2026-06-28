@@ -18,13 +18,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { atom } from "nanostores";
 
-const EMPTY_PLAYER = {
-  id: null,
-  name: null,
-  stations_url: null,
-  switchboard_url: null,
-};
-
 export const authStore = atom({
   enabled: false,
   reason: "not_configured",
@@ -44,8 +37,8 @@ export const settingsUiStore = atom({
 });
 
 export const controlStore = atom({
-  player: EMPTY_PLAYER,
-  stationCatalog: null,
+  player: null,
+  radioDial: null,
   currentStation: null,
   loading: false,
   connectionState: "idle",
@@ -55,7 +48,7 @@ export const controlStore = atom({
 });
 
 export const listenStore = atom({
-  stationCatalog: null,
+  radioDial: null,
   currentStation: null,
   loading: false,
 });

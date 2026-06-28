@@ -33,7 +33,7 @@ logger = logging.getLogger("MACROPAD")
 DATA_INTERFACE_NAME = "CircuitPython CDC2"
 HEARTBEAT_INTERVAL_SECONDS = 2
 PLAYER_STATUS_LEVELS = {"ok", "loading", "warning", "error"}
-PLAYER_STATUS_SCOPES = {"stations", "switchboard", "playback"}
+PLAYER_STATUS_SCOPES = {"radio_dial", "switchboard", "playback"}
 
 
 def _candidate_ports():
@@ -56,8 +56,7 @@ class MacropadClient(RadioPadClient):
         self._status_by_scope: dict[str, dict[str, str | None]] = {}
         self._closed = False
 
-        # Override station catalog handler for the local serial controller.
-        self.register_event("station_catalog_request", self._handle_station_catalog_request)
+        self.register_event("station_menu_request", self._handle_station_menu_request)
 
     async def run(self):
         self._closed = False
@@ -219,12 +218,15 @@ class MacropadClient(RadioPadClient):
                 continue
             await self._send(json.dumps({"event": "player_status", "data": status}))
 
-    async def _handle_station_catalog_request(self, event):
-        station_names = [station.name for station in self.player.config.stations]
+    async def _handle_station_menu_request(self, event):
+        config = self.player.config
+        if config is None:
+            await self.resend_status("radio_dial")
+            return
 
         await self.broadcast(
-            "station_catalog",
-            data={"stations": [{"name": name} for name in station_names]},
+            "station_menu",
+            data=[station.call_sign for station in config.stations],
             limit_to_self=True,
         )
         await asyncio.sleep(0.1)  # Handle backpressure

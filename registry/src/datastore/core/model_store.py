@@ -122,7 +122,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return models
 
     def upsert(self, object_id: str, spec: Spec, *, path_params: PathParams | None = None) -> Entity:
-        """Replace a writable resource spec or create it, using OCC for existing resources.
+        """Replace a writable resource spec or create it, using OCC for concurrent writes.
 
         This implements PUT semantics: omitted optional fields take their Spec defaults
         rather than retaining values from an existing resource.
@@ -144,7 +144,13 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         model = self._model.model_validate({**base, **payload})
         data = self._strip_reserved(model.model_dump(mode="json"))
         try:
-            self._backend.save(model.id, data, *comps, if_match=version if current is not None else None)
+            self._backend.save(
+                model.id,
+                data,
+                *comps,
+                if_match=version,
+                if_none_match=current is None,
+            )
         except ConcurrencyError as e:  # backend conflict (e.g., ETag mismatch)
             raise ConcurrencyError("Conditional save failed") from e
         return model

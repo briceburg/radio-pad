@@ -1,7 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from lib.types import CallSign, Descriptor, StationKey
-from lib.validators import trim_name
+from lib.types import CallSign, StationKey
 
 
 class StationSpec(BaseModel):
@@ -9,13 +8,7 @@ class StationSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display_name: Descriptor | None = Field(default=None, json_schema_extra={"example": "WWOZ 90.7 FM"})
     stream_url: HttpUrl = Field(..., json_schema_extra={"example": "https://www.wwoz.org/listen/hi"})
-
-    @field_validator("display_name", mode="before")
-    @classmethod
-    def _trim_display_name(cls, value: object) -> object:
-        return trim_name(value) if value is not None else None
 
 
 class Station(StationSpec):
