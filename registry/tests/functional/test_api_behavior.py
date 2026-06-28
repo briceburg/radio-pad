@@ -1,20 +1,15 @@
-import httpx
 import pytest
+from starlette.testclient import TestClient
 
 
 @pytest.mark.functional
-def test_real_server_omits_none_values(functional_client: httpx.Client) -> None:
-    """
-    A functional test to verify the real Uvicorn server omits None values
-    from the JSON response, which confirms `response_model_exclude_none=True`
-    is working as expected.
-    """
+def test_response_omits_none_values(functional_client: TestClient) -> None:
+    """Verify that response models configured to exclude None omit those values."""
     radio_dial_data = {
         "name": "Functional Test RadioDial",
         "stations": ["community/WWOZ"],
     }
 
-    # Use httpx to make a real HTTP request to the running server
     response = functional_client.put(
         "accounts/testuser1/radio-dials/functional-test",
         json=radio_dial_data,

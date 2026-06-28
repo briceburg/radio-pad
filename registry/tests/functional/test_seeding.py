@@ -1,7 +1,6 @@
 import json
 
 import boto3
-import httpx
 import pytest
 from starlette.testclient import TestClient
 
@@ -11,7 +10,7 @@ from tests.functional.conftest import FunctionalTestBed
 
 
 @pytest.mark.functional
-def test_seeded_resources_are_loaded(functional_client: httpx.Client) -> None:
+def test_seeded_resources_are_loaded(functional_client: TestClient) -> None:
     """Verify default account, player, Station, and RadioDial seeds load on startup."""
     # Accounts
     accounts_resp = functional_client.get("accounts")

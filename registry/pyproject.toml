@@ -8,7 +8,7 @@ dependencies = [
   "dulwich>=1.1,<1.2",
   "fastapi",
   "fastapi-oidc",
-  "httpx",
+  "httpx2",
   "pydantic",
   "uvicorn[standard]",
 ]
@@ -16,7 +16,6 @@ dependencies = [
 [dependency-groups]
 dev = [
   "hypothesis",
-  "httpx2",
   "moto[s3]",
   "mypy",
   "pytest",

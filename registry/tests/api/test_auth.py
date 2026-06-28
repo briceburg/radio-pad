@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
 from unittest.mock import patch
 
 import pytest
-from httpx import Response
+from httpx2 import Response
 from starlette.testclient import TestClient
 
 from api.auth import AuthServices
@@ -109,13 +108,10 @@ def _with_account_owner(account_id: str, email: str) -> Callable[[AuthzStore], N
 
 
 def _put_station(client: TestClient, account_id: str, headers: dict[str, str] | None = None) -> Response:
-    return cast(
-        Response,
-        client.put(
-            f"accounts/{account_id}/stations/KEXP",
-            headers=headers or {},
-            json={"stream_url": "https://example.com/kexp"},
-        ),
+    return client.put(
+        f"accounts/{account_id}/stations/KEXP",
+        headers=headers or {},
+        json={"stream_url": "https://example.com/kexp"},
     )
 
 

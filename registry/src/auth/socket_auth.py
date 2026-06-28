@@ -1,4 +1,4 @@
-import httpx
+import httpx2
 from fastapi import Request, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -35,11 +35,11 @@ async def validate_remote(request: Request | WebSocket, account_id: str, player_
     url = f"{REGISTRY_URL.rstrip('/')}/accounts/{account_id}/players/{player_id}"
     headers = {"Authorization": f"Bearer {token}"} if token else {}
 
-    client: httpx.AsyncClient = request.app.state.http_client
+    client: httpx2.AsyncClient = request.app.state.http_client
 
     try:
         resp = await client.get(url, headers=headers)
-    except httpx.HTTPError as e:
+    except httpx2.HTTPError as e:
         logger.error("Remote socket validation failed: %s", e)
         raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from e
 
