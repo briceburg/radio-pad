@@ -67,11 +67,14 @@ data port. `bin/dev` does not mount or sync firmware; those steps stay explicit
 because they can prompt for privileges and write to the device.
 
 Registry and switchboard ports default to ephemeral; the web app defaults to
-port 5173 for OAuth redirects. Override them in `.env` when needed:
+port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to
+configure overrides or to enable Google sign-in and registry write auth —
+see [remote-control](./remote-control/README.md#web-development) for OAuth client
+setup and [registry](./registry/README.md#write-authentication-and-authz-seeding)
+for authz seeding.
 
-```
-RADIOPAD_REGISTRY_PORT=1980
-RADIOPAD_REMOTE_CONTROL_PORT=5173
+```sh
+cp .env.example .env
 ```
 
 View assigned ports:

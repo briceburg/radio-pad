@@ -27,10 +27,10 @@ class OIDCConfig:
         client_ids_raw = os.environ.get("REGISTRY_AUTH_OIDC_CLIENT_IDS")
         issuer = os.environ.get("REGISTRY_AUTH_OIDC_ISSUER")
 
-        if not client_ids_raw and not issuer:
+        if not client_ids_raw:
             return None
-        if not client_ids_raw or not issuer:
-            raise ValueError("REGISTRY_AUTH_OIDC_CLIENT_IDS and REGISTRY_AUTH_OIDC_ISSUER must both be set")
+        if not issuer:
+            raise ValueError("REGISTRY_AUTH_OIDC_ISSUER must be set when REGISTRY_AUTH_OIDC_CLIENT_IDS is configured")
 
         client_ids = tuple(dict.fromkeys(part.strip() for part in client_ids_raw.split(",") if part.strip()))
         if not client_ids:
