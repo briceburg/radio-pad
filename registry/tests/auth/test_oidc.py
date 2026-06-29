@@ -10,31 +10,22 @@ def test_oidc_config_from_env_returns_none_when_oidc_is_unset(monkeypatch: pytes
     assert OIDCConfig.from_env() is None
 
 
-@pytest.mark.parametrize(
-    ("client_ids", "issuer"),
-    [
-        ("radio-pad-remote-control-web", None),
-        (None, "https://accounts.google.com"),
-    ],
-)
-def test_oidc_config_from_env_requires_client_id_and_issuer(
-    monkeypatch: pytest.MonkeyPatch,
-    client_ids: str | None,
-    issuer: str | None,
-) -> None:
-    if client_ids is None:
-        monkeypatch.delenv("REGISTRY_AUTH_OIDC_CLIENT_IDS", raising=False)
-    else:
-        monkeypatch.setenv("REGISTRY_AUTH_OIDC_CLIENT_IDS", client_ids)
+def test_oidc_config_from_env_returns_none_when_client_ids_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("REGISTRY_AUTH_OIDC_CLIENT_IDS", raising=False)
+    monkeypatch.setenv("REGISTRY_AUTH_OIDC_ISSUER", "https://accounts.google.com")
 
-    if issuer is None:
-        monkeypatch.delenv("REGISTRY_AUTH_OIDC_ISSUER", raising=False)
-    else:
-        monkeypatch.setenv("REGISTRY_AUTH_OIDC_ISSUER", issuer)
+    assert OIDCConfig.from_env() is None
+
+
+def test_oidc_config_from_env_requires_issuer_when_client_ids_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REGISTRY_AUTH_OIDC_CLIENT_IDS", "radio-pad-remote-control-web")
+    monkeypatch.delenv("REGISTRY_AUTH_OIDC_ISSUER", raising=False)
 
     with pytest.raises(
         ValueError,
-        match="REGISTRY_AUTH_OIDC_CLIENT_IDS and REGISTRY_AUTH_OIDC_ISSUER must both be set",
+        match="REGISTRY_AUTH_OIDC_ISSUER must be set when REGISTRY_AUTH_OIDC_CLIENT_IDS is configured",
     ):
         OIDCConfig.from_env()
 

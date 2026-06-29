@@ -8,6 +8,8 @@ services:
     environment:
       REGISTRY_PROFILES: "api,switchboard"
       REGISTRY_BIND_PORT: "1980"
+      REGISTRY_AUTH_OIDC_ISSUER: "https://accounts.google.com"
+      REGISTRY_AUTH_OIDC_CLIENT_IDS: "${GOOGLE_CLIENT_ID:-}"
     volumes:
       - ./registry:/app
 
@@ -33,6 +35,7 @@ services:
       VITE_SWITCHBOARD_URL: "/switchboard"
       RADIOPAD_REGISTRY_PROXY_TARGET: "http://registry:1980"
       RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://registry:1980"
+      VITE_GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
     ports:
       - "${RADIOPAD_REMOTE_CONTROL_PORT:-5173}:5173"
     volumes:
