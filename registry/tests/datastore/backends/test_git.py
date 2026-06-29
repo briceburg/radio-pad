@@ -6,7 +6,7 @@ import subprocess
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
@@ -93,14 +93,22 @@ def _patch_git_failure(
     original_run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run
 
     def failing_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        command = cast(list[str], args[0])
-        if len(command) > 1 and command[1] == action:
+        command = args[0] if args else None
+        if isinstance(command, list) and command[:2] == ["git", action]:
             if error:
                 raise error
             return subprocess.CompletedProcess(command, 128, stdout="", stderr=stderr)
         return original_run(*args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", failing_run)
+
+
+@pytest.mark.parametrize("remote_path", [r"C:\repo", "C:/repo"])
+def test_git_backend_does_not_classify_windows_path_as_ssh_remote(tmp_path: Path, remote_path: str) -> None:
+    backend = _backend(tmp_path / "repo")
+
+    assert not backend._is_ssh_remote(remote_path)
+    assert backend._display_remote(remote_path) == remote_path
 
 
 def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
