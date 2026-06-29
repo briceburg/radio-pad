@@ -43,6 +43,7 @@ Guidance for coding agents working in `radio-pad/registry`.
   `*Summary` models exist only for genuinely reduced list/discovery projections.
 - Player `radio_dial` values are qualified RadioDial identities, not URLs or backend paths.
 - For Git-backed storage, prefer leaving `REGISTRY_BACKEND_PREFIX` unset so data lives at the repository root.
+- The Git backend uses the system Git executable with fixed subprocess argument lists; do not add a Python Git implementation or shell command construction without a concrete need.
 - `REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY` is a deployment secret used by Fly deploy setup; the runtime env var table documents `REGISTRY_BACKEND_GIT_SSH_KEY_PATH` for file-based key usage.
 
 ## Auth and seeding conventions

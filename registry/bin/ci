@@ -3,8 +3,6 @@ set -eu
 
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
-# Dulwich resolves a fallback username even when commit identities are explicit.
-export USER="${USER:-radiopad}"
 
 uv run mypy src/ tests/
 uv run ruff format --check src/ tests/

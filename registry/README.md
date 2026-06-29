@@ -53,7 +53,7 @@ REGISTRY_BACKEND_GIT_BRANCH | branch used for fetch/push operations. | `main`
 REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; writes always refresh first. | `30`
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
 REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
-REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path for deploy-key authentication. | `None`
+REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path used to configure `GIT_SSH_COMMAND` for deploy-key authentication. | `None`
 REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client ids for write auth. | `None`
 REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for write access. | `None`
 REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc`; defaults to `REGISTRY_AUTH_OIDC_ISSUER`. | same as issuer
@@ -78,7 +78,7 @@ The registry supports pluggable storage backends.
 
 - Default: file store on local disk.
 - Optional: S3-backed store using boto3.
-- Optional: Git-backed store using `dulwich`.
+- Optional: Git-backed store using the system Git executable.
 
 Select the backend via the `REGISTRY_BACKEND` environment variable.
 
@@ -123,6 +123,8 @@ The recommended layout for a dedicated data repository is to keep those director
 By default, the Git backend uses `tmp/data` as its checkout path, `git@github.com:briceburg/radio-pad-registry-data.git` as its bootstrap remote, and the GitHub noreply identity for `briceburg` for registry-managed commits.
 
 The intended authentication model is a write-enabled GitHub deploy key over SSH. To run without remote sync, set `REGISTRY_BACKEND_GIT_REMOTE_URL=` and place an existing checkout in `REGISTRY_BACKEND_PATH`.
+
+Git operations run as fixed subprocess argument lists without a shell. The container includes Git and OpenSSH, disables interactive credential prompts, and uses `GIT_SSH_COMMAND` for deploy-key configuration.
 
 ##### Fly.io deployment
 

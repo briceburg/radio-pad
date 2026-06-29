@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 import fcntl
-import io
 import json
+import os
+import shlex
+import subprocess
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any, TypeVar, cast
 from urllib.parse import urlsplit, urlunsplit
-
-from dulwich import porcelain
-from dulwich.client import SSHGitClient, get_transport_and_path
-from dulwich.errors import GitProtocolError, HangupException, SendPackError
-from dulwich.refs import Ref
-from dulwich.repo import Repo
 
 from datastore.core import (
     atomic_write_json_file,
@@ -31,7 +28,13 @@ from lib.logging import logger
 
 _T = TypeVar("_T")
 _RETRY = object()
-_UNSET = object()
+
+
+@dataclass(frozen=True)
+class _Remote:
+    location: str
+    label: str
+    url: str | None
 
 
 class GitBackend:
@@ -57,26 +60,38 @@ class GitBackend:
         self.author_name = author_name
         self.author_email = author_email
         self.ssh_key_path = ssh_key_path
+        self._branch_ref = f"refs/heads/{self.branch}"
+        self._remote_branch_ref = f"refs/remotes/origin/{self.branch}"
 
-        self._head_ref = cast(Ref, b"HEAD")
-        self._branch_ref = cast(Ref, f"refs/heads/{self.branch}".encode())
-        self._remote_branch_ref = cast(Ref, f"refs/remotes/origin/{self.branch}".encode())
+        self._git_env = os.environ.copy()
+        self._git_env.update(
+            {
+                "GIT_LITERAL_PATHSPECS": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+                "LC_ALL": "C",
+            }
+        )
+        if self.ssh_key_path and "GIT_SSH_COMMAND" not in self._git_env:
+            self._git_env["GIT_SSH_COMMAND"] = (
+                f"ssh -i {shlex.quote(self.ssh_key_path)} -o StrictHostKeyChecking=accept-new"
+            )
+
         self._lock = RLock()
         self._lock_path = self.repo_path.parent / f".{self.repo_path.name}.lock"
         self._last_fetch_at = 0.0
-        self._origin_remote_url_cache: str | None | object = _UNSET
+
+        self._validate_branch()
 
         with self._operation_lock():
             self._ensure_repo_exists()
             self._ensure_branch_symbolic_head()
             self._sync_from_remote(force=True)
-            repo = self._repo()
-            _, remote_label, _ = self._resolved_remote(repo)
+            remote = self._resolve_remote()
             logger.info(
                 "Git backend ready: repo=%s branch=%s remote=%s lock=%s fetch_ttl=%ss",
                 self.repo_path,
                 self.branch,
-                remote_label,
+                remote.label if remote else "disabled",
                 self._lock_path,
                 self.fetch_ttl_seconds,
             )
@@ -132,103 +147,90 @@ class GitBackend:
         self.repo_path.parent.mkdir(parents=True, exist_ok=True)
         if self.remote_url:
             remote_url = self.remote_url
-            self._run_remote_operation(
+            self._run_git(
                 "clone",
-                remote_label=self._display_remote(remote_url),
-                remote_url=remote_url,
-                operation=lambda: porcelain.clone(
-                    remote_url,
-                    str(self.repo_path),
-                    checkout=True,
-                    branch=self.branch,
-                    origin="origin",
-                    errstream=io.BytesIO(),
-                    **self._auth_kwargs(),
-                ),
+                "--quiet",
+                "--branch",
+                self.branch,
+                "--origin",
+                "origin",
+                "--",
+                remote_url,
+                str(self.repo_path),
+                repo=False,
+                remote=_Remote(remote_url, self._display_remote(remote_url), remote_url),
             )
         else:
-            self.repo_path.mkdir(parents=True, exist_ok=True)
-            Repo.init(str(self.repo_path))
+            self._run_git("init", "--quiet", "--initial-branch", self.branch, str(self.repo_path), repo=False)
 
     def _ensure_branch_symbolic_head(self) -> None:
-        repo = self._repo()
-        expected = b"ref: " + self._branch_ref
-        if repo.refs.read_ref(self._head_ref) == expected:
+        head = self._run_git("symbolic-ref", "--quiet", "HEAD", check=False)
+        if head.returncode == 0 and head.stdout.strip() == self._branch_ref:
             return
 
-        if self._branch_ref not in repo.refs.keys():
-            try:
-                repo.refs[self._branch_ref] = repo.head()
-            except KeyError:
-                pass
+        if not self._ref_exists(self._branch_ref):
+            current_head = self._run_git("rev-parse", "--verify", "--quiet", "HEAD^{commit}", check=False)
+            if current_head.returncode == 0:
+                self._run_git("branch", self.branch, "HEAD")
+            elif current_head.returncode != 1:
+                raise RuntimeError(self._git_failure("rev-parse", current_head))
 
-        repo.refs.set_symbolic_ref(self._head_ref, self._branch_ref)
+        self._run_git("symbolic-ref", "HEAD", self._branch_ref)
 
     def _sync_from_remote(self, *, force: bool) -> None:
-        repo = self._repo()
-        remote_location, remote_label, remote_url = self._resolved_remote(repo)
-        if remote_location is None:
+        remote = self._resolve_remote()
+        if remote is None:
             self._last_fetch_at = time.monotonic()
             return
 
         now = time.monotonic()
         if not force and self.fetch_ttl_seconds > 0 and now - self._last_fetch_at < self.fetch_ttl_seconds:
-            logger.debug("Skipping git fetch for %s; within fetch TTL (%ss)", remote_label, self.fetch_ttl_seconds)
+            logger.debug("Skipping git fetch for %s; within fetch TTL (%ss)", remote.label, self.fetch_ttl_seconds)
             return
 
-        logger.debug("Fetching git remote %s for branch %s", remote_label, self.branch)
-        self._run_remote_operation(
+        logger.debug("Fetching git remote %s for branch %s", remote.label, self.branch)
+        self._run_git(
             "fetch",
-            remote_label=remote_label,
-            remote_url=remote_url,
-            operation=lambda: porcelain.fetch(
-                str(self.repo_path),
-                remote_location,
-                outstream=io.StringIO(),
-                errstream=io.BytesIO(),
-                quiet=True,
-                **self._auth_kwargs(),
-            ),
+            "--quiet",
+            "--no-tags",
+            "--",
+            remote.location,
+            f"+refs/heads/{self.branch}:{self._remote_branch_ref}",
+            remote=remote,
         )
 
-        repo = self._repo()
-        if self._remote_branch_ref in repo.refs.keys():
-            target = repo.refs[self._remote_branch_ref]
-            repo.refs[self._branch_ref] = target
-            repo.refs.set_symbolic_ref(self._head_ref, self._branch_ref)
-            porcelain.reset(str(self.repo_path), mode="hard", treeish=target)
-            logger.debug("Updated local branch %s to remote target %s", self.branch, target.hex())
+        self._run_git("symbolic-ref", "HEAD", self._branch_ref)
+        self._run_git("reset", "--quiet", "--hard", self._remote_branch_ref)
+        target = self._run_git("rev-parse", self._remote_branch_ref).stdout.strip()
+        logger.debug("Updated local branch %s to remote target %s", self.branch, target)
 
         self._last_fetch_at = now
 
     def _push_branch(self) -> bool:
-        repo = self._repo()
-        remote_location, remote_label, remote_url = self._resolved_remote(repo)
-        if remote_location is None:
+        remote = self._resolve_remote()
+        if remote is None:
             return True
 
-        logger.debug("Pushing git branch %s to %s", self.branch, remote_label)
-        result = self._run_remote_operation(
+        logger.debug("Pushing git branch %s to %s", self.branch, remote.label)
+        result = self._run_git(
             "push",
-            remote_label=remote_label,
-            remote_url=remote_url,
-            operation=lambda: porcelain.push(
-                str(self.repo_path),
-                remote_location,
-                refspecs=f"refs/heads/{self.branch}:refs/heads/{self.branch}",
-                outstream=io.BytesIO(),
-                errstream=io.BytesIO(),
-                **self._auth_kwargs(),
-            ),
+            "--porcelain",
+            "--",
+            remote.location,
+            f"refs/heads/{self.branch}:refs/heads/{self.branch}",
+            remote=remote,
+            check=False,
         )
-        statuses = result.ref_status or {}
-        if any(status is not None for status in statuses.values()):
-            logger.debug("Git push to %s was rejected; refreshing from remote before retry", remote_label)
+
+        if result.returncode != 0 and "\t[rejected]" in result.stdout:
+            logger.debug("Git push to %s was rejected; refreshing from remote before retry", remote.label)
             self._sync_from_remote(force=True)
             return False
+        if result.returncode != 0:
+            raise RuntimeError(self._git_failure("push", result, remote))
 
         self._last_fetch_at = time.monotonic()
-        logger.debug("Git push to %s succeeded", remote_label)
+        logger.debug("Git push to %s succeeded", remote.label)
         return True
 
     def _save_once(
@@ -249,7 +251,7 @@ class GitBackend:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_json_file(file_path, data)
         rel_path = self._relative_repo_path(file_path)
-        porcelain.add(str(self.repo_path), paths=[rel_path])
+        self._run_git("add", "--", rel_path)
         self._commit_change("update", rel_path)
         return None if self._push_branch() else _RETRY
 
@@ -259,7 +261,7 @@ class GitBackend:
             return False
 
         rel_path = self._relative_repo_path(file_path)
-        porcelain.remove(str(self.repo_path), paths=[rel_path])
+        self._run_git("rm", "--quiet", "--", rel_path)
         self._prune_empty_dirs(file_path.parent)
         self._commit_change("delete", rel_path)
         return True if self._push_branch() else _RETRY
@@ -313,21 +315,25 @@ class GitBackend:
                 break
             current = current.parent
 
-    def _author_identity(self) -> bytes:
-        return f"{self.author_name} <{self.author_email}>".encode()
-
     def _commit_change(self, action: str, rel_path: str) -> None:
-        author = self._author_identity()
-        porcelain.commit(
-            str(self.repo_path),
-            message=self._commit_message(action, rel_path),
-            author=author,
-            committer=author,
+        self._run_git(
+            "commit",
+            "--quiet",
+            "--message",
+            self._commit_message(action, rel_path),
+            "--",
+            rel_path,
+            extra_env={
+                "GIT_AUTHOR_NAME": self.author_name,
+                "GIT_AUTHOR_EMAIL": self.author_email,
+                "GIT_COMMITTER_NAME": self.author_name,
+                "GIT_COMMITTER_EMAIL": self.author_email,
+            },
         )
 
-    def _commit_message(self, action: str, rel_path: str) -> bytes:
+    def _commit_message(self, action: str, rel_path: str) -> str:
         summary = f"radio-pad-registry: {action} {self._commit_target(rel_path)}"
-        return f"{summary}\n\nGenerated-by: radio-pad-registry".encode()
+        return f"{summary}\n\nGenerated-by: radio-pad-registry"
 
     def _commit_target(self, rel_path: str) -> str:
         parts = Path(rel_path).parts
@@ -341,48 +347,75 @@ class GitBackend:
             return f"radio dial {parts[1]}/{Path(parts[3]).stem}"
         return rel_path
 
-    def _remote_location(self, repo: Repo) -> str | None:
+    def _validate_branch(self) -> None:
+        result = self._run_git("check-ref-format", "--branch", self.branch, repo=False, check=False)
+        if result.returncode != 0:
+            raise ValueError(f"Invalid Git branch name: {self.branch!r}")
+
+    def _ref_exists(self, ref: str) -> bool:
+        result = self._run_git("show-ref", "--verify", "--quiet", ref, check=False)
+        if result.returncode not in {0, 1}:
+            raise RuntimeError(self._git_failure("show-ref", result))
+        return result.returncode == 0
+
+    def _resolve_remote(self) -> _Remote | None:
         if self.remote_url == "":
             return None
-        if any(ref.startswith(b"refs/remotes/origin/") for ref in repo.refs.keys()):
-            return "origin"
-        return self.remote_url
+        origin_url = self._origin_remote_url()
+        if origin_url is not None:
+            return _Remote("origin", "origin", origin_url)
+        if self.remote_url is None:
+            return None
+        return _Remote(self.remote_url, self._display_remote(self.remote_url), self.remote_url)
 
-    def _resolved_remote(self, repo: Repo) -> tuple[str | None, str, str | None]:
-        remote_location = self._remote_location(repo)
-        if remote_location is None:
-            return None, "disabled", None
-        if remote_location == "origin":
-            return "origin", "origin", self._origin_remote_url(repo)
-        return remote_location, self._display_remote(remote_location), remote_location
-
-    def _repo(self) -> Repo:
-        return Repo(str(self.repo_path))
-
-    def _run_remote_operation(
+    def _run_git(
         self,
-        action: str,
-        *,
-        remote_label: str,
-        remote_url: str | None,
-        operation: Callable[[], _T],
-    ) -> _T:
+        *args: str,
+        repo: bool = True,
+        remote: _Remote | None = None,
+        check: bool = True,
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        env = self._git_env if extra_env is None else self._git_env | extra_env
         try:
-            return operation()
-        except (HangupException, GitProtocolError, SendPackError) as exc:
-            raise RuntimeError(self._remote_error_message(action, remote_label, remote_url)) from exc
+            result = subprocess.run(
+                ["git", *args],
+                cwd=self.repo_path if repo else None,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         except OSError as exc:
             message = (
-                f"{self._remote_error_message(action, remote_label, remote_url)} "
-                f"Underlying local error: {exc.__class__.__name__}: {exc}"
+                self._remote_error_message(args[0], remote) if remote else f"Failed to run Git command {args[0]!r}."
             )
-            raise RuntimeError(message) from exc
+            raise RuntimeError(f"{message} Underlying local error: {exc.__class__.__name__}: {exc}") from exc
+        if check and result.returncode != 0:
+            raise RuntimeError(self._git_failure(args[0], result, remote))
+        return result
 
-    def _remote_error_message(self, action: str, remote_label: str, remote_url: str | None) -> str:
+    def _git_failure(
+        self,
+        action: str,
+        result: subprocess.CompletedProcess[str],
+        remote: _Remote | None = None,
+    ) -> str:
+        message = (
+            self._remote_error_message(action, remote)
+            if remote
+            else f"Git command {action!r} failed with exit status {result.returncode}."
+        )
+        detail = " | ".join(output.strip() for output in (result.stderr, result.stdout) if output.strip())
+        if remote and remote.url:
+            detail = detail.replace(remote.url, self._display_remote(remote.url))
+        return f"{message} Git reported: {detail}" if detail else message
+
+    def _remote_error_message(self, action: str, remote: _Remote) -> str:
         message = [
-            f"Git backend failed to {action} remote {remote_label!r} for branch {self.branch!r}.",
+            f"Git backend failed to {action} remote {remote.label!r} for branch {self.branch!r}.",
         ]
-        if self._is_ssh_remote(remote_url):
+        if self._is_ssh_remote(remote.url):
             message.append("Check SSH auth: ensure REGISTRY_BACKEND_GIT_SSH_KEY_PATH points to a readable private key.")
             message.append(
                 "On Fly, set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY and add the matching public key "
@@ -392,17 +425,13 @@ class GitBackend:
             message.append("Check remote connectivity and credentials.")
         return " ".join(message)
 
-    def _origin_remote_url(self, repo: Repo) -> str | None:
-        if self._origin_remote_url_cache is not _UNSET:
-            return cast(str | None, self._origin_remote_url_cache)
-        try:
-            remote_url = repo.get_config_stack().get((b"remote", b"origin"), b"url")
-        except KeyError:
-            self._origin_remote_url_cache = None
+    def _origin_remote_url(self) -> str | None:
+        result = self._run_git("config", "--get", "remote.origin.url", check=False)
+        if result.returncode == 1:
             return None
-        resolved = remote_url.decode() if isinstance(remote_url, bytes) else str(remote_url)
-        self._origin_remote_url_cache = resolved
-        return resolved
+        if result.returncode != 0:
+            raise RuntimeError(self._git_failure("config", result))
+        return result.stdout.strip()
 
     def _display_remote(self, remote_url: str) -> str:
         if "://" in remote_url:
@@ -415,11 +444,9 @@ class GitBackend:
     def _is_ssh_remote(self, remote_url: str | None) -> bool:
         if remote_url is None:
             return self.ssh_key_path is not None
-        try:
-            client, _ = get_transport_and_path(remote_url)
-        except Exception:
-            return False
-        return isinstance(client, SSHGitClient)
+        if "://" in remote_url:
+            return urlsplit(remote_url).scheme in {"git+ssh", "ssh", "ssh+git"}
+        return self._scp_style_target(remote_url) is not None
 
     def _redacted_url(self, remote_url: str) -> str:
         parsed = urlsplit(remote_url)
@@ -429,13 +456,8 @@ class GitBackend:
         return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
 
     def _scp_style_target(self, remote_url: str) -> str | None:
-        if "@" not in remote_url:
+        host, separator, path = remote_url.partition(":")
+        if not separator or not host or "/" in host or host.startswith("."):
             return None
-        _, target = remote_url.split("@", 1)
-        return target if ":" in target else None
-
-    def _auth_kwargs(self) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {}
-        if self.ssh_key_path:
-            kwargs["key_filename"] = self.ssh_key_path
-        return kwargs
+        hostname = host.rsplit("@", 1)[-1]
+        return f"{hostname}:{path}"

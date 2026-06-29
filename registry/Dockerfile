@@ -1,7 +1,7 @@
 FROM python:3.13-alpine AS base
 COPY --from=ghcr.io/astral-sh/uv:0.11.24 /uv /uvx /bin/
 
-RUN apk add --no-cache openssh-client
+RUN apk add --no-cache git openssh-client
 
 ENV \
   HOME=/tmp \
