@@ -1,49 +1,40 @@
 from __future__ import annotations
 
-import io
 import json
 import multiprocessing as mp
+import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from dulwich import porcelain
-from dulwich.errors import HangupException
-from dulwich.objects import Commit
-from dulwich.refs import Ref
-from dulwich.repo import Repo
 
 from datastore import DataStore
 from datastore.backends.git import GitBackend
 from datastore.exceptions import ConcurrencyError
+from tests.datastore._git_helpers import TEST_IDENTITY, init_repo, run_git
 
-AUTHOR = b"Tests <tests@example.invalid>"
 AUTHOR_NAME = "Tests"
 AUTHOR_EMAIL = "tests@example.invalid"
 
 
-def _init_repo(path: Path, *, branch: str = "main") -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    repo = Repo.init(str(path))
-    repo.refs.set_symbolic_ref(cast(Ref, b"HEAD"), cast(Ref, f"refs/heads/{branch}".encode()))
-
-
-def _commit_json(repo_path: Path, relative_path: str, data: dict[str, object], *, message: bytes) -> None:
+def _commit_json(repo_path: Path, relative_path: str, data: dict[str, object], *, message: str) -> None:
     file_path = repo_path / relative_path
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(json.dumps(data, separators=(",", ":"), sort_keys=True), encoding="utf-8")
-    porcelain.add(str(repo_path), paths=[relative_path])
-    porcelain.commit(str(repo_path), message=message, author=AUTHOR, committer=AUTHOR)
+    run_git("add", "--", relative_path, cwd=repo_path)
+    run_git("commit", "--quiet", "--message", message, cwd=repo_path, env=TEST_IDENTITY)
 
 
 def _push_main(repo_path: Path, remote_location: str | Path) -> None:
-    porcelain.push(
-        str(repo_path),
+    run_git(
+        "push",
+        "--quiet",
+        "--",
         str(remote_location),
-        refspecs="refs/heads/main:refs/heads/main",
-        outstream=io.BytesIO(),
-        errstream=io.BytesIO(),
+        "refs/heads/main:refs/heads/main",
+        cwd=repo_path,
     )
 
 
@@ -76,12 +67,11 @@ def _contend_for_backend_lock(repo_path: str, ready_conn: Any, result_conn: Any)
 
 def _create_remote_with_seed(tmp_path: Path) -> Path:
     remote = tmp_path / "remote.git"
-    remote.mkdir(parents=True, exist_ok=True)
-    Repo.init_bare(str(remote))
+    init_repo(remote, bare=True)
 
     seed = tmp_path / "seed"
-    _init_repo(seed)
-    _commit_json(seed, "accounts/seed.json", {"name": "Seed"}, message=b"seed")
+    init_repo(seed)
+    _commit_json(seed, "accounts/seed.json", {"name": "Seed"}, message="seed")
     _push_main(seed, remote)
     return remote
 
@@ -89,8 +79,28 @@ def _create_remote_with_seed(tmp_path: Path) -> Path:
 def _clone_pair(tmp_path: Path, remote: Path, *names: str) -> tuple[Path, ...]:
     paths = tuple(tmp_path / name for name in names)
     for path in paths:
-        porcelain.clone(str(remote), str(path), checkout=True, branch="main")
+        run_git("clone", "--quiet", "--branch", "main", "--", str(remote), str(path), cwd=None)
     return paths
+
+
+def _patch_git_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    *,
+    error: OSError | None = None,
+    stderr: str = "remote operation failed",
+) -> None:
+    original_run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run
+
+    def failing_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        command = cast(list[str], args[0])
+        if len(command) > 1 and command[1] == action:
+            if error:
+                raise error
+            return subprocess.CompletedProcess(command, 128, stdout="", stderr=stderr)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", failing_run)
 
 
 def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
@@ -104,10 +114,7 @@ def test_git_backend_clones_remote_and_reads_seed_data(tmp_path: Path) -> None:
 
 
 def test_git_backend_clone_error_explains_deploy_key_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_clone(*args: object, **kwargs: object) -> None:
-        raise HangupException
-
-    monkeypatch.setattr(porcelain, "clone", failing_clone)
+    _patch_git_failure(monkeypatch, "clone")
 
     with pytest.raises(RuntimeError, match="failed to clone remote") as excinfo:
         _backend(
@@ -121,10 +128,11 @@ def test_git_backend_clone_error_explains_deploy_key_setup(tmp_path: Path, monke
 
 
 def test_git_backend_clone_error_redacts_remote_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_clone(*args: object, **kwargs: object) -> None:
-        raise HangupException
-
-    monkeypatch.setattr(porcelain, "clone", failing_clone)
+    _patch_git_failure(
+        monkeypatch,
+        "clone",
+        stderr="failed to access https://token@github.com/briceburg/radio-pad-registry-data.git",
+    )
 
     with pytest.raises(RuntimeError) as excinfo:
         _backend(
@@ -143,7 +151,7 @@ def test_git_backend_refreshes_reads_from_remote(tmp_path: Path) -> None:
 
     backend = _backend(backend_path)
 
-    _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message=b"writer update")
+    _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message="writer update")
     _push_main(writer_path, "origin")
 
     data, _ = backend.get("fetched", "accounts")
@@ -154,15 +162,13 @@ def test_git_backend_origin_ssh_remote_uses_ssh_guidance(tmp_path: Path, monkeyp
     remote = _create_remote_with_seed(tmp_path)
     (backend_path,) = _clone_pair(tmp_path, remote, "backend")
 
-    repo = Repo(str(backend_path))
-    config = repo.get_config()
-    config.set((b"remote", b"origin"), b"url", b"ssh://git@github.com/briceburg/radio-pad-registry-data.git")
-    config.write_to_path()
-
-    def failing_fetch(*args: object, **kwargs: object) -> None:
-        raise HangupException
-
-    monkeypatch.setattr(porcelain, "fetch", failing_fetch)
+    run_git(
+        "config",
+        "remote.origin.url",
+        "ssh://git@github.com/briceburg/radio-pad-registry-data.git",
+        cwd=backend_path,
+    )
+    _patch_git_failure(monkeypatch, "fetch")
 
     with pytest.raises(RuntimeError) as excinfo:
         _backend(backend_path)
@@ -173,10 +179,7 @@ def test_git_backend_origin_ssh_remote_uses_ssh_guidance(tmp_path: Path, monkeyp
 def test_git_backend_clone_oserror_reports_underlying_local_problem(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def failing_clone(*args: object, **kwargs: object) -> None:
-        raise OSError("permission denied")
-
-    monkeypatch.setattr(porcelain, "clone", failing_clone)
+    _patch_git_failure(monkeypatch, "clone", error=OSError("permission denied"))
 
     with pytest.raises(RuntimeError) as excinfo:
         _backend(
@@ -189,7 +192,7 @@ def test_git_backend_clone_oserror_reports_underlying_local_problem(
 
 def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
-    _init_repo(repo_path)
+    init_repo(repo_path)
 
     backend = _backend(repo_path)
     backend.save(
@@ -204,10 +207,8 @@ def test_git_backend_writes_pretty_json_and_clear_commit_subject(tmp_path: Path)
         '{\n  "name": "Fresh",\n  "stations": [\n    "community/WWOZ"\n  ]\n}\n'
     )
 
-    repo = Repo(str(repo_path))
-    commit = cast(Commit, repo[repo.head()])
-    assert commit.message == (
-        b"radio-pad-registry: update radio dial community/fresh\n\nGenerated-by: radio-pad-registry"
+    assert run_git("log", "-1", "--format=%B", cwd=repo_path).stdout.rstrip() == (
+        "radio-pad-registry: update radio dial community/fresh\n\nGenerated-by: radio-pad-registry"
     )
 
 
@@ -233,7 +234,7 @@ def test_git_backend_can_disable_remote_sync_for_existing_clone(tmp_path: Path) 
 
     backend = _backend(backend_path, remote_url="")
 
-    _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message=b"writer update")
+    _commit_json(writer_path, "accounts/fetched.json", {"name": "Fetched"}, message="writer update")
     _push_main(writer_path, "origin")
 
     data, _ = backend.get("fetched", "accounts")
@@ -242,10 +243,10 @@ def test_git_backend_can_disable_remote_sync_for_existing_clone(tmp_path: Path) 
 
 def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
-    _init_repo(repo_path)
+    init_repo(repo_path)
     (repo_path / "LICENSE").write_text("test\n", encoding="utf-8")
-    porcelain.add(str(repo_path), paths=["LICENSE"])
-    porcelain.commit(str(repo_path), message=b"init", author=AUTHOR, committer=AUTHOR)
+    run_git("add", "--", "LICENSE", cwd=repo_path)
+    run_git("commit", "--quiet", "--message", "init", cwd=repo_path, env=TEST_IDENTITY)
 
     seed_dir = tmp_path / "seed"
     (seed_dir / "accounts").mkdir(parents=True, exist_ok=True)
@@ -276,27 +277,22 @@ def test_git_backend_seeds_empty_repo(tmp_path: Path) -> None:
 
 def test_git_backend_repoints_head_to_configured_branch(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
-    _init_repo(repo_path)
-    _commit_json(repo_path, "accounts/seed.json", {"name": "Seed"}, message=b"seed")
-
-    repo = Repo(str(repo_path))
-    main_ref = cast(Ref, b"refs/heads/main")
-    other_ref = cast(Ref, b"refs/heads/other")
-    repo.refs[other_ref] = repo.refs[main_ref]
-    repo.refs.set_symbolic_ref(cast(Ref, b"HEAD"), other_ref)
+    init_repo(repo_path)
+    _commit_json(repo_path, "accounts/seed.json", {"name": "Seed"}, message="seed")
+    run_git("branch", "other", "main", cwd=repo_path)
+    run_git("symbolic-ref", "HEAD", "refs/heads/other", cwd=repo_path)
 
     backend = _backend(repo_path)
 
     backend.save("fresh", {"name": "Fresh"}, "accounts")
 
-    repo = Repo(str(repo_path))
-    assert repo.refs.read_ref(cast(Ref, b"HEAD")) == b"ref: refs/heads/main"
-    assert repo.refs[main_ref] != repo.refs[other_ref]
+    assert run_git("symbolic-ref", "HEAD", cwd=repo_path).stdout.strip() == "refs/heads/main"
+    assert run_git("rev-parse", "main", cwd=repo_path).stdout != run_git("rev-parse", "other", cwd=repo_path).stdout
 
 
 def test_git_backend_uses_cross_process_lock_for_shared_repo(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
-    _init_repo(repo_path)
+    init_repo(repo_path)
 
     backend = _backend(repo_path)
     ctx = mp.get_context("spawn")

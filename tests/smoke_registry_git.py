@@ -1,13 +1,26 @@
 """Prod smoke test for the registry git backend.
 
-Exercises entrypoint SSH plumbing and dulwich operations without a real remote.
+Exercises entrypoint SSH plumbing and system Git without a real remote.
 Run inside the registry-git prod container via compose.prod-smoke.yaml.
 """
 
 import json
 import os
 import pathlib
+import subprocess
 import tempfile
+
+
+def git(*args: str, cwd: pathlib.Path | None = None, env: dict[str, str] | None = None) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 def main() -> None:
@@ -24,33 +37,24 @@ def main() -> None:
     assert known_hosts.exists(), f"SSH known-hosts file not created: {known_hosts}"
     print(f"entrypoint: ok  (GIT_SSH_COMMAND={cmd})")
 
-    # -- dulwich native extensions load --
-    from dulwich import porcelain
-    from dulwich.client import SSHGitClient, get_transport_and_path
-    from dulwich.repo import Repo
-
-    print("dulwich: imported")
+    print(f"system git: {git('--version')}")
 
     # -- local init / add / commit round-trip --
     with tempfile.TemporaryDirectory() as td:
         rp = pathlib.Path(td) / "smoke"
-        porcelain.init(str(rp))
+        git("init", "--quiet", "--initial-branch=main", str(rp))
         (rp / "test.json").write_text(json.dumps({"ok": True}))
-        porcelain.add(str(rp), paths=["test.json"])
-        sha = porcelain.commit(
-            str(rp),
-            message=b"smoke",
-            author=b"smoke <smoke@test>",
-            committer=b"smoke <smoke@test>",
-        )
-        assert sha and Repo(str(rp)).head() == sha
-        print(f"dulwich: local commit {sha.hex()[:12]}")
-
-    # -- SSH transport picks up GIT_SSH_COMMAND --
-    client, _ = get_transport_and_path("git@github.com:example/repo.git")
-    assert isinstance(client, SSHGitClient), f"wrong client: {type(client)}"
-    assert client.ssh_command == cmd, f"transport mismatch: {client.ssh_command!r}"
-    print("dulwich: SSH transport wired")
+        git("add", "--", "test.json", cwd=rp)
+        identity = os.environ | {
+            "GIT_AUTHOR_NAME": "smoke",
+            "GIT_AUTHOR_EMAIL": "smoke@test",
+            "GIT_COMMITTER_NAME": "smoke",
+            "GIT_COMMITTER_EMAIL": "smoke@test",
+        }
+        git("commit", "--quiet", "--message", "smoke", cwd=rp, env=identity)
+        sha = git("rev-parse", "HEAD", cwd=rp)
+        assert sha
+        print(f"system git: local commit {sha[:12]}")
 
     print("registry-git smoke: ok")
 

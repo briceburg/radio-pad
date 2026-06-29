@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from dulwich.repo import Repo
 from pytest import LogCaptureFixture
 
 from datastore import DataStore
 from datastore.backends import GitBackend, LocalBackend, S3Backend
+from tests.datastore._git_helpers import init_repo
 
 
 def test_datastore_creates_local_backend_by_default(monkeypatch: MonkeyPatch) -> None:
@@ -51,8 +51,7 @@ def test_datastore_creates_git_backend_from_env_var(
 ) -> None:
     """GitBackend is created when REGISTRY_BACKEND is 'git'."""
     repo_path = tmp_path / "git-data"
-    repo_path.mkdir()
-    Repo.init(str(repo_path))
+    init_repo(repo_path)
     monkeypatch.setenv("REGISTRY_BACKEND", "git")
     monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(repo_path))
     monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
