@@ -7,10 +7,11 @@ TestClient context.
 Those flows are covered by the compose-based integration tests instead.
 """
 
+import time
 from collections.abc import Generator
 
 import pytest
-from starlette.testclient import TestClient
+from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from lib import constants
@@ -24,6 +25,15 @@ from switchboard.switchboard import (
 PLAYER_UA = "RadioPad/1.0 (test)"
 PLAYER_RADIO_DIAL_URL = "http://example.com/radio-dial.json"
 PLAYER_HEADERS = {"User-Agent": PLAYER_UA, "RadioPad-Radio-Dial-Url": PLAYER_RADIO_DIAL_URL}
+
+
+def _close_player(ws: WebSocketTestSession, player_key: str = "acct/player1") -> None:
+    """Let the endpoint finish its disconnect cleanup before TestClient cancels its session task."""
+    ws.close()
+    deadline = time.monotonic() + 1
+    while player_key in ACTIVE_PLAYER_CONNECTIONS and time.monotonic() < deadline:
+        time.sleep(0.001)
+    assert player_key not in ACTIVE_PLAYER_CONNECTIONS
 
 
 @pytest.fixture()
@@ -57,10 +67,11 @@ def test_controller_rejected_without_token(switchboard_client: TestClient) -> No
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:
-    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS):
+    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as player:
         with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as duplicate:
             with pytest.raises(WebSocketDisconnect) as error:
                 duplicate.receive_json()
+        _close_player(player)
     assert error.value.code == 4002
 
 
@@ -75,6 +86,7 @@ def test_invalid_json_ignored(switchboard_client: TestClient) -> None:
         ws.send_json({"event": "ping"})
         resp = ws.receive_json()
         assert resp["event"] == "pong"
+        _close_player(ws)
 
 
 def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
@@ -84,6 +96,7 @@ def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
         ws.send_json({"event": "ping"})
         resp = ws.receive_json()
         assert resp["event"] == "pong"
+        _close_player(ws)
 
 
 def test_playback_start_is_not_retained_state() -> None:
