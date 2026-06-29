@@ -459,5 +459,7 @@ class GitBackend:
         host, separator, path = remote_url.partition(":")
         if not separator or not host or "/" in host or host.startswith("."):
             return None
+        if len(host) == 1 and host.isalpha() and path.startswith(("/", "\\")):
+            return None
         hostname = host.rsplit("@", 1)[-1]
         return f"{hostname}:{path}"
