@@ -17,12 +17,15 @@ def mock_request() -> AsyncMock:
 
 
 async def test_validate_remote_success(mock_request: AsyncMock) -> None:
-    """200 response passes validation."""
-    mock_response = httpx2.Response(200, request=httpx2.Request("GET", "http://test"))
+    """204 response passes validation."""
+    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
     await validate_remote(mock_request, "acct", "player1", "valid-token")
-    mock_request.app.state.http_client.get.assert_called_once()
+    mock_request.app.state.http_client.get.assert_called_once_with(
+        "http://localhost:8000/api/auth/players/acct/player1/control",
+        headers={"Authorization": "Bearer valid-token"},
+    )
 
 
 async def test_validate_remote_unauthorized(mock_request: AsyncMock) -> None:
@@ -61,7 +64,7 @@ async def test_validate_remote_timeout(mock_request: AsyncMock) -> None:
 
 async def test_validate_remote_headers_token(mock_request: AsyncMock) -> None:
     """Bearer token is included in Authorization header."""
-    mock_response = httpx2.Response(200, request=httpx2.Request("GET", "http://test"))
+    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
     await validate_remote(mock_request, "acct", "player1", "my-token")
@@ -73,7 +76,7 @@ async def test_validate_remote_headers_token(mock_request: AsyncMock) -> None:
 
 async def test_validate_remote_headers_no_token(mock_request: AsyncMock) -> None:
     """No token results in empty headers."""
-    mock_response = httpx2.Response(200, request=httpx2.Request("GET", "http://test"))
+    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
     await validate_remote(mock_request, "acct", "player1", None)

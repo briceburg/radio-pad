@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   discoverAccounts,
+  discoverAuthStatus,
+  discoverPlayer,
+  discoverPlayers,
   discoverRadioDials,
 } from "../../src/js/services/registry-discovery.js";
 
@@ -53,6 +56,54 @@ describe("Registry Discovery", () => {
       "http://localhost:3000/api/accounts/",
       {},
     );
+  });
+
+  it("discovers whether registry auth is enabled", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ enabled: false }),
+    });
+
+    await expect(discoverAuthStatus("/api/")).resolves.toEqual({
+      enabled: false,
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:3000/api/auth/status",
+      {},
+    );
+  });
+
+  it("keeps player reads public when the remote is signed out", async () => {
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [{ id: "living-room", name: "Living Room" }],
+          links: {},
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "living-room",
+          name: "Living Room",
+          radio_dial: "community/briceburg",
+        }),
+      });
+    const auth = { signedIn: false };
+
+    await expect(
+      discoverPlayers("briceburg", "/api/", auth),
+    ).resolves.toEqual([{ value: "living-room", label: "Living Room" }]);
+    await expect(
+      discoverPlayer("briceburg", "living-room", "/api/", auth),
+    ).resolves.toMatchObject({
+      id: "living-room",
+      configured_radio_dial_url:
+        "http://localhost:3000/api/accounts/community/radio-dials/briceburg",
+      switchboard_url:
+        "ws://localhost:3000/switchboard/briceburg/living-room",
+    });
   });
 
   it("discovers account and public community RadioDials", async () => {

@@ -7,7 +7,6 @@ import pytest
 import websockets
 
 PLAYER_ROOM = "briceburg/living-room"
-CONTROLLER_TOKEN = "integration-test-token"
 
 
 async def wait_for_event(ws, event_name, predicate=None, timeout=15):
@@ -23,7 +22,7 @@ async def wait_for_event(ws, event_name, predicate=None, timeout=15):
 
 @pytest.mark.asyncio
 async def test_real_player_processes_playback_commands(switchboard_url):
-    controller_url = f"{switchboard_url}/{PLAYER_ROOM}?token={CONTROLLER_TOKEN}"
+    controller_url = f"{switchboard_url}/{PLAYER_ROOM}"
 
     async with websockets.connect(controller_url) as controller:
         await controller.send(json.dumps({"event": "playback_start", "data": {"call_sign": "WWOZ"}}))
