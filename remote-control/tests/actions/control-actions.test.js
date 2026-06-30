@@ -18,7 +18,8 @@ function createMockListen() {
 const PLAYER = {
   id: "living-room",
   name: "Living Room",
-  configured_radio_dial_url: "https://example.test/radio-dial.json",
+  configured_radio_dial_url:
+    "https://example.test/api/accounts/community/radio-dials/briceburg",
   switchboard_url: "wss://example.test/switchboard/briceburg/living-room",
 };
 
@@ -105,7 +106,7 @@ describe("control-actions", () => {
     });
   });
 
-  it("reuses an in-flight RadioDial load for a retained URL", async () => {
+  it("reuses an in-flight load when the player reports the configured RadioDial", async () => {
     const control = createMockControl();
     const actions = createControlActions({
       control,
@@ -122,7 +123,8 @@ describe("control-actions", () => {
     await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledOnce());
     control.dispatchEvent(
       new CustomEvent("radiodialurl", {
-        detail: PLAYER.configured_radio_dial_url,
+        detail:
+          "http://registry:1980/api/accounts/community/radio-dials/briceburg",
       }),
     );
 
@@ -132,6 +134,31 @@ describe("control-actions", () => {
       json: async () => ({ name: "Empty", stations: [] }),
     });
     await selection;
+  });
+
+  it("loads a different RadioDial reported by the running player", async () => {
+    const control = createMockControl();
+    const actions = createControlActions({
+      control,
+      listen: createMockListen(),
+    });
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ name: "Empty", stations: [] }),
+    });
+    const reportedUrl =
+      "https://player.test/accounts/briceburg/radio-dials/alternate";
+
+    await actions.selectPlayer(PLAYER);
+    control.dispatchEvent(
+      new CustomEvent("radiodialurl", { detail: reportedUrl }),
+    );
+
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      reportedUrl,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("dispatches explicit playback commands for control stations", async () => {

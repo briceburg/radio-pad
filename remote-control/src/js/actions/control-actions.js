@@ -57,6 +57,30 @@ function parseRadioDial(value) {
   return value;
 }
 
+function radioDialResourcePath(url) {
+  try {
+    const segments = new URL(url, window.location.origin).pathname
+      .split("/")
+      .filter(Boolean);
+    const resource = segments.slice(-4);
+    return resource[0] === "accounts" && resource[2] === "radio-dials"
+      ? resource.join("/")
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveReportedRadioDialUrl(player, reportedUrl) {
+  const configuredUrl = player?.configured_radio_dial_url;
+  const reportedResource = radioDialResourcePath(reportedUrl);
+  return configuredUrl &&
+    reportedResource &&
+    reportedResource === radioDialResourcePath(configuredUrl)
+    ? configuredUrl
+    : reportedUrl;
+}
+
 export function createControlActions({ control, listen }) {
   const getTabStore = (tabName) =>
     tabName === "listen" ? listenStore : controlStore;
@@ -150,9 +174,10 @@ export function createControlActions({ control, listen }) {
   control.addEventListener("playbackstate", (event) =>
     updateTab("control", { currentStation: event.detail }),
   );
-  control.addEventListener("radiodialurl", (event) =>
-    loadRadioDial(event.detail, "control"),
-  );
+  control.addEventListener("radiodialurl", (event) => {
+    const player = controlStore.get().player;
+    loadRadioDial(resolveReportedRadioDialUrl(player, event.detail), "control");
+  });
   control.addEventListener("playerpresence", (event) => {
     const connected = event.detail?.connected === true;
     updateTab("control", {

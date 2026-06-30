@@ -51,5 +51,6 @@ Guidance for coding agents working in `radio-pad/remote-control`.
   from the current registry URL. Do not persist URLs as RadioDial identity.
 - Treat `radio_dial_url` as the source URL reported by a running player.
   `configured_radio_dial_url` is the remote's initial URL derived from registry
-  configuration; a running player's report may supersede it.
+  configuration. Retain the configured URL when both URLs identify the same
+  RadioDial resource; a different running-player report may supersede it.
 - Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.
