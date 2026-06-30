@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Path
 from lib.types import CallSign
 from models import Station, StationSpec
 
-from ..auth import require_account_manager
+from ..auth import require_account_owner
 from ..helpers import ensure_account, get_or_404
 from ..models import PaginatedList
 from ..responses import ERROR_409
@@ -20,7 +20,7 @@ async def register_station(
     call_sign: Annotated[CallSign, Path(..., description="Canonical station call sign")],
     ds: DS,
     station_spec: StationSpec,
-    _identity: object = Depends(require_account_manager),
+    _identity: object = Depends(require_account_owner),
 ) -> Station:
     ensure_account(ds, account_id)
     return ds.stations.upsert(account_id, call_sign, station_spec)

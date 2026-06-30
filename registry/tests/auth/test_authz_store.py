@@ -2,8 +2,18 @@ from pathlib import Path
 
 from _pytest.monkeypatch import MonkeyPatch
 
-from auth import AccountAccess, AuthenticatedIdentity, AuthzStore, GlobalAdmins
+from auth import AccountOwners, AuthenticatedIdentity, AuthzStore
 from datastore.backends import LocalBackend
+from lib.constants import BASE_DIR
+
+
+def _identity(subject: str, email: str) -> AuthenticatedIdentity:
+    return AuthenticatedIdentity(
+        issuer="https://issuer.example",
+        subject=subject,
+        email=email,
+        email_verified=True,
+    )
 
 
 def test_authz_store_uses_separate_local_path(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -21,49 +31,33 @@ def test_authz_store_uses_separate_local_path(monkeypatch: MonkeyPatch, tmp_path
 def test_authz_store_matches_verified_email_and_subject(tmp_path: Path) -> None:
     backend = LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz")
     store = AuthzStore(backend=backend)
-    identity = AuthenticatedIdentity(
-        issuer="https://issuer.example",
-        subject="user-123",
-        email="owner@example.com",
-        email_verified=True,
+    identity = _identity("user-123", "owner@example.com")
+
+    store.save_account_owners(
+        AccountOwners(
+            id="testuser1",
+            subjects=[identity.subject_key],
+            emails=["SECOND-OWNER@example.com"],
+        )
     )
 
-    store.save_global_admins(GlobalAdmins(emails=["OWNER@example.com"]))
-    store.save_account_access(AccountAccess(id="testuser1", subjects=[identity.subject_key]))
-
-    assert store.is_admin(identity)
-    assert store.can_manage_account("testuser1", identity)
-    assert not store.can_manage_account(
+    assert store.is_account_owner("testuser1", identity)
+    assert store.is_account_owner(
+        "testuser1",
+        _identity("user-456", "second-owner@example.com"),
+    )
+    assert not store.is_account_owner(
         "testuser2",
-        AuthenticatedIdentity(
-            issuer="https://issuer.example",
-            subject="user-999",
-            email="other@example.com",
-            email_verified=True,
-        ),
+        _identity("user-999", "other@example.com"),
     )
 
 
-def test_authz_store_seeds_human_friendly_documents(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
-    seed_root = tmp_path / "seed-data"
-    auth_seed_root = seed_root / "auth"
-    (auth_seed_root / "accounts").mkdir(parents=True)
-    (auth_seed_root / "global-admins.json").write_text('{\n  "emails": ["briceburg@gmail.com"]\n}\n', encoding="utf-8")
-    (auth_seed_root / "accounts" / "briceburg.json").write_text(
-        '{\n  "emails": ["briceburg@gmail.com"]\n}\n',
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("REGISTRY_SEED_DATA_PATH", str(seed_root))
+def test_authz_store_seeds_checked_in_account_owners(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REGISTRY_SEED_DATA_PATH", str(BASE_DIR / "seed-data"))
     store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
     store.seed()
 
-    identity = AuthenticatedIdentity(
-        issuer="https://issuer.example",
-        subject="briceburg-subject",
-        email="briceburg@gmail.com",
-        email_verified=True,
-    )
+    identity = _identity("briceburg-subject", "briceburg@gmail.com")
 
-    assert store.is_admin(identity)
-    assert store.can_manage_account("briceburg", identity)
+    assert store.is_account_owner("briceburg", identity)
+    assert store.is_account_owner("community", identity)

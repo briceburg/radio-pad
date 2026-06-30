@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from lib.keys import join_key
 from models import RadioDial, RadioDialSpec, RadioDialSummary
 
-from ..auth import require_account_manager
+from ..auth import require_account_owner
 from ..helpers import ensure_account, get_or_404
 from ..models import PaginatedList
 from ..radio_dials import materialize_radio_dial, resolve_station_refs, summarize_radio_dial
@@ -24,7 +24,7 @@ async def register_radio_dial(
     radio_dial_id: RadioDialId,
     ds: DS,
     radio_dial_spec: RadioDialSpec,
-    _identity: object = Depends(require_account_manager),
+    _identity: object = Depends(require_account_owner),
 ) -> RadioDial:
     stations = resolve_station_refs(ds, radio_dial_spec)
     ensure_account(ds, account_id)

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 
 from models import Account, AccountSpec
 
-from ..auth import require_account_manager
+from ..auth import require_account_owner
 from ..helpers import get_or_404
 from ..models import PaginatedList
 from ..responses import ERROR_409
@@ -16,7 +16,7 @@ async def register_account(
     account_id: AccountId,
     ds: DS,
     account_spec: AccountSpec,
-    _identity: object = Depends(require_account_manager),
+    _identity: object = Depends(require_account_owner),
 ) -> Account:
     return ds.accounts.upsert(account_id, account_spec)
 

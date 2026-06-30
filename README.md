@@ -68,9 +68,9 @@ because they can prompt for privileges and write to the device.
 
 Registry and switchboard ports default to ephemeral; the web app defaults to
 port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to
-configure overrides or to enable Google sign-in and registry write auth —
+configure overrides or to enable Google sign-in, registry write auth, and authenticated player control —
 see [remote-control](./remote-control/README.md#web-development) for OAuth client
-setup and [registry](./registry/README.md#write-authentication-and-authz-seeding)
+setup and [registry](./registry/README.md#authentication-and-account-owner-seeding)
 for authz seeding.
 
 ```sh
@@ -137,7 +137,7 @@ The registry is controlled by the `REGISTRY_PROFILES` environment variable:
 | Mode | `REGISTRY_PROFILES` | Description |
 |------|---------------------|-------------|
 | **Unified** | `api,switchboard` (default) | Single process serves the REST API and WebSocket switchboard. Simplest to deploy and operate. |
-| **Split** | `api` / `switchboard` separately | API and switchboard run as independent services. The switchboard validates tokens via HTTP call back to the API. Allows independent scaling of stateless API replicas vs. long-lived WebSocket connections. |
+| **Split** | `api` / `switchboard` separately | API and switchboard run as independent services. The switchboard validates controller access via an HTTP call back to the API. Allows independent scaling of stateless API replicas vs. long-lived WebSocket connections. |
 
 `compose.yaml` runs unified mode. `compose.split.yaml` demonstrates the split topology and is also tested in CI.
 
@@ -166,27 +166,27 @@ This is the baseline runtime view: controllers talk to players directly over USB
 
 ```mermaid
 flowchart TD
-    User["Signed-in user"]
+    User["User"]
     Remote["Remote control"]
     Registry["Registry API"]
     Switchboard["Registry Switchboard"]
     Player["Player device"]
 
-    User -- "Google OIDC Auth" --> Remote
-    Remote -- "[Bearer] Access registered players" --> Registry
-    Registry -- "Return assigned players" --> Remote
+    Remote -- "Read auth status + registered players" --> Registry
+    Registry -- "Auth mode + public player data" --> Remote
+    User -. "Google OIDC when auth enabled" .-> Remote
     Remote -- "[?token=] Connect to Switchboard" --> Switchboard
-    Switchboard -- "Validate token (local or remote)" --> Registry
+    Switchboard -- "Validate account-owner control access" --> Registry
     Player -- "Connect as Player" --> Switchboard
     Switchboard -- "Route controls to Player" --> Player
 ```
 
-Player control is authenticated end-to-end:
+Player control follows the registry's advertised auth mode:
 
-* The remote control signs in to get an OIDC Bearer token.
-* It requests access to registered players using this token.
-* During WebSocket connection, the remote control supplies the token as a query parameter.
-* The switchboard validates the token locally (unified mode) or via HTTP call to the registry API (split mode).
+* Player registry reads remain public.
+* When registry auth is disabled, the remote discovers players and connects to the switchboard without a token.
+* When registry auth is enabled, the remote signs in and supplies its OIDC token during the WebSocket connection.
+* The switchboard validates account-owner control access locally (unified mode) or through the registry API (split mode).
 * Unauthorized connections are rejected.
 
 ### Contributing

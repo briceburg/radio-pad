@@ -7,61 +7,7 @@ from starlette.testclient import TestClient
 
 from datastore import DataStore, LocalBackend
 from lib.constants import BASE_DIR
-from models import AccountSpec, PlayerSpec, RadioDialSpec, StationSpec
-from registry import create_app
-
-
-def _seed_store(ds: DataStore) -> None:
-    """Pre-populate a DataStore with consistent test data."""
-    ds.accounts.upsert("testuser1", AccountSpec(name="Test User 1"))
-    ds.accounts.upsert("testuser2", AccountSpec(name="Test User 2"))
-    ds.accounts.upsert("community", AccountSpec(name="RadioPad Community"))
-    ds.stations.upsert(
-        "community",
-        "WWOZ",
-        StationSpec.model_validate({"stream_url": "https://www.wwoz.org/listen/hi"}),
-    )
-    ds.stations.upsert(
-        "community",
-        "KEXP",
-        StationSpec.model_validate({"stream_url": "https://kexp.example/stream"}),
-    )
-    ds.radio_dials.upsert(
-        "briceburg",
-        RadioDialSpec.model_validate(
-            {
-                "name": "Casa Briceburg",
-                "discoverable": True,
-                "stations": ["community/WWOZ", "community/KEXP"],
-            }
-        ),
-        path_params={"account_id": "community"},
-    )
-    ds.players.upsert(
-        "player1",
-        PlayerSpec.model_validate(
-            {
-                "name": "Player 1",
-                "radio_dial": "community/briceburg",
-            }
-        ),
-        path_params={"account_id": "testuser1"},
-    )
-    ds.players.upsert(
-        "player2",
-        PlayerSpec.model_validate(
-            {
-                "name": "Player 2",
-                "radio_dial": "community/briceburg",
-            }
-        ),
-        path_params={"account_id": "testuser1"},
-    )
-    ds.players.upsert(
-        "player3",
-        PlayerSpec(name="Player 3"),
-        path_params={"account_id": "testuser2"},
-    )
+from tests.api._app import build_client, build_store, seed_store
 
 
 def _reset_dir(path: Path) -> Path:
@@ -69,26 +15,6 @@ def _reset_dir(path: Path) -> Path:
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def _build_store(data_dir: Path, *, seed: bool = False) -> DataStore:
-    store = DataStore(backend=LocalBackend(base_path=str(data_dir)))
-    if seed:
-        _seed_store(store)
-    return store
-
-
-def _build_client(store: DataStore) -> TestClient:
-    app = create_app()
-
-    from api.auth import AuthServices
-    from api.types import get_store
-    from lib.constants import API_PREFIX
-
-    app.dependency_overrides[get_store] = lambda: store
-    app.state.store = store
-    app.state.auth = AuthServices(authenticate_user=None, authz_store=None)
-    return TestClient(app, raise_server_exceptions=False, base_url=f"http://testserver{API_PREFIX}/")
 
 
 @pytest.fixture(scope="session")
@@ -110,7 +36,7 @@ def mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     of test data after a run.
     """
     data_dir = _reset_dir(unit_tests_root / "api" / "data")
-    test_store = _build_store(data_dir)
+    test_store = build_store(data_dir)
     yield test_store
     shutil.rmtree(data_dir)
 
@@ -120,16 +46,13 @@ def seeded_store(mock_store: DataStore) -> DataStore:
     """Cleans and re-seeds the mock_store for each test."""
     assert isinstance(mock_store.backend, LocalBackend)
     _reset_dir(mock_store.backend.base_path)
-    _seed_store(mock_store)
+    seed_store(mock_store)
     return mock_store
 
 
 @pytest.fixture(scope="session")
-def client(mock_store: DataStore, session_monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
-    from lib import constants
-
-    session_monkeypatch.setattr(constants, "PROFILES", ["api"])
-    with _build_client(mock_store) as test_client:
+def client(mock_store: DataStore) -> Generator[TestClient]:
+    with build_client(mock_store) as test_client:
         yield test_client
 
 
@@ -137,17 +60,14 @@ def client(mock_store: DataStore, session_monkeypatch: pytest.MonkeyPatch) -> Ge
 def ro_mock_store(unit_tests_root: Path) -> Generator[DataStore]:
     """Session-scoped DataStore for read-only tests (seeded once)."""
     data_dir = _reset_dir(unit_tests_root / "api" / "ro_data")
-    store = _build_store(data_dir, seed=True)
+    store = build_store(data_dir, seed=True)
     yield store
 
 
 @pytest.fixture(scope="session")
-def ro_client(ro_mock_store: DataStore, session_monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
+def ro_client(ro_mock_store: DataStore) -> Generator[TestClient]:
     """Session-scoped TestClient bound to the read-only store."""
-    from lib import constants
-
-    session_monkeypatch.setattr(constants, "PROFILES", ["api"])
-    with _build_client(ro_mock_store) as test_client:
+    with build_client(ro_mock_store) as test_client:
         yield test_client
 
 

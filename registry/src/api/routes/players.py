@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from lib.keys import split_key
 from models import Player, PlayerSpec, PlayerSummary
 
-from ..auth import require_account_manager
+from ..auth import require_account_owner
 from ..helpers import ensure_account, get_or_404
 from ..models import PaginatedList
 from ..responses import ERROR_409
@@ -18,7 +18,7 @@ async def register_player(
     player_id: PlayerId,
     ds: DS,
     player_spec: PlayerSpec,
-    _identity: object = Depends(require_account_manager),
+    _identity: object = Depends(require_account_owner),
 ) -> Player:
     if player_spec.radio_dial is not None:
         radio_dial_account_id, radio_dial_id = split_key(player_spec.radio_dial)

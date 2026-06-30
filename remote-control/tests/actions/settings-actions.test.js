@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSettingsActions } from "../../src/js/actions/settings-actions.js";
 import {
   discoverAccounts,
-  discoverAuthStatus,
+  discoverAuthEnabled,
   discoverPlayer,
   discoverPlayers,
   discoverRadioDials,
@@ -11,7 +11,7 @@ import {
 
 vi.mock("../../src/js/services/registry-discovery.js", () => ({
   discoverAccounts: vi.fn(),
-  discoverAuthStatus: vi.fn(),
+  discoverAuthEnabled: vi.fn(),
   discoverPlayer: vi.fn(),
   discoverPlayers: vi.fn(),
   discoverRadioDials: vi.fn(),
@@ -81,7 +81,7 @@ describe("settings-actions", () => {
     discoverAccounts.mockResolvedValue([
       { value: "briceburg", label: "Briceburg" },
     ]);
-    discoverAuthStatus.mockResolvedValue({ enabled: false });
+    discoverAuthEnabled.mockResolvedValue(false);
     discoverPlayers.mockResolvedValue([
       { value: "living-room", label: "Living Room" },
     ]);
@@ -150,7 +150,7 @@ describe("settings-actions", () => {
   });
 
   it("hides players while signed out when registry auth is enabled", async () => {
-    discoverAuthStatus.mockResolvedValue({ enabled: true });
+    discoverAuthEnabled.mockResolvedValue(true);
     const prefs = createPrefs();
     const { actions, onPlayerSelected } = createActions(prefs, {
       signedIn: false,

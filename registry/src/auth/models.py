@@ -20,7 +20,8 @@ class AuthenticatedIdentity(BaseModel):
         return None
 
 
-class AccessList(BaseModel):
+class AccountOwners(BaseModel):
+    id: str
     subjects: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
 
@@ -28,11 +29,3 @@ class AccessList(BaseModel):
         return identity.subject_key in self.subjects or identity.verified_email in {
             email.casefold() for email in self.emails
         }
-
-
-class GlobalAdmins(AccessList):
-    id: str = Field(default="global-admins")
-
-
-class AccountAccess(AccessList):
-    id: str
