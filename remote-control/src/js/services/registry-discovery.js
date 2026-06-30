@@ -92,7 +92,7 @@ export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
-export async function discoverAuthStatus(registryUrl, options = {}) {
+export async function discoverAuthEnabled(registryUrl, options = {}) {
   if (!registryUrl) return null;
 
   const url = new URL(
@@ -108,7 +108,7 @@ export async function discoverAuthStatus(registryUrl, options = {}) {
   if (typeof status?.enabled !== "boolean") {
     throw new Error("Invalid registry auth status response.");
   }
-  return status;
+  return status.enabled;
 }
 
 export async function discoverPlayers(

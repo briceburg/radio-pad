@@ -3,18 +3,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 
 from ..auth import AuthServices, get_auth_services, require_player_control_access
-from ..models import AuthStatus
 
 router = APIRouter(prefix="/auth")
 
 
-@router.get("/status", response_model=AuthStatus)
+@router.get("/status")
 async def get_auth_status(
     response: Response,
     services: Annotated[AuthServices, Depends(get_auth_services)],
-) -> AuthStatus:
+) -> dict[str, bool]:
     response.headers["Cache-Control"] = "no-store"
-    return AuthStatus(enabled=services.enabled)
+    return {"enabled": services.enabled}
 
 
 @router.get(

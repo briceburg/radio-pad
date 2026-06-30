@@ -48,14 +48,12 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 ## Auth and seeding conventions
 
-- Write-route auth verifies OIDC bearer tokens against a configured client-id allowlist; reads remain public.
+- Write and player-control auth verifies OIDC bearer tokens against a configured client-id allowlist; resource reads remain public.
 - Private authz data is stored separately from public content data and currently uses a local backend configured by `REGISTRY_AUTHZ_PATH`.
 - Checked-in seed data lives under `seed-data/`, with:
   - `store/...` for public datastore seeds
   - `auth/...` for private authz seeds
-- Checked-in authz seed documents live under `seed-data/auth/`, with:
-  - `global-admins.json`
-  - `accounts/<account>.json`
+- Checked-in account-owner documents live under `seed-data/auth/accounts/<account>.json`.
 - Reuse the shared `seed_from_path(...)` helper for both public content and authz seed loading so seeding behavior stays consistent across local, S3, and Git backends.
 - When changing auth or control semantics, ensure any root architecture diagrams or related components (player, remote-control) are updated too.
 

@@ -78,25 +78,7 @@ def current_identity(
     )
 
 
-def require_admin(
-    identity: Annotated[AuthenticatedIdentity | None, Depends(current_identity)],
-    services: Annotated[AuthServices, Depends(get_auth_services)],
-) -> AuthenticatedIdentity | None:
-    if not services.enabled:
-        return None
-
-    assert identity is not None
-    assert services.authz_store is not None
-    if services.authz_store.is_admin(identity):
-        return identity
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Admin access required",
-    )
-
-
-def require_account_manager(
+def require_account_owner(
     account_id: str,
     identity: Annotated[AuthenticatedIdentity | None, Depends(current_identity)],
     services: Annotated[AuthServices, Depends(get_auth_services)],
@@ -106,19 +88,19 @@ def require_account_manager(
 
     assert identity is not None
     assert services.authz_store is not None
-    if services.authz_store.can_manage_account(account_id, identity):
+    if services.authz_store.is_account_owner(account_id, identity):
         return identity
 
     logger.warning("403 Forbidden for %s. Identity: %s", account_id, identity.model_dump())
-    access = services.authz_store.get_account_access(account_id)
-    if access:
-        logger.warning("Account access allows emails: %s, subjects: %s", access.emails, access.subjects)
+    owners = services.authz_store.get_account_owners(account_id)
+    if owners:
+        logger.warning("Account owners allow emails: %s, subjects: %s", owners.emails, owners.subjects)
     else:
-        logger.warning("No account access seeded for %s", account_id)
+        logger.warning("No account owners seeded for %s", account_id)
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Account owner or admin access required",
+        detail="Account owner access required",
     )
 
 
@@ -126,7 +108,7 @@ def require_player_control_access(
     account_id: str,
     player_id: str,
     ds: DS,
-    _identity: Annotated[AuthenticatedIdentity | None, Depends(require_account_manager)],
+    _identity: Annotated[AuthenticatedIdentity | None, Depends(require_account_owner)],
 ) -> None:
     get_or_404(
         ds.players.get(player_id, path_params={"account_id": account_id}),

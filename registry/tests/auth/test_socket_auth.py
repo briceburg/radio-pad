@@ -16,21 +16,28 @@ def mock_request() -> AsyncMock:
     return req
 
 
-async def test_validate_remote_success(mock_request: AsyncMock) -> None:
-    """204 response passes validation."""
+@pytest.mark.parametrize(
+    ("token", "headers"),
+    [("valid-token", {"Authorization": "Bearer valid-token"}), (None, {})],
+)
+async def test_validate_remote_forwards_optional_token(
+    mock_request: AsyncMock,
+    token: str | None,
+    headers: dict[str, str],
+) -> None:
     mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
-    await validate_remote(mock_request, "acct", "player1", "valid-token")
+    await validate_remote(mock_request, "acct", "player1", token)
     mock_request.app.state.http_client.get.assert_called_once_with(
         "http://localhost:8000/api/auth/players/acct/player1/control",
-        headers={"Authorization": "Bearer valid-token"},
+        headers=headers,
     )
 
 
-async def test_validate_remote_unauthorized(mock_request: AsyncMock) -> None:
-    """Non-200 response raises WS_1008_POLICY_VIOLATION."""
-    mock_response = httpx2.Response(403, request=httpx2.Request("GET", "http://test"))
+@pytest.mark.parametrize("response_status", [401, 403, 404])
+async def test_validate_remote_rejects_denied_access(mock_request: AsyncMock, response_status: int) -> None:
+    mock_response = httpx2.Response(response_status, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
     with pytest.raises(WebSocketException) as exc:
@@ -40,9 +47,12 @@ async def test_validate_remote_unauthorized(mock_request: AsyncMock) -> None:
     assert "Unauthorized" in exc.value.reason
 
 
-async def test_validate_remote_http_error(mock_request: AsyncMock) -> None:
-    """Network connection errors raise WS_1011_INTERNAL_ERROR."""
-    mock_request.app.state.http_client.get.side_effect = httpx2.ConnectError("Connection refused")
+@pytest.mark.parametrize(
+    "error",
+    [httpx2.ConnectError("Connection refused"), httpx2.TimeoutException("Timeout")],
+)
+async def test_validate_remote_reports_transport_errors(mock_request: AsyncMock, error: httpx2.HTTPError) -> None:
+    mock_request.app.state.http_client.get.side_effect = error
 
     with pytest.raises(WebSocketException) as exc:
         await validate_remote(mock_request, "acct", "player1", "token")
@@ -51,36 +61,14 @@ async def test_validate_remote_http_error(mock_request: AsyncMock) -> None:
     assert "internal error" in exc.value.reason
 
 
-async def test_validate_remote_timeout(mock_request: AsyncMock) -> None:
-    """Network timeouts raise WS_1011_INTERNAL_ERROR."""
-    mock_request.app.state.http_client.get.side_effect = httpx2.TimeoutException("Timeout")
+async def test_validate_remote_reports_registry_errors(mock_request: AsyncMock) -> None:
+    mock_request.app.state.http_client.get.return_value = httpx2.Response(
+        500,
+        request=httpx2.Request("GET", "http://test"),
+    )
 
     with pytest.raises(WebSocketException) as exc:
         await validate_remote(mock_request, "acct", "player1", "token")
 
     assert exc.value.code == 1011
     assert "internal error" in exc.value.reason
-
-
-async def test_validate_remote_headers_token(mock_request: AsyncMock) -> None:
-    """Bearer token is included in Authorization header."""
-    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
-    mock_request.app.state.http_client.get.return_value = mock_response
-
-    await validate_remote(mock_request, "acct", "player1", "my-token")
-
-    mock_request.app.state.http_client.get.assert_called_once()
-    _, kwargs = mock_request.app.state.http_client.get.call_args
-    assert kwargs.get("headers") == {"Authorization": "Bearer my-token"}
-
-
-async def test_validate_remote_headers_no_token(mock_request: AsyncMock) -> None:
-    """No token results in empty headers."""
-    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
-    mock_request.app.state.http_client.get.return_value = mock_response
-
-    await validate_remote(mock_request, "acct", "player1", None)
-
-    mock_request.app.state.http_client.get.assert_called_once()
-    _, kwargs = mock_request.app.state.http_client.get.call_args
-    assert kwargs.get("headers") == {}

@@ -1,12 +1,11 @@
-from .models import AccountAccess, AuthenticatedIdentity, GlobalAdmins
+from .models import AccountOwners, AuthenticatedIdentity
 from .oidc import OIDCConfig, RegistryIDToken
 from .store import AuthzStore
 
 __all__ = [
-    "AccountAccess",
+    "AccountOwners",
     "AuthenticatedIdentity",
     "AuthzStore",
-    "GlobalAdmins",
     "OIDCConfig",
     "RegistryIDToken",
 ]

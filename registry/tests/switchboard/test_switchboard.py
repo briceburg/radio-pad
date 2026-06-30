@@ -9,7 +9,7 @@ Those flows are covered by the compose-based integration tests instead.
 
 import time
 from collections.abc import Generator
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from starlette.testclient import TestClient, WebSocketTestSession
@@ -72,8 +72,7 @@ def test_controller_auth_validation_receives_missing_token(
         ws.send_json({"event": "ping"})
         assert ws.receive_json() == {"event": "pong"}
 
-    validate.assert_awaited_once()
-    assert validate.await_args.args[3] is None
+    validate.assert_awaited_once_with(ANY, "acct", "player1", None)
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:

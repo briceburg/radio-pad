@@ -54,11 +54,11 @@ REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; write
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
 REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
 REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path used to configure `GIT_SSH_COMMAND` for deploy-key authentication. | `None`
-REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client ids for write auth. | `None`
-REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for write access. | `None`
+REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client ids for write and player-control auth. | `None`
+REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for writes and player control. | `None`
 REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc`; defaults to `REGISTRY_AUTH_OIDC_ISSUER`. | same as issuer
 REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL | JWKS/discovery cache TTL in seconds for bearer token verification. | `3600`
-REGISTRY_AUTHZ_PATH | local private authz data path for owner/admin rules. This can share a Fly volume with the public datastore as long as it uses a separate directory. | `tmp/authz`
+REGISTRY_AUTHZ_PATH | local private authz data path for account-owner rules. This can share a Fly volume with the public datastore as long as it uses a separate directory. | `tmp/authz`
 REGISTRY_AUTHZ_PREFIX | prefix to apply to local private authz files. | `registry-authz-v1`
 REGISTRY_PROFILES | Comma separated list of application roles to enable. Options are `api` and `switchboard`. | `api,switchboard`
 REGISTRY_API_PREFIX | API routing prefix. | `/api`
@@ -160,11 +160,14 @@ Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
 The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Playback state and commands identify Stations by `call_sign`. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
-### Write authentication and authz seeding
+### Authentication and account-owner seeding
 
-Read endpoints remain public. Write endpoints become protected when both `REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured.
+Resource reads remain public. Writes and player control become protected when both
+`REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured. Clients discover this mode through
+`GET /api/auth/status`; split switchboards validate a controller through
+`GET /api/auth/players/{account_id}/{player_id}/control`. Both auth responses use `Cache-Control: no-store`.
 
-The registry verifies OIDC bearer tokens against an allowed client-id list and then applies owner/admin ACL checks from a separate private local authz store.
+The registry verifies OIDC bearer tokens against an allowed client-id list and then applies account-owner ACL checks from a separate private local authz store.
 
 For Google OIDC, use one issuer and list the web, Android, and iOS client ids used by `remote-control`:
 
@@ -180,15 +183,12 @@ The checked-in seed documents live under a dedicated `seed-data/` root:
 - `seed-data/store/...` for public datastore seed content
 - `seed-data/auth/...` for private authz seed content
 
-The initial authz documents follow the same seed-file pattern as the public datastore, but live under `seed-data/auth/`:
+The initial authz documents follow the same seed-file pattern as the public datastore, but live under `seed-data/auth/accounts/<account>.json`.
 
-- `seed-data/auth/global-admins.json`
-- `seed-data/auth/accounts/<account>.json`
-
-These files are intended to stay human-friendly and easy to review. The checked-in defaults bootstrap:
-
-- `briceburg@gmail.com` as the first global admin
-- `briceburg` as an owned account for that verified email
+These files are intended to stay human-friendly and easy to review. The checked-in defaults make
+`briceburg@gmail.com` an owner of both the `briceburg` and `community` accounts. An account can have
+multiple owners by listing multiple verified emails or OIDC subjects in its document.
+Provision that account-owner document before the account's first authenticated write.
 
 If you later want less public identity exposure, you can replace email entries with OIDC `subject` entries after first login.
 

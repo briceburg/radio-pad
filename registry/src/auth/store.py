@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 
 from datastore.backends import LocalBackend
-from datastore.core import ModelStore, ObjectStore, SeedableStore, seed_from_path, seedable
+from datastore.core import ModelStore, ObjectStore, seed_from_path, seedable
 from lib.constants import BASE_DIR
 from lib.logging import logger
 
-from .models import AccountAccess, AuthenticatedIdentity, GlobalAdmins
+from .models import AccountOwners, AuthenticatedIdentity
 
 
 class AuthzStore:
@@ -22,44 +22,21 @@ class AuthzStore:
             backend = LocalBackend(base_path=str(data_path), prefix=prefix)
 
         self.backend = backend
-        self._global_admins: ModelStore[GlobalAdmins, GlobalAdmins] = ModelStore(
+        self._account_owners: ModelStore[AccountOwners, AccountOwners] = ModelStore(
             self.backend,
-            model=GlobalAdmins,
-            path_template="{id}",
-        )
-        self._account_access: ModelStore[AccountAccess, AccountAccess] = ModelStore(
-            self.backend,
-            model=AccountAccess,
+            model=AccountOwners,
             path_template="accounts/{id}",
         )
 
     def seed(self) -> None:
-        seed_from_path(self.seed_path, self._seedable_stores(), label="authz")
+        seed_from_path(self.seed_path, [seedable(self._account_owners)], label="authz")
 
-    def get_global_admins(self) -> GlobalAdmins | None:
-        return self._global_admins.get("global-admins")
+    def get_account_owners(self, account_id: str) -> AccountOwners | None:
+        return self._account_owners.get(account_id)
 
-    def save_global_admins(self, admins: GlobalAdmins) -> GlobalAdmins:
-        return self._global_admins.save(admins)
+    def save_account_owners(self, owners: AccountOwners) -> AccountOwners:
+        return self._account_owners.save(owners)
 
-    def get_account_access(self, account_id: str) -> AccountAccess | None:
-        return self._account_access.get(account_id)
-
-    def save_account_access(self, access: AccountAccess) -> AccountAccess:
-        return self._account_access.save(access)
-
-    def is_admin(self, identity: AuthenticatedIdentity) -> bool:
-        admins = self.get_global_admins()
-        return admins is not None and admins.allows(identity)
-
-    def can_manage_account(self, account_id: str, identity: AuthenticatedIdentity) -> bool:
-        if self.is_admin(identity):
-            return True
-        access = self.get_account_access(account_id)
-        return access is not None and access.allows(identity)
-
-    def _seedable_stores(self) -> list[SeedableStore]:
-        return [
-            seedable(self._global_admins),
-            seedable(self._account_access),
-        ]
+    def is_account_owner(self, account_id: str, identity: AuthenticatedIdentity) -> bool:
+        owners = self.get_account_owners(account_id)
+        return owners is not None and owners.allows(identity)
