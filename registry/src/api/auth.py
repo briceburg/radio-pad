@@ -10,6 +10,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from auth import AuthenticatedIdentity, AuthzStore, OIDCConfig, RegistryIDToken
 from lib.logging import logger
 
+from .helpers import get_or_404
+from .types import DS
+
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -116,4 +119,18 @@ def require_account_manager(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Account owner or admin access required",
+    )
+
+
+def require_player_control_access(
+    account_id: str,
+    player_id: str,
+    ds: DS,
+    _identity: Annotated[AuthenticatedIdentity | None, Depends(require_account_manager)],
+) -> None:
+    get_or_404(
+        ds.players.get(player_id, path_params={"account_id": account_id}),
+        "Player not found",
+        account_id=account_id,
+        player_id=player_id,
     )

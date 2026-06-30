@@ -64,9 +64,10 @@ class RegistryAPI(FastAPI):
             from lib.constants import API_PREFIX
 
             from .responses import ERROR_404
-            from .routes import accounts, players, radio_dials, stations
+            from .routes import accounts, auth, players, radio_dials, stations
 
             router = APIRouter(responses=ERROR_404)
+            router.include_router(auth.router, tags=["auth"])
             router.include_router(accounts.router, tags=["accounts"])
             router.include_router(players.router, tags=["players"])
             router.include_router(stations.router, tags=["stations"])

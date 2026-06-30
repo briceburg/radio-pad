@@ -10,7 +10,7 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 * discovers players and RadioDials from the [registry](../registry/)
   * RadioDial choices include the selected account and discoverable community dials
   * the saved selection is a qualified RadioDial identity, not a registry URL
-  * sign in when you need to control managed players
+  * sign in to control players when registry auth is enabled
 
 ## Usage
 
@@ -25,6 +25,9 @@ The registry URL defaults to `https://registry.radiopad.dev/api/`. Override it o
 An explicit player `switchboard_url` takes precedence; otherwise the remote infers a same-origin `/switchboard/{account}/{player}` URL before applying the web-only `VITE_SWITCHBOARD_URL` override.
 
 Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
+
+The remote reads the registry's auth status at runtime. When registry auth is disabled, public player discovery and
+tokenless switchboard control remain available for local development.
 
 Set `VITE_GOOGLE_REDIRECT_URL` only if the browser should return to a specific URL instead of the current page URL.
 
@@ -43,7 +46,7 @@ Then run:
 npm start
 ```
 
-Open `http://localhost:5173`. Sign in from `Settings` when you want to load managed players or test registry writes.
+Open `http://localhost:5173`. When registry auth is enabled, sign in from `Settings` to control players or test registry writes.
 
 For compose-based development, the root `.env` pins the remote-control port to `5173` so the same Google OAuth web client works with `docker compose up`. If you change that port, update the Google web client origin and redirect URI to match.
 

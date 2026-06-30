@@ -9,6 +9,7 @@ Those flows are covered by the compose-based integration tests instead.
 
 import time
 from collections.abc import Generator
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.testclient import TestClient, WebSocketTestSession
@@ -59,11 +60,20 @@ def test_player_requires_radio_dial_url_header(switchboard_client: TestClient) -
             pass
 
 
-def test_controller_rejected_without_token(switchboard_client: TestClient) -> None:
-    """Controller without a token is closed with 4001."""
-    with pytest.raises(WebSocketDisconnect):
-        with switchboard_client.websocket_connect("switchboard/acct/player1") as ws:
-            ws.receive_text()
+def test_controller_auth_validation_receives_missing_token(
+    switchboard_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Auth validation decides whether a tokenless controller is allowed."""
+    validate = AsyncMock()
+    monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
+
+    with switchboard_client.websocket_connect("switchboard/acct/player1") as ws:
+        ws.send_json({"event": "ping"})
+        assert ws.receive_json() == {"event": "pong"}
+
+    validate.assert_awaited_once()
+    assert validate.await_args.args[3] is None
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:

@@ -112,9 +112,6 @@ async def websocket_endpoint(
 
     # Authenticate controllers
     if not is_player:
-        if not token:
-            await websocket.close(code=4001, reason="Authentication token required")
-            return
         try:
             await validate_socket_client(websocket, account_id, player_id, token)
         except WebSocketException as e:

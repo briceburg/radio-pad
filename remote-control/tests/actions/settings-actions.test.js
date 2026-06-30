@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSettingsActions } from "../../src/js/actions/settings-actions.js";
 import {
   discoverAccounts,
+  discoverAuthStatus,
   discoverPlayer,
   discoverPlayers,
   discoverRadioDials,
@@ -10,6 +11,7 @@ import {
 
 vi.mock("../../src/js/services/registry-discovery.js", () => ({
   discoverAccounts: vi.fn(),
+  discoverAuthStatus: vi.fn(),
   discoverPlayer: vi.fn(),
   discoverPlayers: vi.fn(),
   discoverRadioDials: vi.fn(),
@@ -54,7 +56,7 @@ function createPrefs(values = {}) {
   };
 }
 
-function createActions(prefs) {
+function createActions(prefs, auth = { signedIn: true }) {
   const onPlayerSelected = vi.fn(async () => {});
   const onRadioDialSelected = vi.fn(async () => {});
   const onRegistryStatus = vi.fn();
@@ -62,7 +64,7 @@ function createActions(prefs) {
   return {
     actions: createSettingsActions({
       prefs,
-      auth: { signedIn: true },
+      auth,
       onPlayerSelected,
       onRadioDialSelected,
       onRegistryStatus,
@@ -79,6 +81,7 @@ describe("settings-actions", () => {
     discoverAccounts.mockResolvedValue([
       { value: "briceburg", label: "Briceburg" },
     ]);
+    discoverAuthStatus.mockResolvedValue({ enabled: false });
     discoverPlayers.mockResolvedValue([
       { value: "living-room", label: "Living Room" },
     ]);
@@ -131,5 +134,33 @@ describe("settings-actions", () => {
       "https://registry.example/api/",
     );
     expect(onRadioDialSelected).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads a player while signed out when registry auth is disabled", async () => {
+    const prefs = createPrefs();
+    const { actions, onPlayerSelected } = createActions(prefs, {
+      signedIn: false,
+    });
+
+    await actions.sync();
+
+    expect(discoverPlayers).toHaveBeenCalled();
+    expect(discoverPlayer).toHaveBeenCalled();
+    expect(onPlayerSelected).toHaveBeenCalledWith(PLAYER);
+  });
+
+  it("hides players while signed out when registry auth is enabled", async () => {
+    discoverAuthStatus.mockResolvedValue({ enabled: true });
+    const prefs = createPrefs();
+    const { actions, onPlayerSelected } = createActions(prefs, {
+      signedIn: false,
+    });
+
+    await actions.sync();
+
+    expect(discoverPlayers).not.toHaveBeenCalled();
+    expect(discoverPlayer).not.toHaveBeenCalled();
+    expect(prefs.setOptions).toHaveBeenCalledWith("playerId", []);
+    expect(onPlayerSelected).toHaveBeenCalledWith(null);
   });
 });

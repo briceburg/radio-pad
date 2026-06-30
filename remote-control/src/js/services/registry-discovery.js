@@ -92,6 +92,25 @@ export async function discoverAccounts(registryUrl, auth = null, options = {}) {
   return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
+export async function discoverAuthStatus(registryUrl, options = {}) {
+  if (!registryUrl) return null;
+
+  const url = new URL(
+    "auth/status",
+    resolveRegistryBaseUrl(registryUrl),
+  ).toString();
+  const response = await fetch(url, buildRequestOptions(null, options.signal));
+  if (!response.ok) {
+    throw new RegistryRequestError({ url, status: response.status });
+  }
+
+  const status = await response.json();
+  if (typeof status?.enabled !== "boolean") {
+    throw new Error("Invalid registry auth status response.");
+  }
+  return status;
+}
+
 export async function discoverPlayers(
   accountId,
   registryUrl,
@@ -99,7 +118,6 @@ export async function discoverPlayers(
   options = {},
 ) {
   if (!(accountId && registryUrl)) return [];
-  if (auth && !auth.signedIn) return [];
 
   const items = await fetchAllPages(
     `accounts/${accountId}/players/`,
@@ -146,7 +164,6 @@ export async function discoverPlayer(
   options = {},
 ) {
   if (!(accountId && playerId && registryUrl)) return null;
-  if (auth && !auth.signedIn) return null;
 
   const url = new URL(
     `accounts/${accountId}/players/${playerId}`,

@@ -18,6 +18,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import {
   discoverAccounts,
+  discoverAuthStatus,
   discoverPlayer,
   discoverPlayers,
   discoverRadioDials,
@@ -63,22 +64,48 @@ export function createSettingsActions({
         const registryUrl = await prefs.get("registryUrl");
         if (!registryUrl) return;
 
+        const [accountsResult, authStatusResult] = await Promise.allSettled([
+          discoverAccounts(registryUrl, auth, options),
+          discoverAuthStatus(registryUrl, options),
+        ]);
         // null means discovery failed; [] means the registry was reachable and returned no items.
-        let accounts = null;
-        try {
-          accounts = await discoverAccounts(registryUrl, auth, options);
-        } catch (err) {
-          noteRegistryFailure("Failed to discover accounts", err);
+        const accounts =
+          accountsResult.status === "fulfilled" ? accountsResult.value : null;
+        const authStatus =
+          authStatusResult.status === "fulfilled"
+            ? authStatusResult.value
+            : null;
+
+        if (accountsResult.status === "rejected") {
+          noteRegistryFailure(
+            "Failed to discover accounts",
+            accountsResult.reason,
+          );
+        }
+        if (authStatusResult.status === "rejected") {
+          noteRegistryFailure(
+            "Failed to discover registry auth status",
+            authStatusResult.reason,
+          );
         }
         if (accounts !== null) {
           await prefs.setOptions("accountId", accounts);
         }
 
         const accountId = (await prefs.get("accountId")) || null;
+        const playerAccessKnown = authStatus !== null;
+        const canAccessPlayers =
+          authStatus?.enabled === false || auth.signedIn;
+        let playerDiscovery = Promise.resolve(null);
+        if (playerAccessKnown) {
+          playerDiscovery = canAccessPlayers
+            ? discoverPlayers(accountId, registryUrl, auth, options)
+            : Promise.resolve([]);
+        }
 
         // Discover APIs natively handle null accountId safely
         const results = await Promise.allSettled([
-          discoverPlayers(accountId, registryUrl, auth, options),
+          playerDiscovery,
           discoverRadioDials(accountId, registryUrl, auth, options),
         ]);
         const players =
@@ -100,39 +127,41 @@ export function createSettingsActions({
         if (radioDials !== null)
           await prefs.setOptions("radioDial", radioDials);
 
-        const playerId = (await prefs.get("playerId")) || null;
-        // Validate against available options, clear if no longer available (e.g. signed out)
-        const resolvedPlayerId = resolveSelection(playerId, players);
-        const playerSelection = resolvedPlayerId
-          ? `${registryUrl} ${accountId}/${resolvedPlayerId}`
-          : null;
+        if (playerAccessKnown) {
+          const playerId = (await prefs.get("playerId")) || null;
+          // Validate against available options, clearing inaccessible selections after sign-out.
+          const resolvedPlayerId = resolveSelection(playerId, players);
+          const playerSelection = resolvedPlayerId
+            ? `${registryUrl} ${accountId}/${resolvedPlayerId}`
+            : null;
 
-        if (resolvedPlayerId) {
-          if (playerSelection !== lastPlayerSelection || !hasSyncedOnce) {
-            let player = null;
-            try {
-              player = await discoverPlayer(
-                accountId,
-                resolvedPlayerId,
-                registryUrl,
-                auth,
-                options,
-              );
-            } catch (err) {
-              noteRegistryFailure("Failed to discover selected player", err);
-            }
+          if (resolvedPlayerId) {
+            if (playerSelection !== lastPlayerSelection || !hasSyncedOnce) {
+              let player = null;
+              try {
+                player = await discoverPlayer(
+                  accountId,
+                  resolvedPlayerId,
+                  registryUrl,
+                  auth,
+                  options,
+                );
+              } catch (err) {
+                noteRegistryFailure("Failed to discover selected player", err);
+              }
 
-            if (player) {
-              await onPlayerSelected(player);
-              lastPlayerSelection = playerSelection;
-            } else if (!registryFailure) {
-              await onPlayerSelected(null);
-              lastPlayerSelection = null;
+              if (player) {
+                await onPlayerSelected(player);
+                lastPlayerSelection = playerSelection;
+              } else if (!registryFailure) {
+                await onPlayerSelected(null);
+                lastPlayerSelection = null;
+              }
             }
+          } else if (lastPlayerSelection !== null || !hasSyncedOnce) {
+            await onPlayerSelected(null);
+            lastPlayerSelection = null;
           }
-        } else if (lastPlayerSelection !== null || !hasSyncedOnce) {
-          await onPlayerSelected(null);
-          lastPlayerSelection = null;
         }
 
         const radioDialKey = (await prefs.get("radioDial")) || null;
