@@ -55,15 +55,14 @@ def build_store(data_dir: Path, *, seed: bool = False) -> DataStore:
 
 def build_client(store: DataStore, auth_services: AuthServices | None = None) -> TestClient:
     from api.types import get_store
-    from lib import constants
+    from lib.constants import API_PREFIX
 
-    constants.PROFILES = ["api"]
-    app = create_app()
+    app = create_app(profiles=["api"])
     app.dependency_overrides[get_store] = lambda: store
     app.state.store = store
     app.state.auth = auth_services or AuthServices(authenticate_user=None, authz_store=None)
     return TestClient(
         app,
         raise_server_exceptions=False,
-        base_url=f"http://testserver{constants.API_PREFIX}/",
+        base_url=f"http://testserver{API_PREFIX}/",
     )

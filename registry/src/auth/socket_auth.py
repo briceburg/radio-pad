@@ -11,7 +11,8 @@ from lib.logging import logger
 async def validate_socket_client(
     request: Request | WebSocket, account_id: str, player_id: str, token: str | None
 ) -> None:
-    if "api" in PROFILES:
+    profiles = getattr(request.app.state, "profiles", PROFILES)
+    if "api" in profiles:
         await validate_local(request, account_id, player_id, token)
     else:
         await validate_remote(request, account_id, player_id, token)
@@ -27,7 +28,7 @@ async def validate_local(request: Request | WebSocket, account_id: str, player_i
 
     try:
         identity = current_identity(services, creds)
-        require_player_control_access(account_id, player_id, ds, identity)
+        require_player_control_access(account_id, player_id, ds, identity, services)
     except Exception as e:
         logger.warning("Local socket validation failed for %s/%s: %s", account_id, player_id, e)
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from e

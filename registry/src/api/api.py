@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request, Response
@@ -16,8 +16,7 @@ from .models import ErrorDetail
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handles application startup and shutdown events."""
-    from lib.constants import PROFILES as profiles
-
+    profiles = app.state.profiles
     if "api" in profiles:
         if not hasattr(app.state, "store"):
             ds = DataStore()
@@ -47,19 +46,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 class RegistryAPI(FastAPI):
-    def __init__(self) -> None:
+    def __init__(self, profiles: Sequence[str] | None = None) -> None:
         super().__init__(
             lifespan=lifespan,
             swagger_ui_parameters={"defaultModelsExpandDepth": 0},
             redirect_slashes=True,
         )
+        if profiles is None:
+            from lib.constants import PROFILES
+
+            profiles = PROFILES
+        self.state.profiles = tuple(profiles)
         self._register_routes()
         self._register_exception_handlers()
         self._register_middleware()
 
     def _register_routes(self) -> None:
-        from lib.constants import PROFILES as profiles
-
+        profiles = self.state.profiles
         if "api" in profiles:
             from lib.constants import API_PREFIX
 

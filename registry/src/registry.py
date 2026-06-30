@@ -1,13 +1,14 @@
 import os
+from collections.abc import Sequence
 
 import uvicorn
 from fastapi import FastAPI
 
 
-def create_app() -> FastAPI:
+def create_app(profiles: Sequence[str] | None = None) -> FastAPI:
     from api import RegistryAPI
 
-    return RegistryAPI()
+    return RegistryAPI(profiles=profiles)
 
 
 app = create_app()
