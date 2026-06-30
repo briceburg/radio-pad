@@ -108,8 +108,10 @@ def require_player_control_access(
     account_id: str,
     player_id: str,
     ds: DS,
-    _identity: Annotated[AuthenticatedIdentity | None, Depends(require_account_owner)],
+    identity: Annotated[AuthenticatedIdentity | None, Depends(current_identity)],
+    services: Annotated[AuthServices, Depends(get_auth_services)],
 ) -> None:
+    require_account_owner(account_id, identity, services)
     get_or_404(
         ds.players.get(player_id, path_params={"account_id": account_id}),
         "Player not found",

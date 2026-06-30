@@ -9,18 +9,19 @@ Those flows are covered by the compose-based integration tests instead.
 
 import time
 from collections.abc import Generator
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
-from lib import constants
 from registry import create_app
+from switchboard.broadcast import Broadcast
 from switchboard.switchboard import (
     ACTIVE_PLAYER_CONNECTIONS,
     _cleared_state_key,
     _state_key,
+    websocket_endpoint,
 )
 
 PLAYER_UA = "RadioPad/1.0 (test)"
@@ -38,11 +39,10 @@ def _close_player(ws: WebSocketTestSession, player_key: str = "acct/player1") ->
 
 
 @pytest.fixture()
-def switchboard_client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
+def switchboard_client() -> Generator[TestClient]:
     """TestClient wired up with switchboard profile."""
-    monkeypatch.setattr(constants, "PROFILES", ["switchboard"])
     ACTIVE_PLAYER_CONNECTIONS.clear()
-    app = create_app()
+    app = create_app(profiles=["switchboard"])
     with TestClient(app) as client:
         yield client
     ACTIVE_PLAYER_CONNECTIONS.clear()
@@ -60,19 +60,20 @@ def test_player_requires_radio_dial_url_header(switchboard_client: TestClient) -
             pass
 
 
-def test_controller_auth_validation_receives_missing_token(
-    switchboard_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_controller_auth_validation_receives_missing_token(monkeypatch: pytest.MonkeyPatch) -> None:
     """Auth validation decides whether a tokenless controller is allowed."""
+    websocket = AsyncMock()
+    websocket.headers = {}
+    websocket.app.state.broadcast = Broadcast()
     validate = AsyncMock()
+    run_loop = AsyncMock()
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
+    monkeypatch.setattr("switchboard.switchboard._run_loop", run_loop)
 
-    with switchboard_client.websocket_connect("switchboard/acct/player1") as ws:
-        ws.send_json({"event": "ping"})
-        assert ws.receive_json() == {"event": "pong"}
+    await websocket_endpoint(websocket, "acct", "player1", token=None)
 
-    validate.assert_awaited_once_with(ANY, "acct", "player1", None)
+    validate.assert_awaited_once_with(websocket, "acct", "player1", None)
+    websocket.accept.assert_awaited_once()
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:
