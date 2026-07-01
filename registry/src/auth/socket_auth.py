@@ -1,8 +1,9 @@
 import httpx2
-from fastapi import Request, WebSocket, WebSocketException, status
+from fastapi import HTTPException, Request, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from api.auth import AuthServices, current_identity, require_player_control_access
+from api.exceptions import NotFoundError
 from datastore import DataStore
 from lib.constants import PROFILES, REGISTRY_URL
 from lib.logging import logger
@@ -29,9 +30,12 @@ async def validate_local(request: Request | WebSocket, account_id: str, player_i
     try:
         identity = current_identity(services, creds)
         require_player_control_access(account_id, player_id, ds, identity, services)
-    except Exception as e:
-        logger.warning("Local socket validation failed for %s/%s: %s", account_id, player_id, e)
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from e
+    except NotFoundError as exc:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from exc
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized access") from exc
+        raise
 
 
 async def validate_remote(request: Request | WebSocket, account_id: str, player_id: str, token: str | None) -> None:

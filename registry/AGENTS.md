@@ -56,6 +56,8 @@ Guidance for coding agents working in `radio-pad/registry`.
 - Checked-in account-owner documents live under `seed-data/auth/accounts/<account>.json`.
 - Reuse the shared `seed_from_path(...)` helper for both public content and authz seed loading so seeding behavior stays consistent across local, S3, and Git backends.
 - When changing auth or control semantics, ensure any root architecture diagrams or related components (player, remote-control) are updated too.
+- At transport boundaries, map expected authentication, authorization, and not-found failures to client errors; map infrastructure and unexpected failures to generic internal errors.
+- Log unexpected failures with stack traces and non-sensitive resource context. Never log bearer tokens, authenticated identities, or authorization allowlists.
 
 ## Testing conventions
 

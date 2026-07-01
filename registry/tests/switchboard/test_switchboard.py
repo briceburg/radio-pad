@@ -76,6 +76,18 @@ async def test_controller_auth_validation_receives_missing_token(monkeypatch: py
     websocket.accept.assert_awaited_once()
 
 
+async def test_controller_auth_internal_error_closes_1011(monkeypatch: pytest.MonkeyPatch) -> None:
+    websocket = AsyncMock()
+    websocket.headers = {}
+    validate = AsyncMock(side_effect=RuntimeError("auth backend unavailable"))
+    monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
+
+    await websocket_endpoint(websocket, "acct", "player1", token=None)
+
+    websocket.close.assert_awaited_once_with(code=1011, reason="Validation internal error")
+    websocket.accept.assert_not_awaited()
+
+
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:
     with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as player:
         with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as duplicate:
