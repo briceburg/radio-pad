@@ -91,12 +91,7 @@ def require_account_owner(
     if services.authz_store.is_account_owner(account_id, identity):
         return identity
 
-    logger.warning("403 Forbidden for %s. Identity: %s", account_id, identity.model_dump())
-    owners = services.authz_store.get_account_owners(account_id)
-    if owners:
-        logger.warning("Account owners allow emails: %s, subjects: %s", owners.emails, owners.subjects)
-    else:
-        logger.warning("No account owners seeded for %s", account_id)
+    logger.warning("Account-owner access denied for %s", account_id)
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
