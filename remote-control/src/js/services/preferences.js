@@ -29,10 +29,6 @@ function isPresent(value) {
   return value !== null && value !== undefined;
 }
 
-function isEmptyValue(value) {
-  return value === null || value === undefined;
-}
-
 function identity(value) {
   return value;
 }
@@ -183,14 +179,11 @@ export class RadioPadPreferences {
       return prepareResult(key, "invalid", value, "normalize_error");
     }
 
-    if (
-      pref.type === "select" &&
-      (isEmptyValue(nextValue) || nextValue === "")
-    ) {
+    if (pref.type === "select" && (!isPresent(nextValue) || nextValue === "")) {
       return prepareResult(key, "unchanged", pref.value ?? null);
     }
 
-    if (isEmptyValue(nextValue)) {
+    if (!isPresent(nextValue)) {
       return prepareResult(key, "invalid", value, "empty_value");
     }
 
@@ -249,27 +242,31 @@ export class RadioPadPreferences {
     };
   }
 
-  async setOptions(key, options) {
+  async setOptions(key, options, { invalidSelection = "first" } = {}) {
     if (!validateOptions(options)) {
       throw new Error(
         "options must be an array of objects with 'label' and 'value' fields.",
+      );
+    }
+    if (!["first", "preserve", "clear"].includes(invalidSelection)) {
+      throw new Error(
+        "invalidSelection must be 'first', 'preserve', or 'clear'.",
       );
     }
 
     const pref = this.preferences[key];
     pref.options = options;
 
-    let selection = null;
-    if (options.length > 0) {
-      const current = await this.get(key);
-      if (!options.some((opt) => opt.value === current)) {
-        selection = await this.set(key, options[0].value);
+    const current = await this.get(key);
+    if (!options.some((opt) => opt.value === current)) {
+      if (invalidSelection === "first" && options.length > 0) {
+        await this.set(key, options[0].value);
+      } else if (invalidSelection === "clear" && isPresent(current)) {
+        pref.value = null;
+        await Preferences.remove({ key });
       }
     }
 
-    return {
-      selection,
-      value: await this.get(key),
-    };
+    return { value: await this.get(key) };
   }
 }

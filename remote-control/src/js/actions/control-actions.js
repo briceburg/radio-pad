@@ -148,7 +148,7 @@ export function createControlActions({ control, listen }) {
       if (tabName === "control") {
         setStatusMap("resourceStatuses", RADIO_DIAL_UNAVAILABLE_STATUS);
       }
-      toastWarning("Failed loading RadioDial.", error);
+      toastWarning("Couldn’t load RadioDial.", error);
       return null;
     }
   }
@@ -247,7 +247,7 @@ export function createControlActions({ control, listen }) {
           );
         const started = await listen.play(station);
         if (!started)
-          return toastWarning("⚠️ Failed starting station playback.");
+          return toastWarning("⚠️ Couldn’t start station playback.");
         return updateTab("listen", { currentStation: callSign });
       }
       control.startPlayback(callSign);

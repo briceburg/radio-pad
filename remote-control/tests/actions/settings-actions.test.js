@@ -49,10 +49,30 @@ function createPrefs(values = {}) {
       radioDial: { options: options.radioDial },
       registryUrl: { value: stored.registryUrl },
     })),
-    setOptions: vi.fn(async (key, nextOptions) => {
-      options[key] = nextOptions;
-      return { value: stored[key] ?? null, selection: null };
+    setMany: vi.fn(async (settingsMap) => {
+      const results = Object.fromEntries(
+        Object.entries(settingsMap).map(([key, value]) => {
+          const status = stored[key] === value ? "unchanged" : "applied";
+          if (status === "applied") stored[key] = value;
+          return [key, { key, value, status }];
+        }),
+      );
+      return { status: "ok", results };
     }),
+    setOptions: vi.fn(
+      async (key, nextOptions, { invalidSelection = "first" } = {}) => {
+        options[key] = nextOptions;
+        const valid = nextOptions.some(
+          (option) => option.value === stored[key],
+        );
+        if (!valid && invalidSelection === "first" && nextOptions.length > 0) {
+          stored[key] = nextOptions[0].value;
+        } else if (!valid && invalidSelection === "clear") {
+          stored[key] = null;
+        }
+        return { value: stored[key] ?? null };
+      },
+    ),
   };
 }
 
@@ -119,6 +139,26 @@ describe("settings-actions", () => {
     );
   });
 
+  it("does not switch to the first replacement on a later refresh", async () => {
+    const prefs = createPrefs();
+    const { actions, onPlayerSelected } = createActions(prefs);
+
+    await actions.sync();
+    onPlayerSelected.mockClear();
+    discoverPlayer.mockClear();
+    discoverPlayers.mockResolvedValue([{ value: "kitchen", label: "Kitchen" }]);
+
+    await actions.sync();
+
+    expect(prefs.setOptions).toHaveBeenCalledWith(
+      "playerId",
+      [{ value: "kitchen", label: "Kitchen" }],
+      { invalidSelection: "preserve" },
+    );
+    expect(discoverPlayer).not.toHaveBeenCalled();
+    expect(onPlayerSelected).toHaveBeenCalledWith(null);
+  });
+
   it("reloads the selected RadioDial on each sync", async () => {
     const prefs = createPrefs({ radioDial: "community/briceburg" });
     discoverRadioDials.mockResolvedValue([
@@ -160,7 +200,45 @@ describe("settings-actions", () => {
 
     expect(discoverPlayers).not.toHaveBeenCalled();
     expect(discoverPlayer).not.toHaveBeenCalled();
-    expect(prefs.setOptions).toHaveBeenCalledWith("playerId", []);
+    expect(prefs.setOptions).toHaveBeenCalledWith("playerId", [], {
+      invalidSelection: "first",
+    });
     expect(onPlayerSelected).toHaveBeenCalledWith(null);
+  });
+
+  it("refreshes a changed account on save and clears invalid dependent selections", async () => {
+    const prefs = createPrefs({ radioDial: "community/briceburg" });
+    discoverAccounts.mockResolvedValue([
+      { value: "briceburg", label: "Briceburg" },
+      { value: "pinecrest", label: "Pinecrest" },
+    ]);
+    discoverPlayers.mockResolvedValue([{ value: "kitchen", label: "Kitchen" }]);
+    discoverRadioDials.mockResolvedValue([
+      { value: "pinecrest/daytime", label: "Daytime" },
+    ]);
+    const { actions, onPlayerSelected, onRadioDialSelected } =
+      createActions(prefs);
+
+    await actions.save({ accountId: "pinecrest" });
+
+    expect(discoverPlayers).toHaveBeenCalledWith(
+      "pinecrest",
+      "https://registry.example/api/",
+      expect.anything(),
+      expect.objectContaining({ fromSettingsSave: true }),
+    );
+    expect(prefs.setOptions).toHaveBeenCalledWith(
+      "playerId",
+      [{ value: "kitchen", label: "Kitchen" }],
+      { invalidSelection: "clear" },
+    );
+    expect(prefs.setOptions).toHaveBeenCalledWith(
+      "radioDial",
+      [{ value: "pinecrest/daytime", label: "Daytime" }],
+      { invalidSelection: "clear" },
+    );
+    expect(discoverPlayer).not.toHaveBeenCalled();
+    expect(onPlayerSelected).toHaveBeenCalledWith(null);
+    expect(onRadioDialSelected).toHaveBeenCalledWith(null);
   });
 });

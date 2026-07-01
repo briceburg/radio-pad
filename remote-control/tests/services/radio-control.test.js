@@ -50,38 +50,36 @@ describe("RadioControl", () => {
     vi.unstubAllEnvs();
   });
 
-  it("resolves switchboard URL override correctly in browser mode", () => {
-    vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
-    const rc = new RadioControl();
-
-    rc.connect("ws://remote-server:9000/player/foo?token=123");
-
-    expect(global.WebSocket).toHaveBeenCalledWith(
-      "ws://localhost:8080/player/foo?token=123",
-    );
-  });
-
-  it("resolves same-origin switchboard overrides correctly in browser mode", () => {
-    vi.stubEnv("VITE_SWITCHBOARD_URL", "/switchboard");
-    const rc = new RadioControl();
-
-    rc.connect("ws://remote-server:9000/switchboard/player/foo?token=123");
-
-    expect(global.WebSocket).toHaveBeenCalledWith(
-      "ws://localhost:3000/switchboard/player/foo?token=123",
-    );
-  });
-
-  it("connect ignores override in native platform", () => {
-    vi.stubEnv("VITE_SWITCHBOARD_URL", "ws://localhost:8080");
-    Capacitor.isNativePlatform.mockReturnValue(true);
-    const rc = new RadioControl();
-
-    rc.connect("ws://remote-server:9000/player/foo?token=123");
-
-    expect(global.WebSocket).toHaveBeenCalledWith(
+  it.each([
+    [
+      "uses an absolute browser override",
+      "ws://localhost:8080",
+      false,
       "ws://remote-server:9000/player/foo?token=123",
-    );
+      "ws://localhost:8080/player/foo?token=123",
+    ],
+    [
+      "resolves a same-origin browser override",
+      "/switchboard",
+      false,
+      "ws://remote-server:9000/switchboard/player/foo?token=123",
+      "ws://localhost:3000/switchboard/player/foo?token=123",
+    ],
+    [
+      "ignores browser overrides on native platforms",
+      "ws://localhost:8080",
+      true,
+      "ws://remote-server:9000/player/foo?token=123",
+      "ws://remote-server:9000/player/foo?token=123",
+    ],
+  ])("%s", (_case, override, isNative, input, expected) => {
+    vi.stubEnv("VITE_SWITCHBOARD_URL", override);
+    Capacitor.isNativePlatform.mockReturnValue(isNative);
+    const rc = new RadioControl();
+
+    rc.connect(input);
+
+    expect(global.WebSocket).toHaveBeenCalledWith(expected);
   });
 
   it.each([
@@ -117,24 +115,49 @@ describe("RadioControl", () => {
     );
   });
 
-  it("emits playback state and RadioDial URL events", () => {
+  it.each([
+    ["playback_state", { call_sign: "WXXI" }, "playbackstate", "WXXI"],
+    [
+      "radio_dial_url",
+      "https://example.test/radio-dial.json",
+      "radiodialurl",
+      "https://example.test/radio-dial.json",
+    ],
+    [
+      "player_presence",
+      { player_id: "living-room", connected: true },
+      "playerpresence",
+      { player_id: "living-room", connected: true },
+    ],
+    [
+      "player_status",
+      { scope: "playback", level: "ok" },
+      "playerstatus",
+      { scope: "playback", level: "ok" },
+    ],
+  ])("maps %s messages to UI events", (message, data, event, expected) => {
     const rc = new RadioControl();
-    const playbackSpy = vi.fn();
-    const radioDialSpy = vi.fn();
-    rc.addEventListener("playbackstate", playbackSpy);
-    rc.addEventListener("radiodialurl", radioDialSpy);
+    const listener = vi.fn();
+    rc.addEventListener(event, listener);
     rc.connect("ws://example.com/");
 
-    receiveEvent(rc, "playback_state", { call_sign: "WXXI" });
-    receiveEvent(rc, "radio_dial_url", "https://example.test/radio-dial.json");
+    receiveEvent(rc, message, data);
 
-    expect(playbackSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: "WXXI" }),
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expected }),
     );
-    expect(radioDialSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        detail: "https://example.test/radio-dial.json",
-      }),
+  });
+
+  it("reports malformed socket messages", () => {
+    const rc = new RadioControl();
+    const listener = vi.fn();
+    rc.addEventListener("error", listener);
+    rc.connect("ws://example.com/");
+
+    rc.ws.onmessage({ data: "not-json" });
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: "Error parsing WebSocket message." }),
     );
   });
 });

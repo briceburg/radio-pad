@@ -50,7 +50,10 @@ export function createSettingsActions({
   let hasSyncedOnce = false;
 
   let syncPromise = null;
-  async function sync(failureReason = "accounts", options = {}) {
+  async function sync(
+    failureReason = "accounts",
+    { invalidDependentSelection, ...options } = {},
+  ) {
     if (syncPromise) return syncPromise;
     syncPromise = (async () => {
       let registryFailure = null;
@@ -120,12 +123,21 @@ export function createSettingsActions({
           );
         }
 
-        if (players !== null) await prefs.setOptions("playerId", players);
+        const dependentOptionPolicy = {
+          invalidSelection:
+            invalidDependentSelection || (hasSyncedOnce ? "preserve" : "first"),
+        };
+        if (players !== null)
+          await prefs.setOptions("playerId", players, dependentOptionPolicy);
         if (radioDials !== null)
-          await prefs.setOptions("radioDial", radioDials);
+          await prefs.setOptions(
+            "radioDial",
+            radioDials,
+            dependentOptionPolicy,
+          );
 
         const playerId = (await prefs.get("playerId")) || null;
-        // Validate against available options, clearing inaccessible selections after sign-out.
+        // Resolve against available options, deactivating inaccessible selections after sign-out.
         const resolvedPlayerId = resolveSelection(playerId, players);
         const playerSelection = resolvedPlayerId
           ? `${registryUrl} ${accountId}/${resolvedPlayerId}`
@@ -219,11 +231,15 @@ export function createSettingsActions({
           (r) => r.status === "invalid",
         );
         const label = prefs.getSnapshot()[invalid.key]?.label || invalid.key;
-        toastDanger(`⚠️ Failed saving settings. Invalid ${label}.`);
+        toastDanger(`⚠️ Couldn’t save settings: ${label} is invalid.`);
         return { status, results };
       }
 
-      await sync("accounts", { fromSettingsSave: true });
+      await sync("accounts", {
+        fromSettingsSave: true,
+        invalidDependentSelection:
+          results.accountId?.status === "applied" ? "clear" : undefined,
+      });
       settingsUiStore.set({ saveState: "saved" });
 
       return { status, results };

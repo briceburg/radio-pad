@@ -40,14 +40,13 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
   }
 
   return {
-    signIn: () =>
-      safeAction(() => auth.signIn(), "⚠️ Failed starting sign-in."),
+    signIn: () => safeAction(() => auth.signIn(), "⚠️ Couldn’t start sign-in."),
 
     async signOut() {
       await safeAction(async () => {
         await auth.signOut();
         toastSuccess("Signed out.");
-      }, "⚠️ Failed signing out.");
+      }, "⚠️ Couldn’t sign out.");
     },
 
     async copyToken() {
@@ -59,7 +58,7 @@ export function createAuthActions({ auth, refreshAccountsForCurrentRegistry }) {
       await safeAction(async () => {
         await navigator.clipboard.writeText(token);
         toastSuccess("Copied API test token.");
-      }, "⚠️ Failed copying API test token.");
+      }, "⚠️ Couldn’t copy API test token.");
     },
   };
 }

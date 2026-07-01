@@ -15,6 +15,16 @@ function createMockListen() {
   return { play: vi.fn(), stop: vi.fn() };
 }
 
+function createActions() {
+  const control = createMockControl();
+  const listen = createMockListen();
+  return {
+    actions: createControlActions({ control, listen }),
+    control,
+    listen,
+  };
+}
+
 const PLAYER = {
   id: "living-room",
   name: "Living Room",
@@ -45,8 +55,7 @@ describe("control-actions", () => {
   });
 
   it("selects a player, connects, and loads its RadioDial", async () => {
-    const control = createMockControl();
-    const listen = createMockListen();
+    const { actions, control } = createActions();
     const radioDial = {
       name: "Casa Briceburg",
       stations: [
@@ -57,8 +66,6 @@ describe("control-actions", () => {
       ok: true,
       json: async () => radioDial,
     });
-
-    const actions = createControlActions({ control, listen });
 
     await actions.selectPlayer(PLAYER);
 
@@ -75,11 +82,7 @@ describe("control-actions", () => {
   });
 
   it("rejects RadioDials with ambiguous call signs", async () => {
-    const control = createMockControl();
-    const actions = createControlActions({
-      control,
-      listen: createMockListen(),
-    });
+    const { actions } = createActions();
     global.fetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -107,11 +110,7 @@ describe("control-actions", () => {
   });
 
   it("reuses an in-flight load when the player reports the configured RadioDial", async () => {
-    const control = createMockControl();
-    const actions = createControlActions({
-      control,
-      listen: createMockListen(),
-    });
+    const { actions, control } = createActions();
     let resolveFetch;
     global.fetch.mockReturnValue(
       new Promise((resolve) => {
@@ -137,11 +136,7 @@ describe("control-actions", () => {
   });
 
   it("loads a different RadioDial reported by the running player", async () => {
-    const control = createMockControl();
-    const actions = createControlActions({
-      control,
-      listen: createMockListen(),
-    });
+    const { actions, control } = createActions();
     global.fetch.mockResolvedValue({
       ok: true,
       json: async () => ({ name: "Empty", stations: [] }),
@@ -162,9 +157,7 @@ describe("control-actions", () => {
   });
 
   it("dispatches explicit playback commands for control stations", async () => {
-    const control = createMockControl();
-    const listen = createMockListen();
-    const actions = createControlActions({ control, listen });
+    const { actions, control } = createActions();
 
     await actions.clickStation("control", "KEXP");
     await actions.stopStation("control");
@@ -178,13 +171,9 @@ describe("control-actions", () => {
       call_sign: "KEXP",
       stream_url: "https://example.test/kexp",
     };
-    const listen = createMockListen();
+    const { actions, listen } = createActions();
     listen.play.mockResolvedValue(true);
     listenStore.set({ radioDial: { stations: [station] } });
-    const actions = createControlActions({
-      control: createMockControl(),
-      listen,
-    });
 
     await actions.clickStation("listen", "KEXP");
 

@@ -24,8 +24,8 @@ import { Capacitor } from "@capacitor/core";
 
 const AUTH_DISABLED_HINTS = {
   init_failed:
-    "Sign-in could not be initialized. Check the Google client configuration and try reloading.",
-  not_configured: "This build does not have account sign-in configured.",
+    "Sign-in couldn’t start. Check the Google client configuration, then reload.",
+  not_configured: "Account sign-in is not configured for this build.",
 };
 
 export class RadioAuth extends RadioElement {
@@ -47,15 +47,16 @@ export class RadioAuth extends RadioElement {
     let identityText = "";
     if (!s.enabled) {
       signInStatus = "Sign-in unavailable";
-      signInHint =
-        AUTH_DISABLED_HINTS[s.reason] || "Sign-in is currently unavailable.";
+      signInHint = AUTH_DISABLED_HINTS[s.reason] || "Sign-in is unavailable.";
     } else if (s.signedIn) {
       signInStatus = "Signed in";
-      signInHint = "Your sign-in updates the Account and Player choices below.";
+      signInHint =
+        "Accounts, players, and RadioDials reflect your current access.";
       identityText = [s.name, s.email, s.subject].filter(Boolean).join(" · ");
     } else {
       signInStatus = "Signed out";
-      signInHint = "Sign in to load the accounts and players you can manage.";
+      signInHint =
+        "Sign in to see the accounts, players, and RadioDials available to you.";
     }
 
     let buttons = "";
