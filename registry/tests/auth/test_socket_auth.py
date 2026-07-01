@@ -123,14 +123,13 @@ async def test_validate_remote_rejects_denied_access(mock_request: AsyncMock, re
     "error",
     [httpx2.ConnectError("Connection refused"), httpx2.TimeoutException("Timeout")],
 )
-async def test_validate_remote_reports_transport_errors(mock_request: AsyncMock, error: httpx2.HTTPError) -> None:
+async def test_validate_remote_preserves_transport_errors(mock_request: AsyncMock, error: httpx2.HTTPError) -> None:
     mock_request.app.state.http_client.get.side_effect = error
 
-    with pytest.raises(WebSocketException) as exc:
+    with pytest.raises(type(error)) as exc:
         await validate_remote(mock_request, "acct", "player1", "token")
 
-    assert exc.value.code == 1011
-    assert "internal error" in exc.value.reason
+    assert exc.value is error
 
 
 async def test_validate_remote_reports_registry_errors(mock_request: AsyncMock) -> None:
@@ -139,8 +138,5 @@ async def test_validate_remote_reports_registry_errors(mock_request: AsyncMock) 
         request=httpx2.Request("GET", "http://test"),
     )
 
-    with pytest.raises(WebSocketException) as exc:
+    with pytest.raises(RuntimeError, match="HTTP 500"):
         await validate_remote(mock_request, "acct", "player1", "token")
-
-    assert exc.value.code == 1011
-    assert "internal error" in exc.value.reason

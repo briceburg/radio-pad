@@ -12,6 +12,7 @@ from collections.abc import Generator
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import WebSocketException
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
@@ -82,9 +83,11 @@ async def test_controller_auth_internal_error_closes_1011(monkeypatch: pytest.Mo
     validate = AsyncMock(side_effect=RuntimeError("auth backend unavailable"))
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
 
-    await websocket_endpoint(websocket, "acct", "player1", token=None)
+    with pytest.raises(WebSocketException) as exc:
+        await websocket_endpoint(websocket, "acct", "player1", token=None)
 
-    websocket.close.assert_awaited_once_with(code=1011, reason="Validation internal error")
+    assert exc.value.code == 1011
+    assert exc.value.reason == "Validation internal error"
     websocket.accept.assert_not_awaited()
 
 

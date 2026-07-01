@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketException
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketException, status
 
 from auth.socket_auth import validate_socket_client
 from switchboard.broadcast import Broadcast
@@ -114,14 +114,11 @@ async def websocket_endpoint(
     if not is_player:
         try:
             await validate_socket_client(websocket, account_id, player_id, token)
-        except WebSocketException as e:
-            logger.warning("Socket auth failed for %s: %s", player_key, e)
-            await websocket.close(code=e.code, reason=e.reason)
-            return
-        except Exception:
+        except WebSocketException:
+            raise
+        except Exception as exc:
             logger.exception("Unexpected socket auth error for %s", player_key)
-            await websocket.close(code=1011, reason="Validation internal error")
-            return
+            raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from exc
     else:
         radio_dial_url = websocket.headers.get("RadioPad-Radio-Dial-Url")
         if not radio_dial_url:
