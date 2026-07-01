@@ -8,6 +8,7 @@ import {
   discoverRadioDials,
   radioDialUrl,
 } from "../../src/js/services/registry-discovery.js";
+import { settingsUiStore, toastStore } from "../../src/js/store.js";
 
 vi.mock("../../src/js/services/registry-discovery.js", () => ({
   discoverAccounts: vi.fn(),
@@ -98,6 +99,8 @@ function createActions(prefs, auth = { signedIn: true }) {
 describe("settings-actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    settingsUiStore.set({ saveState: "idle" });
+    toastStore.set({ id: 0 });
     discoverAccounts.mockResolvedValue([
       { value: "briceburg", label: "Briceburg" },
     ]);
@@ -240,5 +243,65 @@ describe("settings-actions", () => {
     expect(discoverPlayer).not.toHaveBeenCalled();
     expect(onPlayerSelected).toHaveBeenCalledWith(null);
     expect(onRadioDialSelected).toHaveBeenCalledWith(null);
+  });
+
+  it("refreshes saved account choices after an in-flight sync completes", async () => {
+    const prefs = createPrefs();
+    const { actions } = createActions(prefs);
+    discoverAccounts.mockResolvedValue([
+      { value: "briceburg", label: "Briceburg" },
+      { value: "pinecrest", label: "Pinecrest" },
+    ]);
+    let resolveInitialPlayers;
+    discoverPlayers
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveInitialPlayers = resolve;
+        }),
+      )
+      .mockResolvedValueOnce([{ value: "kitchen", label: "Kitchen" }]);
+
+    const initialSync = actions.sync();
+    await vi.waitFor(() =>
+      expect(discoverPlayers).toHaveBeenCalledWith(
+        "briceburg",
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+    const save = actions.save({ accountId: "pinecrest" });
+    resolveInitialPlayers([{ value: "living-room", label: "Living Room" }]);
+
+    await Promise.all([initialSync, save]);
+
+    expect(discoverPlayers).toHaveBeenLastCalledWith(
+      "pinecrest",
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ fromSettingsSave: true }),
+    );
+    expect(discoverPlayers).toHaveBeenCalledTimes(2);
+    expect(settingsUiStore.get().saveState).toBe("saved");
+  });
+
+  it("reports persistence failures and leaves settings retryable", async () => {
+    const error = new Error("storage unavailable");
+    const prefs = createPrefs();
+    prefs.setMany.mockRejectedValue(error);
+    const { actions } = createActions(prefs);
+
+    await expect(actions.save({ accountId: "pinecrest" })).resolves.toEqual({
+      status: "error",
+      error,
+    });
+
+    expect(settingsUiStore.get().saveState).toBe("error");
+    expect(toastStore.get()).toMatchObject({
+      summary: "Couldn’t save settings.",
+      error,
+      severity: "danger",
+    });
+    expect(discoverAccounts).not.toHaveBeenCalled();
   });
 });

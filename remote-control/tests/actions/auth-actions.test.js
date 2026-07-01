@@ -82,7 +82,7 @@ describe("auth-actions", () => {
     await actions.signIn();
 
     expect(toastStore.get()).toMatchObject({
-      summary: "⚠️ Couldn’t start sign-in.",
+      summary: "Couldn’t start sign-in.",
       error,
       severity: "danger",
     });

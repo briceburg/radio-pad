@@ -113,7 +113,7 @@ describe("RadioPadAuth", () => {
     });
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({
-        detail: { summary: "⚠️ Sign-in unavailable.", error },
+        detail: { summary: "Sign-in unavailable.", error },
       }),
     );
   });

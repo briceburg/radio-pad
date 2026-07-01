@@ -78,7 +78,7 @@ export class RadioAuth extends RadioElement {
 
     return html`
       <ion-item lines="none">
-        <ion-label color="tertiary">
+        <ion-label color="tertiary" role="status" aria-live="polite">
           <h3 id="auth-status">${signInStatus}</h3>
           <p id="auth-hint">${signInHint}</p>
           ${identityText

@@ -59,7 +59,6 @@ export const toastStore = atom({
   error: null,
   format: "default",
   severity: "warning",
-  persistent: true,
 });
 
 export function updateStore(store, updater) {

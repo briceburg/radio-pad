@@ -85,6 +85,21 @@ describe("RadioPadPreferences", () => {
     expect(Preferences.set).not.toHaveBeenCalled();
   });
 
+  it("does not update in-memory state before storage succeeds", async () => {
+    const prefs = createPlayerPreferences();
+    Preferences.set.mockRejectedValueOnce(new Error("storage unavailable"));
+
+    await expect(prefs.set("playerId", "living-room")).rejects.toThrow(
+      "storage unavailable",
+    );
+    expect(prefs.getSnapshot().playerId.value).toBeUndefined();
+
+    await expect(prefs.set("playerId", "living-room")).resolves.toMatchObject({
+      status: "applied",
+    });
+    expect(prefs.getSnapshot().playerId.value).toBe("living-room");
+  });
+
   it.each([
     ["first", "kitchen", "set"],
     ["preserve", "living-room", null],

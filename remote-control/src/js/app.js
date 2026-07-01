@@ -86,5 +86,5 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
   console.error("Failed bootstrapping remote control app", error);
-  toastDanger("⚠️ Couldn’t start remote control.", error);
+  toastDanger("Couldn’t start remote control.", error);
 });

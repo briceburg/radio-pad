@@ -52,9 +52,12 @@ export function createSettingsActions({
   let syncPromise = null;
   async function sync(
     failureReason = "accounts",
-    { invalidDependentSelection, ...options } = {},
+    { invalidDependentSelection, refreshAfterCurrent = false, ...options } = {},
   ) {
-    if (syncPromise) return syncPromise;
+    if (syncPromise) {
+      if (!refreshAfterCurrent) return syncPromise;
+      await syncPromise;
+    }
     syncPromise = (async () => {
       let registryFailure = null;
       const noteRegistryFailure = (message, error) => {
@@ -223,7 +226,15 @@ export function createSettingsActions({
 
     async save(settingsMap) {
       settingsUiStore.set({ saveState: "saving" });
-      const { status, results } = await prefs.setMany(settingsMap);
+      let result;
+      try {
+        result = await prefs.setMany(settingsMap);
+      } catch (error) {
+        settingsUiStore.set({ saveState: "error" });
+        toastDanger("Couldn’t save settings.", error);
+        return { status: "error", error };
+      }
+      const { status, results } = result;
 
       if (status !== "ok") {
         settingsUiStore.set({ saveState: "error" });
@@ -231,12 +242,13 @@ export function createSettingsActions({
           (r) => r.status === "invalid",
         );
         const label = prefs.getSnapshot()[invalid.key]?.label || invalid.key;
-        toastDanger(`⚠️ Couldn’t save settings: ${label} is invalid.`);
+        toastDanger(`Couldn’t save settings: ${label} is invalid.`);
         return { status, results };
       }
 
       await sync("accounts", {
         fromSettingsSave: true,
+        refreshAfterCurrent: true,
         invalidDependentSelection:
           results.accountId?.status === "applied" ? "clear" : undefined,
       });

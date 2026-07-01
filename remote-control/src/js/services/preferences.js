@@ -208,8 +208,8 @@ export class RadioPadPreferences {
     }
 
     const pref = this.preferences[result.key];
-    pref.value = result.value;
     await Preferences.set({ key: result.key, value: result.value });
+    pref.value = result.value;
     return result;
   }
 
@@ -265,8 +265,8 @@ export class RadioPadPreferences {
       if (invalidSelection === "first" && options.length > 0) {
         await this.set(key, options[0].value);
       } else if (invalidSelection === "clear" && isPresent(current)) {
-        pref.value = null;
         await Preferences.remove({ key });
+        pref.value = null;
       }
     }
 
