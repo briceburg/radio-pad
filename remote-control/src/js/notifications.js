@@ -17,22 +17,42 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { toastStore, updateStore } from "./store.js";
+import { formatErrorMessage, RegistryRequestError } from "./utils/errors.js";
 
-function showToast(summary, options = {}) {
+const TOAST_SEVERITY = {
+  danger: {
+    header: "Error",
+    duration: 10000,
+    position: "top",
+  },
+  warning: {
+    header: "Warning",
+    duration: 8000,
+    position: "top",
+  },
+  success: {
+    header: "Success",
+    duration: 3000,
+    position: "bottom",
+  },
+};
+
+function showToast(
+  summary,
+  { error = null, format = "default", severity = "warning" } = {},
+) {
   updateStore(toastStore, (toast) => ({
     id: toast.id + 1,
     summary,
-    error: options.error || null,
-    format: options.format || "default",
-    severity: options.severity || "warning",
-    persistent: options.persistent ?? true,
+    error,
+    format,
+    severity,
   }));
 }
 
 export function toastDanger(summary, error = null) {
   showToast(summary, {
     error,
-    persistent: true,
     severity: "danger",
   });
 }
@@ -40,62 +60,47 @@ export function toastDanger(summary, error = null) {
 export function toastWarning(summary, error = null) {
   showToast(summary, {
     error,
-    persistent: true,
     severity: "warning",
   });
 }
 
 export function registrySummary(summary, { fromSettingsSave = false } = {}) {
   if (!fromSettingsSave) return summary;
-  const detail = summary.replace(/^⚠️\s*/, "").trim();
+  const detail = summary.trim();
   if (!detail)
     return "Settings saved, but registry data couldn’t be refreshed.";
   return `Settings saved, but ${detail[0].toLowerCase()}${detail.slice(1)}`;
 }
 
 const REGISTRY_FAILURE_MESSAGES = {
-  accounts: "⚠️ Couldn’t refresh accounts.",
-  auth_accounts: "⚠️ Couldn’t refresh accounts after signing in or out.",
-  account_choices: "⚠️ Couldn’t refresh all players and RadioDials.",
-  player: "⚠️ Couldn’t refresh player details.",
+  accounts: "Couldn’t refresh accounts.",
+  auth_accounts: "Couldn’t refresh accounts after signing in or out.",
+  account_choices: "Couldn’t refresh all players and RadioDials.",
+  player: "Couldn’t refresh player details.",
 };
 
-function registryFailureMessage(reason = "accounts") {
-  return (
-    REGISTRY_FAILURE_MESSAGES[reason] || REGISTRY_FAILURE_MESSAGES.accounts
-  );
-}
-
 export function toastRegistryFailure(reason, error, options = {}) {
-  showToast(registrySummary(registryFailureMessage(reason), options), {
+  const summary =
+    REGISTRY_FAILURE_MESSAGES[reason] || REGISTRY_FAILURE_MESSAGES.accounts;
+  showToast(registrySummary(summary, options), {
     error,
     format: "registry",
-    persistent: true,
     severity: "warning",
   });
 }
 
 export function toastSuccess(summary) {
-  showToast(summary, {
-    persistent: false,
-    severity: "success",
-  });
+  showToast(summary, { severity: "success" });
 }
-
-import { formatErrorMessage, RegistryRequestError } from "./utils/errors.js";
 
 async function presentToast(notification) {
   const toast = document.querySelector("#global-toast");
   if (!toast || !notification?.summary) return;
 
-  const TOAST_SEVERITY = {
-    danger: { color: "danger", duration: 0, position: "top" },
-    warning: { color: "warning", duration: 0, position: "top" },
-    success: { color: "success", duration: 3000, position: "bottom" },
-  };
-
-  const config =
-    TOAST_SEVERITY[notification.severity] || TOAST_SEVERITY.warning;
+  const severity = TOAST_SEVERITY[notification.severity]
+    ? notification.severity
+    : "warning";
+  const config = TOAST_SEVERITY[severity];
   const detailText =
     notification.format === "registry"
       ? RegistryRequestError.format(notification.error)
@@ -104,22 +109,29 @@ async function presentToast(notification) {
     ? `${notification.summary} ${detailText}`.trim()
     : notification.summary;
 
+  await toast.dismiss();
+  toast.header = config.header;
   toast.message = message;
-  toast.duration = notification.persistent ? 0 : config.duration;
-  toast.color = config.color;
-  toast.buttons = notification.persistent
-    ? [{ text: "Dismiss", role: "cancel" }]
-    : [];
+  toast.duration = config.duration;
+  toast.color = severity;
+  toast.buttons =
+    severity === "success" ? [] : [{ text: "Dismiss", role: "cancel" }];
   toast.position = config.position;
+  toast.positionAnchor =
+    config.position === "bottom" ? "main-tab-bar" : undefined;
+  toast.swipeGesture = "vertical";
   await toast.present();
 }
 
 export function initNotifications() {
-  let lastToastId = 0;
-  toastStore.subscribe((notification) => {
+  let lastToastId = toastStore.get().id;
+  let presentation = Promise.resolve();
+  return toastStore.subscribe((notification) => {
     if (notification.id !== lastToastId) {
       lastToastId = notification.id;
-      void presentToast(notification).catch(console.error);
+      presentation = presentation
+        .then(() => presentToast(notification))
+        .catch(console.error);
     }
   });
 }

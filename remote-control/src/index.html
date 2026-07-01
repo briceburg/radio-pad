@@ -21,7 +21,7 @@
     <ion-app>
       <ion-tabs>
         <!-- navbar -->
-        <ion-tab-bar slot="bottom">
+        <ion-tab-bar id="main-tab-bar" slot="bottom">
           <ion-tab-button tab="control">
             <ion-icon aria-hidden="true" name="radio-outline"></ion-icon>
             <ion-label>Control</ion-label>
@@ -53,7 +53,9 @@
         <ion-tab tab="settings">
           <ion-header>
             <ion-toolbar>
-              <ion-title size="large"> Settings </ion-title>
+              <ion-title size="large" role="heading" aria-level="1">
+                Settings
+              </ion-title>
             </ion-toolbar>
           </ion-header>
           <ion-content class="ion-padding">

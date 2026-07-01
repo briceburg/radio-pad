@@ -246,8 +246,7 @@ export function createControlActions({ control, listen }) {
             (candidate) => candidate.call_sign === callSign,
           );
         const started = await listen.play(station);
-        if (!started)
-          return toastWarning("⚠️ Couldn’t start station playback.");
+        if (!started) return toastWarning("Couldn’t start station playback.");
         return updateTab("listen", { currentStation: callSign });
       }
       control.startPlayback(callSign);

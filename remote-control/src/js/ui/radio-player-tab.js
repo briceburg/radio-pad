@@ -184,6 +184,7 @@ export class RadioPlayerTab extends RadioElement {
                   <ion-button
                     expand="block"
                     color=${color}
+                    aria-pressed=${String(isActive)}
                     @click=${() => this._onSelectStation(station.call_sign)}
                   >
                     ${station.call_sign}
@@ -233,11 +234,15 @@ export class RadioPlayerTab extends RadioElement {
         : s.playerConnected === false
           ? "Offline"
           : "...");
+    const pageTitle = this.tabName === "control" ? "Control" : "Listen";
+    const title = titleName ? `${titleName}: ${nowPlaying}` : pageTitle;
 
     return html`
       <ion-header>
         <ion-toolbar>
-          <ion-title size="large"> ${titleName}: ${nowPlaying} </ion-title>
+          <ion-title size="large" role="heading" aria-level="1">
+            ${title}
+          </ion-title>
           <ion-buttons slot="end">
             <ion-button
               shape="round"
@@ -257,7 +262,9 @@ export class RadioPlayerTab extends RadioElement {
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <div class="ion-text-center">${statusText}</div>
+        <div class="ion-text-center" role="status" aria-live="polite">
+          ${statusText}
+        </div>
         <ion-grid>${content}</ion-grid>
       </ion-content>
     `;
