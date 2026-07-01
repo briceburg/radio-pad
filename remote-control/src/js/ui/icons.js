@@ -17,6 +17,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 export {
+  chevronDown,
+  chevronForward,
   construct,
   headset,
   headsetOutline,

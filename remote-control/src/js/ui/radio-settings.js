@@ -24,7 +24,12 @@ import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
 
 const ACCOUNT_GROUP_KEY = "radio-account";
+const ADVANCED_GROUP_KEY = "radio-advanced";
 const ACCOUNT_DEPENDENT_KEYS = new Set(["playerId", "radioDial"]);
+const EMPTY_OPTION_MESSAGES = {
+  playerId: "No players are available for this account.",
+  radioDial: "No RadioDials are available for this account.",
+};
 
 const SETTINGS_SAVE_STATES = {
   idle: { label: "Save", color: null, disabled: false, busy: "false" },
@@ -71,11 +76,18 @@ export function preferenceValues(preferences, draftValues = {}) {
   );
 }
 
+function hasPreferenceChanges(preferences, values) {
+  return Object.entries(values).some(
+    ([key, value]) => value !== (preferences[key]?.value ?? ""),
+  );
+}
+
 export class RadioSettings extends RadioElement {
   prefsController = new StoreController(this, preferencesStore);
   uiController = new StoreController(this, settingsUiStore);
   draftValues = {};
   previousSaveState = undefined;
+  advancedExpanded = false;
 
   willUpdate() {
     const saveState = this.uiController.value.saveState;
@@ -98,13 +110,22 @@ export class RadioSettings extends RadioElement {
   }
 
   _onSave() {
-    this._emit(
-      "settings-save",
-      preferenceValues(
-        this.prefsController.value.definitions || {},
-        this.draftValues,
-      ),
-    );
+    const preferences = this.prefsController.value.definitions || {};
+    const values = preferenceValues(preferences, this.draftValues);
+    if (!hasPreferenceChanges(preferences, values)) return;
+
+    this._emit("settings-save", values);
+  }
+
+  _toggleAdvanced() {
+    this.advancedExpanded = !this.advancedExpanded;
+    this.requestUpdate();
+  }
+
+  _onAdvancedKeydown(event) {
+    if (!["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    this._toggleAdvanced();
   }
 
   renderInput(pref, value) {
@@ -145,11 +166,36 @@ export class RadioSettings extends RadioElement {
     return "";
   }
 
-  renderGroupHeader(label, icon) {
+  renderGroupHeader(groupKey, label, icon) {
+    const advanced = groupKey === ADVANCED_GROUP_KEY;
     return html`
-      <ion-item-divider color="tertiary">
+      <ion-item-divider
+        id=${advanced ? "advanced-toggle" : null}
+        class=${advanced ? "settings-group-toggle" : null}
+        color="tertiary"
+        role=${advanced ? "button" : null}
+        tabindex=${advanced ? "0" : null}
+        aria-controls=${advanced ? `settings-group-${groupKey}` : null}
+        aria-expanded=${advanced ? String(this.advancedExpanded) : null}
+        aria-label=${advanced
+          ? `${this.advancedExpanded ? "Hide" : "Show"} Advanced settings`
+          : null}
+        @click=${advanced ? () => this._toggleAdvanced() : null}
+        @keydown=${advanced ? (event) => this._onAdvancedKeydown(event) : null}
+      >
         <ion-icon name="${icon}" slot="start"></ion-icon>
         <ion-label>${label}</ion-label>
+        ${advanced
+          ? html`
+              <span slot="end">${this.advancedExpanded ? "Hide" : "Show"}</span>
+              <ion-icon
+                slot="end"
+                name=${this.advancedExpanded
+                  ? "chevron-down"
+                  : "chevron-forward"}
+              ></ion-icon>
+            `
+          : ""}
       </ion-item-divider>
     `;
   }
@@ -178,16 +224,51 @@ export class RadioSettings extends RadioElement {
     const visiblePrefs = getVisiblePreferences(preferences).filter(
       (pref) => !accountChangePending || !ACCOUNT_DEPENDENT_KEYS.has(pref.key),
     );
+    const emptyPreference =
+      !accountChangePending && values.accountId
+        ? preferences.find(
+            (pref) =>
+              EMPTY_OPTION_MESSAGES[pref.key] &&
+              (pref.options?.length || 0) === 0,
+          )
+        : null;
 
-    if (visiblePrefs.length === 0 && groupKey !== ACCOUNT_GROUP_KEY) {
+    if (
+      visiblePrefs.length === 0 &&
+      groupKey !== ACCOUNT_GROUP_KEY &&
+      !emptyPreference
+    ) {
       return "";
     }
 
+    const groupCollapsed =
+      groupKey === ADVANCED_GROUP_KEY && !this.advancedExpanded;
+    const content = html`
+      ${this.renderPreferenceItems(visiblePrefs, values)}
+      ${emptyPreference
+        ? html`
+            <ion-item
+              id="empty-${emptyPreference.key}"
+              lines="none"
+              color="light"
+            >
+              <ion-label color="medium">
+                ${EMPTY_OPTION_MESSAGES[emptyPreference.key]}
+              </ion-label>
+            </ion-item>
+          `
+        : ""}
+    `;
+
     return html`
       <ion-item-group>
-        ${this.renderGroupHeader(label, icon)}
+        ${this.renderGroupHeader(groupKey, label, icon)}
         ${groupKey === ACCOUNT_GROUP_KEY ? html`<radio-auth></radio-auth>` : ""}
-        ${this.renderPreferenceItems(visiblePrefs, values)}
+        ${groupKey === ADVANCED_GROUP_KEY
+          ? html`<div id="settings-group-${groupKey}" ?hidden=${groupCollapsed}>
+              ${content}
+            </div>`
+          : content}
         ${groupKey === ACCOUNT_GROUP_KEY && accountChangePending
           ? html`
               <ion-item id="account-save-required" lines="none" color="light">
@@ -212,6 +293,7 @@ export class RadioSettings extends RadioElement {
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
     const values = preferenceValues(preferences, this.draftValues);
+    const hasChanges = hasPreferenceChanges(preferences, values);
     const accountChangePending =
       values.accountId !== (preferences.accountId?.value ?? "");
 
@@ -235,7 +317,7 @@ export class RadioSettings extends RadioElement {
         id="settings-save-button"
         expand="block"
         color=${saveState.color || "primary"}
-        .disabled=${saveState.disabled}
+        .disabled=${saveState.disabled || !hasChanges}
         aria-busy=${saveState.busy}
         data-save-state=${saveStateRaw}
         @click=${() => this._onSave()}
