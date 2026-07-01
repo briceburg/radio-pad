@@ -45,9 +45,11 @@ export function toastWarning(summary, error = null) {
   });
 }
 
-function registrySummary(summary, { fromSettingsSave = false } = {}) {
+export function registrySummary(summary, { fromSettingsSave = false } = {}) {
   if (!fromSettingsSave) return summary;
   const detail = summary.replace(/^⚠️\s*/, "").trim();
+  if (!detail)
+    return "Settings saved, but registry data couldn’t be refreshed.";
   return `Settings saved, but ${detail[0].toLowerCase()}${detail.slice(1)}`;
 }
 

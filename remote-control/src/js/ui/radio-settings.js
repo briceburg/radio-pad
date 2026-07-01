@@ -18,7 +18,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import { html } from "lit";
 import { RadioElement } from "./radio-element.js";
-import { keyed } from "lit/directives/keyed.js";
 import { StoreController } from "@nanostores/lit";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
@@ -87,7 +86,6 @@ export class RadioSettings extends RadioElement {
   uiController = new StoreController(this, settingsUiStore);
   draftValues = {};
   previousSaveState = undefined;
-  advancedExpanded = false;
 
   willUpdate() {
     const saveState = this.uiController.value.saveState;
@@ -100,7 +98,7 @@ export class RadioSettings extends RadioElement {
   _onChange(pref, event) {
     this.draftValues = {
       ...this.draftValues,
-      [pref.key]: event.detail?.value ?? event.target?.value ?? "",
+      [pref.key]: event.detail.value ?? "",
     };
     this.requestUpdate();
 
@@ -117,85 +115,47 @@ export class RadioSettings extends RadioElement {
     this._emit("settings-save", values);
   }
 
-  _toggleAdvanced() {
-    this.advancedExpanded = !this.advancedExpanded;
-    this.requestUpdate();
-  }
-
-  _onAdvancedKeydown(event) {
-    if (!["Enter", " "].includes(event.key)) return;
-    event.preventDefault();
-    this._toggleAdvanced();
-  }
-
   renderInput(pref, value) {
     if (pref.type === "text") {
       return html`<ion-input
         id="pref-${pref.key}"
+        .label=${pref.label}
+        label-placement="stacked"
         placeholder="${pref.placeholder || ""}"
         .value=${value}
         .disabled=${this.uiController.value.saveState === "saving"}
         @ionInput=${(event) => this._onChange(pref, event)}
-        @ionChange=${(event) => this._onChange(pref, event)}
       ></ion-input>`;
     }
     if (pref.type === "select") {
       const options = pref.options || [];
-      // Use the 'keyed' directive to force Lit to completely destroy and re-create
-      // the Ionic component when options change so it doesn't freeze the slot
-      const optionsKey = options.map((o) => o.value).join(",");
-      return keyed(
-        optionsKey,
-        html`
-          <ion-select
-            id="pref-${pref.key}"
-            .value=${value}
-            .disabled=${this.uiController.value.saveState === "saving"}
-            @ionChange=${(event) => this._onChange(pref, event)}
-          >
-            ${options.map(
-              (opt) =>
-                html`<ion-select-option value="${opt.value}"
-                  >${opt.label}</ion-select-option
-                >`,
-            )}
-          </ion-select>
-        `,
-      );
+      return html`
+        <ion-select
+          id="pref-${pref.key}"
+          .label=${pref.label}
+          label-placement="stacked"
+          .placeholder=${pref.placeholder || ""}
+          .value=${value}
+          .disabled=${this.uiController.value.saveState === "saving"}
+          @ionChange=${(event) => this._onChange(pref, event)}
+        >
+          ${options.map(
+            (opt) =>
+              html`<ion-select-option value="${opt.value}"
+                >${opt.label}</ion-select-option
+              >`,
+          )}
+        </ion-select>
+      `;
     }
     return "";
   }
 
-  renderGroupHeader(groupKey, label, icon) {
-    const advanced = groupKey === ADVANCED_GROUP_KEY;
+  renderGroupHeader(label, icon) {
     return html`
-      <ion-item-divider
-        id=${advanced ? "advanced-toggle" : null}
-        class=${advanced ? "settings-group-toggle" : null}
-        color="tertiary"
-        role=${advanced ? "button" : null}
-        tabindex=${advanced ? "0" : null}
-        aria-controls=${advanced ? `settings-group-${groupKey}` : null}
-        aria-expanded=${advanced ? String(this.advancedExpanded) : null}
-        aria-label=${advanced
-          ? `${this.advancedExpanded ? "Hide" : "Show"} Advanced settings`
-          : null}
-        @click=${advanced ? () => this._toggleAdvanced() : null}
-        @keydown=${advanced ? (event) => this._onAdvancedKeydown(event) : null}
-      >
-        <ion-icon name="${icon}" slot="start"></ion-icon>
+      <ion-item-divider color="tertiary">
+        <ion-icon aria-hidden="true" name="${icon}" slot="start"></ion-icon>
         <ion-label>${label}</ion-label>
-        ${advanced
-          ? html`
-              <span slot="end">${this.advancedExpanded ? "Hide" : "Show"}</span>
-              <ion-icon
-                slot="end"
-                name=${this.advancedExpanded
-                  ? "chevron-down"
-                  : "chevron-forward"}
-              ></ion-icon>
-            `
-          : ""}
       </ion-item-divider>
     `;
   }
@@ -204,9 +164,6 @@ export class RadioSettings extends RadioElement {
     return preferences.map(
       (pref) => html`
         <ion-item lines="full">
-          <ion-label position="stacked" color="tertiary"
-            >${pref.label}</ion-label
-          >
           ${this.renderInput(pref, values[pref.key])}
         </ion-item>
       `,
@@ -241,8 +198,6 @@ export class RadioSettings extends RadioElement {
       return "";
     }
 
-    const groupCollapsed =
-      groupKey === ADVANCED_GROUP_KEY && !this.advancedExpanded;
     const content = html`
       ${this.renderPreferenceItems(visiblePrefs, values)}
       ${emptyPreference
@@ -260,19 +215,39 @@ export class RadioSettings extends RadioElement {
         : ""}
     `;
 
+    if (groupKey === ADVANCED_GROUP_KEY) {
+      return html`
+        <ion-item-group>
+          <ion-accordion-group>
+            <ion-accordion value="advanced">
+              <ion-item slot="header" color="tertiary" lines="none">
+                <ion-icon
+                  aria-hidden="true"
+                  name="${icon}"
+                  slot="start"
+                ></ion-icon>
+                <ion-label>${label}</ion-label>
+              </ion-item>
+              <div slot="content">${content}</div>
+            </ion-accordion>
+          </ion-accordion-group>
+        </ion-item-group>
+      `;
+    }
+
     return html`
       <ion-item-group>
-        ${this.renderGroupHeader(groupKey, label, icon)}
+        ${this.renderGroupHeader(label, icon)}
         ${groupKey === ACCOUNT_GROUP_KEY ? html`<radio-auth></radio-auth>` : ""}
-        ${groupKey === ADVANCED_GROUP_KEY
-          ? html`<div id="settings-group-${groupKey}" ?hidden=${groupCollapsed}>
-              ${content}
-            </div>`
-          : content}
+        ${content}
         ${groupKey === ACCOUNT_GROUP_KEY && accountChangePending
           ? html`
               <ion-item id="account-save-required" lines="none" color="light">
-                <ion-icon name="information-circle" slot="start"></ion-icon>
+                <ion-icon
+                  aria-hidden="true"
+                  name="information-circle"
+                  slot="start"
+                ></ion-icon>
                 <ion-label class="ion-text-wrap">
                   <h3>Save this account change</h3>
                   <p>

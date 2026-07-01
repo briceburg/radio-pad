@@ -80,6 +80,7 @@ const DEFAULT_PREFERENCES = {
   accountId: {
     type: "select",
     label: "Account",
+    placeholder: "Choose an account",
     options: [],
     group: "radio-account",
   },
@@ -105,12 +106,14 @@ const DEFAULT_PREFERENCES = {
   playerId: {
     type: "select",
     label: "Player",
+    placeholder: "Choose a player",
     options: [],
     group: "radio-control",
   },
   radioDial: {
     type: "select",
     label: "RadioDial",
+    placeholder: "Choose a RadioDial",
     options: [],
     group: "radio-listen",
   },

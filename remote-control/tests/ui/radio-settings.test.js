@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getVisiblePreferences,
   groupPreferencesByGroup,
@@ -21,6 +21,7 @@ const SETTINGS_DEFINITIONS = {
   playerId: {
     type: "select",
     label: "Player",
+    placeholder: "Choose a player",
     value: "living-room",
     options: [{ value: "living-room", label: "Living Room" }],
     group: "radio-control",
@@ -39,6 +40,8 @@ const SETTINGS_DEFINITIONS = {
     group: "radio-advanced",
   },
 };
+
+afterEach(() => document.body.replaceChildren());
 
 async function renderSettings(overrides = {}) {
   const definitions = Object.fromEntries(
@@ -118,6 +121,9 @@ describe("radio-settings helpers", () => {
     expect(saveButton.disabled).toBe(true);
 
     const account = element.querySelector("#pref-accountId");
+    expect(element.querySelector("#pref-playerId").placeholder).toBe(
+      "Choose a player",
+    );
     account.dispatchEvent(
       new CustomEvent("ionChange", { detail: { value: "pinecrest" } }),
     );
@@ -160,36 +166,59 @@ describe("radio-settings helpers", () => {
     element.remove();
   });
 
-  it("collapses Advanced settings without losing its draft", async () => {
+  it("uses an Ionic accordion for Advanced without losing its draft", async () => {
     const element = await renderSettings();
-    const toggle = element.querySelector("#advanced-toggle");
-    const advanced = element.querySelector("#settings-group-radio-advanced");
+    const accordion = element.querySelector("ion-accordion[value=advanced]");
+    const header = accordion.querySelector("ion-item[slot=header]");
+    const content = accordion.querySelector("[slot=content]");
 
-    expect(advanced.hidden).toBe(true);
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(toggle.getAttribute("aria-label")).toBe("Show Advanced settings");
+    expect(accordion.closest("ion-accordion-group")).not.toBeNull();
+    expect(header.getAttribute("color")).toBe("tertiary");
+    expect(header.querySelector("ion-icon")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(content.querySelector("#pref-registryUrl").label).toBe(
+      "Registry URL",
+    );
 
-    toggle.click();
-    await element.updateComplete;
-    expect(advanced.hidden).toBe(false);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(toggle.getAttribute("aria-label")).toBe("Hide Advanced settings");
-
-    element.querySelector("#pref-registryUrl").dispatchEvent(
+    content.querySelector("#pref-registryUrl").dispatchEvent(
       new CustomEvent("ionInput", {
         detail: { value: "https://new-registry.example/api/" },
       }),
     );
     await element.updateComplete;
-    toggle.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
-    await element.updateComplete;
-    expect(advanced.hidden).toBe(true);
 
     const onSave = vi.fn();
     element.addEventListener("settings-save", onSave);
     element.querySelector("#settings-save-button").click();
     expect(onSave.mock.calls[0][0].detail.registryUrl).toBe(
       "https://new-registry.example/api/",
+    );
+    element.remove();
+  });
+
+  it("updates select options without replacing the Ionic control", async () => {
+    const element = await renderSettings();
+    const select = element.querySelector("#pref-playerId");
+
+    preferencesStore.set({
+      definitions: {
+        ...SETTINGS_DEFINITIONS,
+        playerId: {
+          ...SETTINGS_DEFINITIONS.playerId,
+          value: "kitchen",
+          options: [{ value: "kitchen", label: "Kitchen" }],
+        },
+      },
+    });
+    await element.updateComplete;
+
+    expect(element.querySelector("#pref-playerId")).toBe(select);
+    expect(
+      select.querySelector("ion-select-option").getAttribute("value"),
+    ).toBe("kitchen");
+    expect(select.querySelector("ion-select-option").textContent).toContain(
+      "Kitchen",
     );
     element.remove();
   });
