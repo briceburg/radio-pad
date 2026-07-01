@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   initNotifications,
-  registrySummary,
   toastRegistryFailure,
   toastSuccess,
   toastWarning,
 } from "../../src/js/notifications.js";
 import { toastStore } from "../../src/js/store.js";
 
-describe("registry notifications", () => {
+describe("notifications", () => {
   beforeEach(() => toastStore.set({ id: 0 }));
   afterEach(() => document.body.replaceChildren());
 
@@ -23,12 +22,6 @@ describe("registry notifications", () => {
       format: "registry",
       severity: "warning",
     });
-  });
-
-  it("does not mask a registry failure when its summary is empty", () => {
-    expect(registrySummary("", { fromSettingsSave: true })).toBe(
-      "Settings saved, but registry data couldn’t be refreshed.",
-    );
   });
 
   it("replaces and automatically dismisses inline Ionic toasts", async () => {

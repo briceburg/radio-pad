@@ -7,8 +7,8 @@
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "prettier --check src/",
-    "lint:fix": "prettier --write src/",
+    "lint": "prettier --check src/ tests/ vite.config.mjs package.json README.md AGENTS.md",
+    "lint:fix": "prettier --write src/ tests/ vite.config.mjs package.json README.md AGENTS.md",
     "test": "vitest run",
     "test:watch": "vitest"
   },

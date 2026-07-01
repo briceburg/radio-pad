@@ -228,7 +228,6 @@ describe("settings-actions", () => {
       "pinecrest",
       "https://registry.example/api/",
       expect.anything(),
-      expect.objectContaining({ fromSettingsSave: true }),
     );
     expect(prefs.setOptions).toHaveBeenCalledWith(
       "playerId",
@@ -267,7 +266,6 @@ describe("settings-actions", () => {
         "briceburg",
         expect.anything(),
         expect.anything(),
-        expect.anything(),
       ),
     );
     const save = actions.save({ accountId: "pinecrest" });
@@ -279,7 +277,6 @@ describe("settings-actions", () => {
       "pinecrest",
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ fromSettingsSave: true }),
     );
     expect(discoverPlayers).toHaveBeenCalledTimes(2);
     expect(settingsUiStore.get().saveState).toBe("saved");

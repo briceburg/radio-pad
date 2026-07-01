@@ -52,16 +52,12 @@ export function createSettingsActions({
   let syncPromise = null;
   async function sync(
     failureReason = "accounts",
-    { invalidDependentSelection, refreshAfterCurrent = false, ...options } = {},
+    { invalidDependentSelection, fromSettingsSave = false } = {},
   ) {
-    if (syncPromise) {
-      if (!refreshAfterCurrent) return syncPromise;
-      await syncPromise;
-    }
+    if (syncPromise) return syncPromise;
     syncPromise = (async () => {
       let registryFailure = null;
       const noteRegistryFailure = (message, error) => {
-        if (error?.name === "AbortError") throw error;
         console.warn(message, error);
         if (!registryFailure) registryFailure = error;
       };
@@ -71,8 +67,8 @@ export function createSettingsActions({
         if (!registryUrl) return;
 
         const [accountsResult, authEnabledResult] = await Promise.allSettled([
-          discoverAccounts(registryUrl, auth, options),
-          discoverAuthEnabled(registryUrl, options),
+          discoverAccounts(registryUrl, auth),
+          discoverAuthEnabled(registryUrl),
         ]);
         // null means discovery failed; [] means the registry was reachable and returned no items.
         const accounts =
@@ -104,12 +100,12 @@ export function createSettingsActions({
           ? Promise.resolve(null)
           : authEnabled && !auth.signedIn
             ? Promise.resolve([])
-            : discoverPlayers(accountId, registryUrl, auth, options);
+            : discoverPlayers(accountId, registryUrl, auth);
 
         // Discover APIs natively handle null accountId safely
         const results = await Promise.allSettled([
           playerDiscovery,
-          discoverRadioDials(accountId, registryUrl, auth, options),
+          discoverRadioDials(accountId, registryUrl, auth),
         ]);
         const players =
           results[0].status === "fulfilled" ? results[0].value : null;
@@ -155,7 +151,6 @@ export function createSettingsActions({
                 resolvedPlayerId,
                 registryUrl,
                 auth,
-                options,
               );
             } catch (err) {
               noteRegistryFailure("Failed to discover selected player", err);
@@ -187,16 +182,16 @@ export function createSettingsActions({
 
         if (registryFailure) {
           onRegistryStatus(REGISTRY_UNAVAILABLE_STATUS);
-          toastRegistryFailure(failureReason, registryFailure, options);
+          toastRegistryFailure(failureReason, registryFailure, {
+            fromSettingsSave,
+          });
         } else {
           onRegistryStatus(REGISTRY_OK_STATUS);
         }
       } catch (error) {
-        if (error.name !== "AbortError") {
-          onRegistryStatus(REGISTRY_UNAVAILABLE_STATUS);
-          toastRegistryFailure(failureReason, error, options);
-          if (!registryFailure) registryFailure = error;
-        }
+        onRegistryStatus(REGISTRY_UNAVAILABLE_STATUS);
+        toastRegistryFailure(failureReason, error, { fromSettingsSave });
+        if (!registryFailure) registryFailure = error;
       } finally {
         if (!hasSyncedOnce && !registryFailure) {
           await onPlayerSelected(null);
@@ -208,6 +203,11 @@ export function createSettingsActions({
       }
     })();
     return syncPromise;
+  }
+
+  async function syncAfterCurrent(failureReason, options) {
+    if (syncPromise) await syncPromise;
+    return sync(failureReason, options);
   }
 
   return {
@@ -246,9 +246,8 @@ export function createSettingsActions({
         return { status, results };
       }
 
-      await sync("accounts", {
+      await syncAfterCurrent("accounts", {
         fromSettingsSave: true,
-        refreshAfterCurrent: true,
         invalidDependentSelection:
           results.accountId?.status === "applied" ? "clear" : undefined,
       });
@@ -263,11 +262,6 @@ export function createSettingsActions({
       }
     },
 
-    refreshAccountsForCurrentRegistry(
-      failureReason = "accounts",
-      options = {},
-    ) {
-      return sync(failureReason, options);
-    },
+    refreshAccountsForCurrentRegistry: sync,
   };
 }

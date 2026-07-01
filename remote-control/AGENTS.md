@@ -2,8 +2,8 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 ## Project shape
 
-- Ionic + Capacitor + `lit-html` remote control UI.
-- `lit-html` is used declaratively for XSS-safe DOM bindings (do not use raw `.innerHTML` or `.innerText` assignments).
+- Ionic + Capacitor + Lit web-component UI.
+- Lit templates provide declarative, XSS-safe DOM bindings (do not use raw `.innerHTML` or `.innerText` assignments).
 - Services directly inherit native `EventTarget` (no custom emitters needed).
 - Web and native builds intentionally share most code.
 
@@ -11,7 +11,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 - Run local web dev with `npm start`.
 - Validate production bundling with `npm run build`.
-- Formatting/linting uses `npm run lint` (`prettier --check src/`).
+- Formatting/linting uses `npm run lint` (Prettier checks source, tests, config, and component Markdown).
 - Run headless logic tests via `npm test` or `npm run test:watch`.
 
 ## Auth conventions
@@ -46,7 +46,10 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 - Keep platform-specific behavior explicit only where the plugin or native project metadata requires it.
 - Prefer small helpers over broad auth rewrites; the shared Google sign-in path should stay easy to reason about.
-- Preserve the grouped Settings UI structure (`ion-item-group` + `ion-item-divider`) when adjusting auth/settings presentation.
+- Keep Settings edits as component-local drafts until explicit Save; account-dependent discovery and active Control changes
+  occur only after Save.
+- Preserve the grouped Settings UI. Standard groups use `ion-item-group` + `ion-item-divider`; Advanced uses Ionic's
+  `ion-accordion` within an item group.
 - Persist qualified RadioDial identities in preferences and derive resource URLs
   from the current registry URL. Do not persist URLs as RadioDial identity.
 - Treat `radio_dial_url` as the source URL reported by a running player.
