@@ -152,15 +152,11 @@ export class RadioPlayerTab extends RadioElement {
         <ion-text color="medium">
           <h2>No ${noun} selected</h2>
         </ion-text>
-        <p>
-          Please select a ${noun} from the
-          <ion-icon name="settings-outline"></ion-icon>
-          <strong>Settings</strong> tab to begin.
-        </p>
+        <p>Choose a ${noun} in <strong>Settings</strong> to begin.</p>
         ${this.tabName === "control"
           ? html`<ion-text color="medium">
               <p class="ion-margin-top text-sm">
-                Note: You may need to sign in to access private players.
+                You may need to sign in to access private players.
               </p>
             </ion-text>`
           : ""}

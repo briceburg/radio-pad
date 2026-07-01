@@ -1,59 +1,119 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Preferences } from "@capacitor/preferences";
 import { RadioPadPreferences } from "../../src/js/services/preferences.js";
 
-// Mock Capacitor Preferences
 vi.mock("@capacitor/preferences", () => ({
   Preferences: {
-    get: vi.fn().mockResolvedValue({ value: null }),
-    set: vi.fn().mockResolvedValue(),
-    remove: vi.fn().mockResolvedValue()
-  }
+    get: vi.fn(),
+    set: vi.fn(),
+    remove: vi.fn(),
+  },
 }));
 
-// Mock import.meta.env
-vi.stubEnv('VITE_REGISTRY_URL', 'https://registry.radiopad.dev/api/');
+function createPlayerPreferences() {
+  return new RadioPadPreferences({
+    playerId: {
+      type: "select",
+      label: "Player",
+      options: [{ value: "living-room", label: "Living Room" }],
+    },
+  });
+}
 
 describe("RadioPadPreferences", () => {
-  it("initializes with default URL preference", async () => {
-    const prefs = new RadioPadPreferences();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Preferences.get.mockResolvedValue({ value: null });
+    Preferences.set.mockResolvedValue();
+    Preferences.remove.mockResolvedValue();
+  });
+
+  it("initializes and persists default values", async () => {
+    const prefs = new RadioPadPreferences({
+      registryUrl: {
+        type: "text",
+        default: "https://registry.example/api/",
+      },
+    });
+
     await prefs.init();
-    
-    const snapshot = prefs.getSnapshot();
-    expect(snapshot.registryUrl.value).toContain("registry.radiopad.dev");
+
+    expect(prefs.getSnapshot().registryUrl.value).toBe(
+      "https://registry.example/api/",
+    );
+    expect(Preferences.set).toHaveBeenCalledWith({
+      key: "registryUrl",
+      value: "https://registry.example/api/",
+    });
   });
 
-  it("normalizes preferences correctly", () => {
-    const prefs = new RadioPadPreferences();
-    const result = prefs.prepare("registryUrl", "localhost:3000");
-    
-    // Automatically Prepends https if missing
-    expect(result.status).toBe("applied");
-    expect(result.value).toBe("https://localhost:3000/");
+  it.each([
+    ["adds an HTTPS scheme", "localhost:3000", "https://localhost:3000/"],
+    ["accepts same-origin paths", "/api", "/api/"],
+    [
+      "preserves query and hash",
+      "https://example.com/api?x=1#frag",
+      "https://example.com/api/?x=1#frag",
+    ],
+  ])("normalizes Registry URLs: %s", (_case, value, expected) => {
+    const result = new RadioPadPreferences().prepare("registryUrl", value);
+
+    expect(result).toMatchObject({ status: "applied", value: expected });
   });
 
-  it("accepts same-origin relative registry paths", () => {
-    const prefs = new RadioPadPreferences();
-    const result = prefs.prepare("registryUrl", "/api");
+  it("rejects invalid Registry URLs", () => {
+    const result = new RadioPadPreferences().prepare(
+      "registryUrl",
+      "http://:3000",
+    );
 
-    expect(result.status).toBe("applied");
-    expect(result.value).toBe("/api/");
+    expect(result).toMatchObject({
+      status: "invalid",
+      reason: "validation_failed",
+    });
   });
 
-  it("preserves query and hash while normalizing absolute URLs", () => {
+  it("does not partially persist an invalid settings batch", async () => {
     const prefs = new RadioPadPreferences();
-    const result = prefs.prepare("registryUrl", "https://example.com/api?x=1#frag");
 
-    expect(result.status).toBe("applied");
-    expect(result.value).toBe("https://example.com/api/?x=1#frag");
-  });
+    const result = await prefs.setMany({
+      accountId: "pinecrest",
+      registryUrl: "http://:3000",
+    });
 
-  it("fails validation for invalid preferences", () => {
-    const prefs = new RadioPadPreferences();
-    // The previous test failed because "https://not_a_valid_url_at_all" is legally parsed by `new URL()` as having a hostname! 
-    // Let's use an actually un-parseable URL string or check normalization behavior.
-    const result = prefs.prepare("registryUrl", "http://:3000"); // Missing hostname causes URL parser to throw
-    
     expect(result.status).toBe("invalid");
-    expect(result.reason).toBe("validation_failed");
+    expect(Preferences.set).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["first", "kitchen", "set"],
+    ["preserve", "living-room", null],
+    ["clear", null, "remove"],
+  ])(
+    "%s reconciles an invalid option selection",
+    async (invalidSelection, expected, storageAction) => {
+      const prefs = createPlayerPreferences();
+      await prefs.set("playerId", "living-room");
+      vi.clearAllMocks();
+
+      await prefs.setOptions(
+        "playerId",
+        [{ value: "kitchen", label: "Kitchen" }],
+        { invalidSelection },
+      );
+
+      expect(await prefs.get("playerId")).toBe(expected);
+      if (storageAction === "set") {
+        expect(Preferences.set).toHaveBeenCalledWith({
+          key: "playerId",
+          value: "kitchen",
+        });
+      } else if (storageAction === "remove") {
+        expect(Preferences.remove).toHaveBeenCalledWith({ key: "playerId" });
+      } else {
+        expect(Preferences.set).not.toHaveBeenCalled();
+        expect(Preferences.remove).not.toHaveBeenCalled();
+      }
+    },
+  );
 });

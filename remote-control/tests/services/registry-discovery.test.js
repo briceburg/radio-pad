@@ -16,14 +16,12 @@ describe("Registry Discovery", () => {
   });
 
   it("discoverAccounts handles basic pagination", async () => {
-    // Mock the first fetch response containing a 'next' link
     global.fetch.mockResolvedValueOnce(
       page([{ id: "acct1", name: "Account One" }], {
         next: "/v1/accounts?page=2",
       }),
     );
 
-    // Mock the second fetch response (no next link)
     global.fetch.mockResolvedValueOnce(
       page([{ id: "acct2", name: "Account Two" }]),
     );
@@ -31,11 +29,22 @@ describe("Registry Discovery", () => {
     const accounts = await discoverAccounts("http://mock-registry");
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    // Should extract map { value, label } output correctly
     expect(accounts).toEqual([
       { value: "acct1", label: "Account One" },
       { value: "acct2", label: "Account Two" },
     ]);
+  });
+
+  it("attaches registry bearer tokens to authenticated discovery", async () => {
+    global.fetch.mockResolvedValueOnce(page([]));
+    const auth = { getRegistryBearerToken: () => "token" };
+
+    await discoverAccounts("/api/", auth);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:3000/api/accounts/",
+      { headers: { Authorization: "Bearer token" } },
+    );
   });
 
   it("discoverAccounts resolves relative registry paths against the browser origin", async () => {
@@ -83,6 +92,21 @@ describe("Registry Discovery", () => {
       configured_radio_dial_url:
         "http://localhost:3000/api/accounts/community/radio-dials/briceburg",
       switchboard_url: "ws://localhost:3000/switchboard/briceburg/living-room",
+    });
+  });
+
+  it("preserves an explicit player switchboard URL", async () => {
+    global.fetch.mockResolvedValueOnce(
+      response({
+        id: "living-room",
+        switchboard_url: "wss://switchboard.example/player/living-room",
+      }),
+    );
+
+    await expect(
+      discoverPlayer("briceburg", "living-room", "/api/"),
+    ).resolves.toMatchObject({
+      switchboard_url: "wss://switchboard.example/player/living-room",
     });
   });
 

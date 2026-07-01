@@ -63,7 +63,7 @@ export class RegistryRequestError extends Error {
     }
     const msg = formatErrorMessage(error, "Unknown registry error");
     if (msg === "Network connection failed.") {
-      return "Unable to connect. Please verify your Registry URL in Settings.";
+      return "Unable to connect. Check your Registry URL in Settings.";
     }
     return msg;
   }

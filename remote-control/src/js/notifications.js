@@ -46,16 +46,16 @@ export function toastWarning(summary, error = null) {
 }
 
 function registrySummary(summary, { fromSettingsSave = false } = {}) {
-  return fromSettingsSave
-    ? `Saved settings. ${summary.replace(/^⚠️\s*/, "").trim()}`
-    : summary;
+  if (!fromSettingsSave) return summary;
+  const detail = summary.replace(/^⚠️\s*/, "").trim();
+  return `Settings saved, but ${detail[0].toLowerCase()}${detail.slice(1)}`;
 }
 
 const REGISTRY_FAILURE_MESSAGES = {
-  accounts: "⚠️ Failed refreshing accounts.",
-  auth_accounts: "⚠️ Failed refreshing accounts after auth change.",
-  account_choices: "⚠️ Failed refreshing account players and RadioDials.",
-  player: "⚠️ Failed refreshing player info.",
+  accounts: "⚠️ Couldn’t refresh accounts.",
+  auth_accounts: "⚠️ Couldn’t refresh accounts after signing in or out.",
+  account_choices: "⚠️ Couldn’t refresh all players and RadioDials.",
+  player: "⚠️ Couldn’t refresh player details.",
 };
 
 function registryFailureMessage(reason = "accounts") {

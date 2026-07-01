@@ -24,13 +24,14 @@ import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
 
 const ACCOUNT_GROUP_KEY = "radio-account";
+const ACCOUNT_DEPENDENT_KEYS = new Set(["playerId", "radioDial"]);
 
 const SETTINGS_SAVE_STATES = {
   idle: { label: "Save", color: null, disabled: false, busy: "false" },
-  saving: { label: "Saving...", color: "medium", disabled: true, busy: "true" },
+  saving: { label: "Saving…", color: "medium", disabled: true, busy: "true" },
   saved: { label: "Saved", color: "success", disabled: false, busy: "false" },
   error: {
-    label: "Retry Save",
+    label: "Retry save",
     color: "danger",
     disabled: false,
     busy: "false",
@@ -57,38 +58,64 @@ export function getVisiblePreferences(preferences = []) {
   });
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+export function preferenceValues(preferences, draftValues = {}) {
+  return Object.fromEntries(
+    Object.entries(preferences).map(([key, pref]) => [
+      key,
+      hasOwn(draftValues, key) ? draftValues[key] : (pref.value ?? ""),
+    ]),
+  );
+}
+
 export class RadioSettings extends RadioElement {
   prefsController = new StoreController(this, preferencesStore);
   uiController = new StoreController(this, settingsUiStore);
+  draftValues = {};
+  previousSaveState = undefined;
 
-  _onChange() {
+  willUpdate() {
+    const saveState = this.uiController.value.saveState;
+    if (saveState === "saved" && this.previousSaveState !== "saved") {
+      this.draftValues = {};
+    }
+    this.previousSaveState = saveState;
+  }
+
+  _onChange(pref, event) {
+    this.draftValues = {
+      ...this.draftValues,
+      [pref.key]: event.detail?.value ?? event.target?.value ?? "",
+    };
+    this.requestUpdate();
+
     if (this.uiController.value.saveState !== "saving") {
       this._emit("settings-edited");
     }
   }
 
   _onSave() {
-    const settingsList = this.querySelector("#settings-list");
-    if (!settingsList) return;
-
-    const settingsMap = Object.fromEntries(
-      [...settingsList.querySelectorAll("ion-input, ion-select")]
-        .map((input) => [input.id?.replace(/^pref-/, ""), input.value])
-        .filter(([key]) => key),
+    this._emit(
+      "settings-save",
+      preferenceValues(
+        this.prefsController.value.definitions || {},
+        this.draftValues,
+      ),
     );
-    this._emit("settings-save", settingsMap);
   }
 
   renderInput(pref, value) {
     if (pref.type === "text") {
-      // Use string interpolation (attribute) instead of Lit property binding (.value)
-      // preventing the component from overriding user drafts when the save state triggers UI re-renders!
       return html`<ion-input
         id="pref-${pref.key}"
         placeholder="${pref.placeholder || ""}"
-        value="${value}"
-        @ionInput=${() => this._onChange()}
-        @ionChange=${() => this._onChange()}
+        .value=${value}
+        .disabled=${this.uiController.value.saveState === "saving"}
+        @ionInput=${(event) => this._onChange(pref, event)}
+        @ionChange=${(event) => this._onChange(pref, event)}
       ></ion-input>`;
     }
     if (pref.type === "select") {
@@ -101,8 +128,9 @@ export class RadioSettings extends RadioElement {
         html`
           <ion-select
             id="pref-${pref.key}"
-            value="${value}"
-            @ionChange=${() => this._onChange()}
+            .value=${value}
+            .disabled=${this.uiController.value.saveState === "saving"}
+            @ionChange=${(event) => this._onChange(pref, event)}
           >
             ${options.map(
               (opt) =>
@@ -117,7 +145,7 @@ export class RadioSettings extends RadioElement {
     return "";
   }
 
-  renderGroupHeader(groupKey, label, icon) {
+  renderGroupHeader(label, icon) {
     return html`
       <ion-item-divider color="tertiary">
         <ion-icon name="${icon}" slot="start"></ion-icon>
@@ -126,21 +154,30 @@ export class RadioSettings extends RadioElement {
     `;
   }
 
-  renderPreferenceItems(preferences, { lines = "full" } = {}) {
+  renderPreferenceItems(preferences, values) {
     return preferences.map(
       (pref) => html`
-        <ion-item lines=${lines}>
+        <ion-item lines="full">
           <ion-label position="stacked" color="tertiary"
             >${pref.label}</ion-label
           >
-          ${this.renderInput(pref, pref.value ?? "")}
+          ${this.renderInput(pref, values[pref.key])}
         </ion-item>
       `,
     );
   }
 
-  renderPreferenceGroup(groupKey, label, icon, preferences) {
-    const visiblePrefs = getVisiblePreferences(preferences);
+  renderPreferenceGroup(
+    groupKey,
+    label,
+    icon,
+    preferences,
+    values,
+    accountChangePending,
+  ) {
+    const visiblePrefs = getVisiblePreferences(preferences).filter(
+      (pref) => !accountChangePending || !ACCOUNT_DEPENDENT_KEYS.has(pref.key),
+    );
 
     if (visiblePrefs.length === 0 && groupKey !== ACCOUNT_GROUP_KEY) {
       return "";
@@ -148,9 +185,23 @@ export class RadioSettings extends RadioElement {
 
     return html`
       <ion-item-group>
-        ${this.renderGroupHeader(groupKey, label, icon)}
+        ${this.renderGroupHeader(label, icon)}
         ${groupKey === ACCOUNT_GROUP_KEY ? html`<radio-auth></radio-auth>` : ""}
-        ${this.renderPreferenceItems(visiblePrefs)}
+        ${this.renderPreferenceItems(visiblePrefs, values)}
+        ${groupKey === ACCOUNT_GROUP_KEY && accountChangePending
+          ? html`
+              <ion-item id="account-save-required" lines="none" color="light">
+                <ion-icon name="information-circle" slot="start"></ion-icon>
+                <ion-label class="ion-text-wrap">
+                  <h3>Save this account change</h3>
+                  <p>
+                    Player and RadioDial options will refresh after saving. Your
+                    current player stays active until then.
+                  </p>
+                </ion-label>
+              </ion-item>
+            `
+          : ""}
       </ion-item-group>
     `;
   }
@@ -160,6 +211,9 @@ export class RadioSettings extends RadioElement {
     const saveStateRaw = this.uiController.value.saveState;
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
+    const values = preferenceValues(preferences, this.draftValues);
+    const accountChangePending =
+      values.accountId !== (preferences.accountId?.value ?? "");
 
     const prefByGroup = groupPreferencesByGroup(preferences);
 
@@ -171,6 +225,8 @@ export class RadioSettings extends RadioElement {
             label,
             icon,
             prefByGroup[groupKey] || [],
+            values,
+            accountChangePending,
           ),
         )}
       </ion-list>
