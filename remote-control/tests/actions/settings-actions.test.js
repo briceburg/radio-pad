@@ -282,6 +282,33 @@ describe("settings-actions", () => {
     expect(settingsUiStore.get().saveState).toBe("saved");
   });
 
+  it("refreshes access-dependent choices after auth changes during a sync", async () => {
+    const auth = { signedIn: false };
+    const prefs = createPrefs();
+    const { actions } = createActions(prefs, auth);
+    discoverAuthEnabled.mockResolvedValue(true);
+    let resolveInitialRadioDials;
+    discoverRadioDials
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveInitialRadioDials = resolve;
+        }),
+      )
+      .mockResolvedValueOnce([]);
+
+    const initialSync = actions.sync();
+    await vi.waitFor(() => expect(discoverRadioDials).toHaveBeenCalledOnce());
+
+    auth.signedIn = true;
+    const authRefresh =
+      actions.refreshAccountsForCurrentRegistry("auth_accounts");
+    resolveInitialRadioDials([]);
+    await Promise.all([initialSync, authRefresh]);
+
+    expect(discoverRadioDials).toHaveBeenCalledTimes(2);
+    expect(discoverPlayers).toHaveBeenCalledOnce();
+  });
+
   it("reports persistence failures and leaves settings retryable", async () => {
     const error = new Error("storage unavailable");
     const prefs = createPrefs();
