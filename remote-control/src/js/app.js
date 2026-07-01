@@ -80,10 +80,7 @@ async function bootstrap() {
 
   const wasOauthCallback = await settingsActions.initialize();
   if (wasOauthCallback) {
-    const settingsTab = document.querySelector(
-      'ion-tab-button[tab="settings"]',
-    );
-    if (settingsTab) setTimeout(() => settingsTab.click(), 100);
+    await document.querySelector("ion-tabs")?.select("settings");
   }
 }
 

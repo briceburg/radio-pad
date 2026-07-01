@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { toastRegistryFailure } from "../../src/js/notifications.js";
+import {
+  registrySummary,
+  toastRegistryFailure,
+} from "../../src/js/notifications.js";
 import { toastStore } from "../../src/js/store.js";
 
 describe("registry notifications", () => {
@@ -16,5 +19,11 @@ describe("registry notifications", () => {
       format: "registry",
       severity: "warning",
     });
+  });
+
+  it("does not mask a registry failure when its summary is empty", () => {
+    expect(registrySummary("", { fromSettingsSave: true })).toBe(
+      "Settings saved, but registry data couldn’t be refreshed.",
+    );
   });
 });

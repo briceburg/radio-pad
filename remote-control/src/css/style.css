@@ -13,16 +13,6 @@
   font-size: 0.9em;
 }
 
-.settings-group-toggle {
-  cursor: pointer;
-  user-select: none;
-}
-
-.settings-group-toggle:focus-visible {
-  outline: 2px solid var(--ion-color-tertiary-contrast, #fff);
-  outline-offset: -2px;
-}
-
 ion-row.station-placeholder ion-skeleton-text {
   height: 2em;
   width: 100%;

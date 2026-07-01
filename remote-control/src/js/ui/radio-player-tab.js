@@ -145,6 +145,7 @@ export class RadioPlayerTab extends RadioElement {
     return html`
       <div class="ion-text-center ion-padding ion-margin-top">
         <ion-icon
+          aria-hidden="true"
           class="icon-hero"
           color="medium"
           name="radio-outline"
@@ -246,7 +247,11 @@ export class RadioPlayerTab extends RadioElement {
               @click=${() => this._onStopStation()}
               aria-label="Stop playback"
             >
-              <ion-icon slot="icon-only" name="stop"></ion-icon>
+              <ion-icon
+                aria-hidden="true"
+                slot="icon-only"
+                name="stop"
+              ></ion-icon>
             </ion-button>
           </ion-buttons>
         </ion-toolbar>
