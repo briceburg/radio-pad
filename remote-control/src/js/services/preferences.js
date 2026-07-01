@@ -269,7 +269,5 @@ export class RadioPadPreferences {
         pref.value = null;
       }
     }
-
-    return { value: await this.get(key) };
   }
 }

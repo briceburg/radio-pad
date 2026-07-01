@@ -85,12 +85,7 @@ export function getStationVisualState(tabName, state) {
   return "normal";
 }
 
-export function getStationButtonColor(visualState, isActive) {
-  if (isActive) return "success";
-  return visualState === "warning" ? "warning" : "primary";
-}
-
-function renderSkeleton(visualState = "loading") {
+function renderSkeleton(visualState) {
   const rows = [1, 2, 3];
   const cssClass =
     visualState === "warning"
@@ -178,7 +173,11 @@ export class RadioPlayerTab extends RadioElement {
           <ion-row>
             ${row.map((station) => {
               const isActive = station.call_sign === currentStation;
-              const color = getStationButtonColor(visualState, isActive);
+              const color = isActive
+                ? "success"
+                : visualState === "warning"
+                  ? "warning"
+                  : "primary";
               return html`
                 <ion-col size="4">
                   <ion-button

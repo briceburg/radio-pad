@@ -64,25 +64,22 @@ export function toastWarning(summary, error = null) {
   });
 }
 
-export function registrySummary(summary, { fromSettingsSave = false } = {}) {
-  if (!fromSettingsSave) return summary;
-  const detail = summary.trim();
-  if (!detail)
-    return "Settings saved, but registry data couldn’t be refreshed.";
-  return `Settings saved, but ${detail[0].toLowerCase()}${detail.slice(1)}`;
-}
-
-const REGISTRY_FAILURE_MESSAGES = {
-  accounts: "Couldn’t refresh accounts.",
-  auth_accounts: "Couldn’t refresh accounts after signing in or out.",
-  account_choices: "Couldn’t refresh all players and RadioDials.",
-  player: "Couldn’t refresh player details.",
+const REGISTRY_FAILURE_ACTIONS = {
+  accounts: "refresh accounts",
+  auth_accounts: "refresh accounts after signing in or out",
+  account_choices: "refresh all players and RadioDials",
+  player: "refresh player details",
 };
 
-export function toastRegistryFailure(reason, error, options = {}) {
-  const summary =
-    REGISTRY_FAILURE_MESSAGES[reason] || REGISTRY_FAILURE_MESSAGES.accounts;
-  showToast(registrySummary(summary, options), {
+export function toastRegistryFailure(
+  reason,
+  error,
+  { fromSettingsSave = false } = {},
+) {
+  const action =
+    REGISTRY_FAILURE_ACTIONS[reason] || REGISTRY_FAILURE_ACTIONS.accounts;
+  const prefix = fromSettingsSave ? "Settings saved, but couldn’t" : "Couldn’t";
+  showToast(`${prefix} ${action}.`, {
     error,
     format: "registry",
     severity: "warning",

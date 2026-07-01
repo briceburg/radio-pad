@@ -15,7 +15,8 @@ export default defineConfig({
     host: "0.0.0.0",
     proxy: {
       "/api": {
-        target: trimEnv("RADIOPAD_REGISTRY_PROXY_TARGET") || "http://localhost:1980",
+        target:
+          trimEnv("RADIOPAD_REGISTRY_PROXY_TARGET") || "http://localhost:1980",
         changeOrigin: true,
       },
       "/switchboard": {
@@ -33,5 +34,5 @@ export default defineConfig({
     environment: "jsdom",
     include: ["tests/**/*.test.js", "tests/**/*.spec.js"],
     globals: true,
-  }
+  },
 });

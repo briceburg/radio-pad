@@ -31,25 +31,11 @@ const EMPTY_OPTION_MESSAGES = {
 };
 
 const SETTINGS_SAVE_STATES = {
-  idle: { label: "Save", color: null, disabled: false, busy: "false" },
-  saving: { label: "Saving…", color: "medium", disabled: true, busy: "true" },
-  saved: { label: "Saved", color: "success", disabled: false, busy: "false" },
-  error: {
-    label: "Retry save",
-    color: "danger",
-    disabled: false,
-    busy: "false",
-  },
+  idle: { label: "Save" },
+  saving: { label: "Saving…", color: "medium" },
+  saved: { label: "Saved", color: "success" },
+  error: { label: "Retry save", color: "danger" },
 };
-
-export function groupPreferencesByGroup(preferences = {}) {
-  return Object.entries(preferences).reduce((groups, [key, pref]) => {
-    const groupKey = pref.group || "default";
-    groups[groupKey] = groups[groupKey] || [];
-    groups[groupKey].push({ ...pref, key });
-    return groups;
-  }, {});
-}
 
 export function getVisiblePreferences(preferences = []) {
   return preferences.filter((pref) => {
@@ -267,12 +253,16 @@ export class RadioSettings extends RadioElement {
     const saveStateRaw = this.uiController.value.saveState;
     const saveState =
       SETTINGS_SAVE_STATES[saveStateRaw] || SETTINGS_SAVE_STATES.idle;
+    const saving = saveStateRaw === "saving";
     const values = preferenceValues(preferences, this.draftValues);
     const hasChanges = hasPreferenceChanges(preferences, values);
     const accountChangePending =
       values.accountId !== (preferences.accountId?.value ?? "");
 
-    const prefByGroup = groupPreferencesByGroup(preferences);
+    const preferenceList = Object.entries(preferences).map(([key, pref]) => ({
+      ...pref,
+      key,
+    }));
 
     return html`
       <ion-list id="settings-list">
@@ -281,20 +271,18 @@ export class RadioSettings extends RadioElement {
             groupKey,
             label,
             icon,
-            prefByGroup[groupKey] || [],
+            preferenceList.filter((pref) => pref.group === groupKey),
             values,
             accountChangePending,
           ),
         )}
       </ion-list>
       <ion-button
-        exportparts="button"
         id="settings-save-button"
         expand="block"
         color=${saveState.color || "primary"}
-        .disabled=${saveState.disabled || !hasChanges}
-        aria-busy=${saveState.busy}
-        data-save-state=${saveStateRaw}
+        .disabled=${saving || !hasChanges}
+        aria-busy=${String(saving)}
         @click=${() => this._onSave()}
       >
         ${saveState.label}

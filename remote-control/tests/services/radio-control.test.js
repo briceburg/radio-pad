@@ -37,16 +37,21 @@ describe("RadioControl", () => {
       close: vi.fn(),
       send: vi.fn(),
     };
-    global.WebSocket = vi.fn(function (url) {
-      this.url = url;
-      Object.assign(this, mockWebSocketInstance);
-      return this;
-    });
+    vi.stubGlobal(
+      "WebSocket",
+      vi.fn(function (url) {
+        this.url = url;
+        Object.assign(this, mockWebSocketInstance);
+        return this;
+      }),
+    );
     Capacitor.isNativePlatform.mockReturnValue(false);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 

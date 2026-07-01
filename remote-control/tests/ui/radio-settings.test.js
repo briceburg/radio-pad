@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getVisiblePreferences,
-  groupPreferencesByGroup,
   preferenceValues,
   RadioSettings,
 } from "../../src/js/ui/radio-settings.js";
@@ -63,23 +62,7 @@ async function renderSettings(overrides = {}) {
   return element;
 }
 
-describe("radio-settings helpers", () => {
-  it("groups preference definitions by group and preserves their keys", () => {
-    const grouped = groupPreferencesByGroup({
-      accountId: { label: "Account", group: "radio-account" },
-      radioDial: { label: "RadioDial", group: "radio-listen" },
-      unnamed: { label: "Fallback" },
-    });
-
-    expect(grouped["radio-account"]).toEqual([
-      { key: "accountId", label: "Account", group: "radio-account" },
-    ]);
-    expect(grouped["radio-listen"]).toEqual([
-      { key: "radioDial", label: "RadioDial", group: "radio-listen" },
-    ]);
-    expect(grouped.default).toEqual([{ key: "unnamed", label: "Fallback" }]);
-  });
-
+describe("radio-settings", () => {
   it("keeps only visible select preferences for the settings list", () => {
     const visiblePrefs = getVisiblePreferences([
       { key: "registryUrl", type: "text" },
@@ -163,7 +146,6 @@ describe("radio-settings helpers", () => {
     await element.updateComplete;
     expect(element.draftValues).toEqual({});
     expect(saveButton.disabled).toBe(true);
-    element.remove();
   });
 
   it("uses an Ionic accordion for Advanced without losing its draft", async () => {
@@ -194,7 +176,6 @@ describe("radio-settings helpers", () => {
     expect(onSave.mock.calls[0][0].detail.registryUrl).toBe(
       "https://new-registry.example/api/",
     );
-    element.remove();
   });
 
   it("updates select options without replacing the Ionic control", async () => {
@@ -220,7 +201,6 @@ describe("radio-settings helpers", () => {
     expect(select.querySelector("ion-select-option").textContent).toContain(
       "Kitchen",
     );
-    element.remove();
   });
 
   it("shows empty states for account-dependent options", async () => {
@@ -237,6 +217,5 @@ describe("radio-settings helpers", () => {
     );
     expect(element.querySelector("#pref-playerId")).toBeNull();
     expect(element.querySelector("#pref-radioDial")).toBeNull();
-    element.remove();
   });
 });

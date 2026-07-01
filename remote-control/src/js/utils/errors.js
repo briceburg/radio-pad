@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-export function sanitizeUrl(targetUrl) {
+function sanitizeUrl(targetUrl) {
   if (!targetUrl) return "<unknown>";
   try {
     const { origin, pathname } = new URL(targetUrl);
@@ -36,10 +36,6 @@ export function formatErrorMessage(error, fallback = "") {
     return msg;
   }
   return fallback;
-}
-
-export function isAbortError(error) {
-  return error?.name === "AbortError";
 }
 
 export class RegistryRequestError extends Error {

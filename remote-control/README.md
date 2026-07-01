@@ -4,13 +4,13 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 
 ## Overview
 
-* connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
-  * remote controls publish playback commands and listen for playback state
-  * players listen for playback commands and publish current playback and status state
-* discovers players and RadioDials from the [registry](../registry/)
-  * RadioDial choices include the selected account and discoverable community dials
-  * the saved selection is a qualified RadioDial identity, not a registry URL
-  * sign in to control players when registry auth is enabled
+- connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
+  - remote controls publish playback commands and listen for playback state
+  - players listen for playback commands and publish current playback and status state
+- discovers players and RadioDials from the [registry](../registry/)
+  - RadioDial choices include the selected account and discoverable community dials
+  - the saved selection is a qualified RadioDial identity, not a registry URL
+  - sign in to control players when registry auth is enabled
 
 ## Usage
 
@@ -28,6 +28,9 @@ Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 
 The remote reads the registry's auth status at runtime. When registry auth is disabled, public player discovery and
 tokenless switchboard control remain available for local development.
+
+Settings edits remain local drafts until you select `Save`. Changing the Account hides its Player and RadioDial choices
+until Save refreshes discovery; the current Control player remains active until that save completes.
 
 Set `VITE_GOOGLE_REDIRECT_URL` only if the browser should return to a specific URL instead of the current page URL.
 
@@ -56,15 +59,15 @@ When you deploy the web app, add the deployed origin and redirect URI to the sam
 
 ### Testing
 
-The `remote-control` component uses Vitest + jsdom for headless domain logic testing.
+The `remote-control` component uses Vitest + jsdom for headless domain and UI-structure tests.
 
-To run the test suite for client logic:
+Run formatting and the full client test suite with:
 
 ```bash
-npm test
+./bin/ci
 ```
 
-To run tests in watch mode during development:
+Use `npm test` for tests only, or run tests in watch mode during development:
 
 ```bash
 npm run test:watch
