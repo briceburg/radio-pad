@@ -262,6 +262,6 @@ export function createSettingsActions({
       }
     },
 
-    refreshAccountsForCurrentRegistry: sync,
+    refreshAccountsForCurrentRegistry: syncAfterCurrent,
   };
 }
