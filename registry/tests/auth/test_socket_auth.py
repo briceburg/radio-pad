@@ -1,11 +1,11 @@
 """Socket auth validation tests."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import httpx2
 import pytest
-from fastapi import FastAPI, Request, WebSocketException
+from fastapi import FastAPI, HTTPException, Request, WebSocketException
 from starlette.types import Scope
 
 from api.auth import AuthServices
@@ -58,6 +58,34 @@ async def test_validate_local_rejects_other_account_owner(tmp_path: Path) -> Non
         await validate_local(_local_request(tmp_path, "testuser2"), "testuser1", "player1", "valid-token")
 
     assert exc.value.code == 1008
+
+
+async def test_validate_local_rejects_missing_token(tmp_path: Path) -> None:
+    with pytest.raises(WebSocketException) as exc:
+        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", None)
+
+    assert exc.value.code == 1008
+
+
+async def test_validate_local_rejects_missing_player(tmp_path: Path) -> None:
+    with pytest.raises(WebSocketException) as exc:
+        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "missing", "valid-token")
+
+    assert exc.value.code == 1008
+
+
+@pytest.mark.parametrize("error", [HTTPException(status_code=500), RuntimeError("backend unavailable")])
+async def test_validate_local_preserves_internal_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+) -> None:
+    monkeypatch.setattr("auth.socket_auth.current_identity", Mock(side_effect=error))
+
+    with pytest.raises(type(error)) as exc:
+        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", "valid-token")
+
+    assert exc.value is error
 
 
 @pytest.mark.parametrize(
