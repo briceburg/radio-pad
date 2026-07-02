@@ -13,8 +13,8 @@ class FakeKeys:
     def set_stations(self, stations, refresh=True):
         self.station_updates.append((stations, refresh))
 
-    def set_playback_state(self, call_sign, requested_call_sign):
-        self.playback_states.append((call_sign, requested_call_sign))
+    def set_playback_state(self, call_sign, requested_call_sign, failed_call_sign):
+        self.playback_states.append((call_sign, requested_call_sign, failed_call_sign))
 
 
 def assert_view(state, degraded, visual_mode, title_override):
@@ -107,12 +107,12 @@ def test_playback_state_event_updates_keys():
     state.handle_event(
         {
             "event": "playback_state",
-            "data": {"call_sign": None, "requested_call_sign": "KEXP"},
+            "data": {"call_sign": None, "requested_call_sign": "KEXP", "failed_call_sign": None},
         },
         keys,
     )
 
-    assert keys.playback_states == [(None, "KEXP")]
+    assert keys.playback_states == [(None, "KEXP", None)]
 
 
 def test_unavailable_player_clears_session_state():

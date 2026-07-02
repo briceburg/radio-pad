@@ -70,16 +70,16 @@ def test_pending_station_is_distinct_and_recovers_to_confirmed_or_idle():
     keys = MacropadKeys(FakeMacropad(), FakeDisplay())
     keys.set_stations(["KEXP"])
 
-    keys.set_playback_state(None, "KEXP")
+    keys.set_playback_state(None, "KEXP", None)
     assert keys.macropad.pixels.values[0] == macropad_keys.PENDING_COLOR
     assert keys.display.title == "Starting KEXP"
     assert keys.can_stop
 
-    keys.set_playback_state("KEXP", None)
+    keys.set_playback_state("KEXP", None, None)
     assert keys.macropad.pixels.values[0] == macropad_keys.PLAYING_COLOR
     assert keys.display.title == "KEXP"
 
-    keys.set_playback_state(None, None)
+    keys.set_playback_state(None, None, None)
     assert keys.macropad.pixels.values[0] == macropad_keys.DEFAULT_COLOR
     assert not keys.can_stop
 
@@ -97,3 +97,17 @@ def test_local_request_immediately_replaces_pending_station():
         macropad_keys.PENDING_COLOR,
     ]
     assert keys.display.title == "Starting KGUT"
+
+
+def test_failed_station_turns_red_and_retry_turns_amber():
+    keys = MacropadKeys(FakeMacropad(), FakeDisplay())
+    keys.set_stations(["LOFI"])
+    keys.set_visual_state(False, None, "Playback failed")
+
+    keys.set_playback_state(None, None, "LOFI")
+    assert keys.macropad.pixels.values[0] == macropad_keys.FAILED_COLOR
+    assert keys.display.title == "Failed LOFI"
+
+    keys.set_pending_station("LOFI")
+    assert keys.macropad.pixels.values[0] == macropad_keys.PENDING_COLOR
+    assert keys.display.title == "Starting LOFI"

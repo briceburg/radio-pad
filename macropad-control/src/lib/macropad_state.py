@@ -86,7 +86,11 @@ class MacropadState:
         if not isinstance(data, dict):
             print(f"Unexpected playback_state payload: {data}")
             return
-        keys.set_playback_state(data.get("call_sign"), data.get("requested_call_sign"))
+        keys.set_playback_state(
+            data.get("call_sign"),
+            data.get("requested_call_sign"),
+            data.get("failed_call_sign"),
+        )
 
     def update_status(self, data):
         if not isinstance(data, dict):

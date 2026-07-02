@@ -20,6 +20,7 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 | Loading RadioDial | `Loading RadioDial` or a short status | Grey station-slot skeleton animation |
 | Healthy | Station/page name | Blue station keys, with green for the playing station |
 | Starting station | `Starting <call sign>` | Amber requested station key; green remains confirmed-only |
+| Failed station | `Failed <call sign>` | Red failed station key until the next request |
 | RadioDial or switchboard degraded | Station/page name when stations are loaded | Amber warning treatment |
 | Playback issue | Short playback status | Existing station key state |
 

@@ -6,6 +6,10 @@ import json
 import pytest
 import websockets
 
+IDLE = {"call_sign": None, "requested_call_sign": None, "failed_call_sign": None}
+PENDING_WWOZ = {**IDLE, "requested_call_sign": "WWOZ"}
+PLAYING_WWOZ = {**IDLE, "call_sign": "WWOZ"}
+
 PLAYER_ROOM = "briceburg/living-room"
 
 
@@ -30,22 +34,22 @@ async def test_real_player_processes_playback_commands(switchboard_url):
         pending = await wait_for_event(
             controller,
             "playback_state",
-            predicate=lambda data: data == {"call_sign": None, "requested_call_sign": "WWOZ"},
+            predicate=lambda data: data == PENDING_WWOZ,
         )
-        assert pending["data"] == {"call_sign": None, "requested_call_sign": "WWOZ"}
+        assert pending["data"] == PENDING_WWOZ
 
         playing = await wait_for_event(
             controller,
             "playback_state",
-            predicate=lambda data: data == {"call_sign": "WWOZ", "requested_call_sign": None},
+            predicate=lambda data: data == PLAYING_WWOZ,
         )
-        assert playing["data"] == {"call_sign": "WWOZ", "requested_call_sign": None}
+        assert playing["data"] == PLAYING_WWOZ
 
         await controller.send(json.dumps({"event": "playback_stop", "data": None}))
 
         stopped = await wait_for_event(
             controller,
             "playback_state",
-            predicate=lambda data: data == {"call_sign": None, "requested_call_sign": None},
+            predicate=lambda data: data == IDLE,
         )
-        assert stopped["data"] == {"call_sign": None, "requested_call_sign": None}
+        assert stopped["data"] == IDLE

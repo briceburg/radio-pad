@@ -67,7 +67,7 @@ def test_live_process_without_ready_audio_times_out_and_clears_state(tmp_path):
 
     assert player.station is None
     process.terminate.assert_called_once()
-    assert statuses[-1] == ("error", "Playback timed out")
+    assert statuses == [("error", "Playback timed out")]
 
 
 def test_process_exit_for_unreachable_stream_reports_failure(tmp_path):
@@ -88,4 +88,4 @@ def test_process_exit_for_unreachable_stream_reports_failure(tmp_path):
         assert asyncio.run(player.play(station)) is False
 
     assert player.station is None
-    assert statuses[-1] == ("error", "Playback failed")
+    assert statuses == [("error", "Playback failed")]

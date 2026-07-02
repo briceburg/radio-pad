@@ -80,6 +80,7 @@ describe("radio-player-tab", () => {
       radioDial: null,
       currentStation: null,
       requestedStation: null,
+      failedStation: null,
       loading: false,
       connectionState: "idle",
       playerConnected: null,
@@ -100,6 +101,7 @@ describe("radio-player-tab", () => {
       },
       currentStation: "KEXP",
       requestedStation: null,
+      failedStation: null,
       loading: false,
       connectionState: "connected",
       playerConnected: true,
@@ -129,5 +131,28 @@ describe("radio-player-tab", () => {
     expect(station.getAttribute("fill")).toBe("outline");
     expect(station.getAttribute("aria-busy")).toBe("true");
     expect(station.getAttribute("aria-pressed")).toBe("false");
+
+    controlStore.set({
+      ...controlStore.get(),
+      requestedStation: null,
+      failedStation: "KEXP",
+    });
+    await element.updateComplete;
+
+    expect(title.textContent.trim()).toBe("Living Room: Failed KEXP");
+    expect(status.textContent.trim()).toBe("Failed to play KEXP.");
+    expect(station.getAttribute("color")).toBe("danger");
+    expect(station.getAttribute("aria-invalid")).toBe("true");
+
+    controlStore.set({
+      ...controlStore.get(),
+      requestedStation: "KEXP",
+      failedStation: null,
+    });
+    await element.updateComplete;
+
+    expect(station.getAttribute("color")).toBe("warning");
+    expect(station.getAttribute("aria-busy")).toBe("true");
+    expect(station.getAttribute("aria-invalid")).toBe("false");
   });
 });

@@ -123,9 +123,17 @@ describe("RadioControl", () => {
   it.each([
     [
       "playback_state",
-      { call_sign: "WXXI", requested_call_sign: "KEXP" },
+      {
+        call_sign: "WXXI",
+        requested_call_sign: "KEXP",
+        failed_call_sign: "LOFI",
+      },
       "playbackstate",
-      { callSign: "WXXI", requestedCallSign: "KEXP" },
+      {
+        callSign: "WXXI",
+        requestedCallSign: "KEXP",
+        failedCallSign: "LOFI",
+      },
     ],
     [
       "radio_dial_url",
