@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  getControlStatusText,
+  getControlTitleStatus,
   getStationVisualState,
   isControlDegraded,
   RadioPlayerTab,
@@ -34,17 +34,17 @@ describe("radio-player-tab", () => {
     ).toBe(true);
   });
 
-  it("derives control status text from connection and retained statuses", () => {
+  it("derives control title status from connection and retained statuses", () => {
     expect(
-      getControlStatusText({
+      getControlTitleStatus({
         playerConnected: false,
         resourceStatuses: {
           registry: { level: "warning", summary: "Registry unavailable." },
         },
       }),
-    ).toBe("Player offline.");
+    ).toBe("Offline");
     expect(
-      getControlStatusText({
+      getControlTitleStatus({
         connectionState: "connected",
         player: { name: "Living Room" },
         resourceStatuses: {
@@ -111,22 +111,27 @@ describe("radio-player-tab", () => {
     await element.updateComplete;
 
     const title = element.querySelector("ion-title");
-    const status = element.querySelector('[role="status"]');
     const station = element.querySelector("ion-button[aria-pressed]");
     expect(title.textContent.trim()).toBe("Living Room: KEXP");
     expect(title.getAttribute("aria-level")).toBe("1");
-    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(title.getAttribute("aria-live")).toBe("polite");
+    expect(element.querySelector('[role="status"]')).toBeNull();
     expect(station.getAttribute("aria-pressed")).toBe("true");
 
     controlStore.set({
       ...controlStore.get(),
       currentStation: null,
+    });
+    await element.updateComplete;
+    expect(title.textContent.trim()).toBe("Living Room");
+
+    controlStore.set({
+      ...controlStore.get(),
       requestedStation: "KEXP",
     });
     await element.updateComplete;
 
     expect(title.textContent.trim()).toBe("Living Room: Starting KEXP...");
-    expect(status.textContent.trim()).toBe("Starting KEXP...");
     expect(station.getAttribute("color")).toBe("warning");
     expect(station.getAttribute("fill")).toBe("outline");
     expect(station.getAttribute("aria-busy")).toBe("true");
@@ -140,7 +145,6 @@ describe("radio-player-tab", () => {
     await element.updateComplete;
 
     expect(title.textContent.trim()).toBe("Living Room: Failed KEXP");
-    expect(status.textContent.trim()).toBe("Failed to play KEXP.");
     expect(station.getAttribute("color")).toBe("danger");
     expect(station.getAttribute("aria-invalid")).toBe("true");
 
