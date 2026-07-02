@@ -59,29 +59,19 @@ export function isControlDegraded(state) {
   );
 }
 
-export function getControlStatusText(state) {
-  if (state.playerConnected === false) return "Player offline.";
+export function getControlTitleStatus(state) {
+  if (state.playerConnected === false) return "Offline";
   if (state.connectionState === "disconnected") {
-    return state.player?.id
-      ? "Switchboard unavailable. Reconnecting..."
-      : "Disconnected.";
+    return state.player?.id ? "Reconnecting..." : "Disconnected";
   }
-
-  if (state.requestedStation) {
-    return `Starting ${state.requestedStation}...`;
-  }
-  if (state.failedStation) return `Failed to play ${state.failedStation}.`;
+  if (state.requestedStation) return `Starting ${state.requestedStation}...`;
+  if (state.failedStation) return `Failed ${state.failedStation}`;
 
   const summary = retainedStatusSummary(state);
   if (summary) return summary;
-
-  if (state.connectionState === "connecting") {
-    return "Connecting to switchboard...";
-  }
-  if (state.connectionState === "connected" && state.player?.name) {
-    return `Connected to ${state.player.name}`;
-  }
-  return "";
+  if (state.currentStation) return state.currentStation;
+  if (state.loading) return "Loading...";
+  return null;
 }
 
 export function getStationVisualState(tabName, state) {
@@ -225,8 +215,6 @@ export class RadioPlayerTab extends RadioElement {
   render() {
     const s = this.state;
     const visualState = getStationVisualState(this.tabName, s);
-    const statusText =
-      this.tabName === "control" ? getControlStatusText(s) : "";
     const shouldRenderSkeleton =
       s.loading ||
       (visualState === "warning" &&
@@ -253,22 +241,25 @@ export class RadioPlayerTab extends RadioElement {
       this.tabName === "control"
         ? s.player?.name || s.radioDial?.name || ""
         : s.radioDial?.name || "";
-    const nowPlaying =
-      s.currentStation ||
-      (s.requestedStation ? `Starting ${s.requestedStation}...` : null) ||
-      (s.failedStation ? `Failed ${s.failedStation}` : null) ||
-      (s.loading
-        ? "Loading..."
-        : s.playerConnected === false
-          ? "Offline"
-          : "...");
+    const titleStatus =
+      this.tabName === "control"
+        ? getControlTitleStatus(s)
+        : s.currentStation || (s.loading ? "Loading..." : null);
     const pageTitle = this.tabName === "control" ? "Control" : "Listen";
-    const title = titleName ? `${titleName}: ${nowPlaying}` : pageTitle;
+    const title = titleName
+      ? [titleName, titleStatus].filter(Boolean).join(": ")
+      : pageTitle;
 
     return html`
       <ion-header>
         <ion-toolbar>
-          <ion-title size="large" role="heading" aria-level="1">
+          <ion-title
+            size="large"
+            role="heading"
+            aria-level="1"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             ${title}
           </ion-title>
           <ion-buttons slot="end">
@@ -290,9 +281,6 @@ export class RadioPlayerTab extends RadioElement {
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <div class="ion-text-center" role="status" aria-live="polite">
-          ${statusText}
-        </div>
         <ion-grid>${content}</ion-grid>
       </ion-content>
     `;
