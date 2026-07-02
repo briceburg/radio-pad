@@ -41,6 +41,7 @@ describe("control-actions", () => {
       player: null,
       radioDial: null,
       currentStation: null,
+      requestedStation: null,
       loading: false,
       connectionState: "idle",
       playerConnected: null,
@@ -164,6 +165,26 @@ describe("control-actions", () => {
 
     expect(control.startPlayback).toHaveBeenCalledWith("KEXP");
     expect(control.stopPlayback).toHaveBeenCalled();
+  });
+
+  it("applies authoritative playback state and clears it on disconnect", () => {
+    const { control } = createActions();
+
+    control.dispatchEvent(
+      new CustomEvent("playbackstate", {
+        detail: { callSign: "KEXP", requestedCallSign: "KGUT" },
+      }),
+    );
+    expect(controlStore.get()).toMatchObject({
+      currentStation: "KEXP",
+      requestedStation: "KGUT",
+    });
+
+    control.dispatchEvent(new Event("disconnect"));
+    expect(controlStore.get()).toMatchObject({
+      currentStation: null,
+      requestedStation: null,
+    });
   });
 
   it("resolves listen stations from the loaded RadioDial", async () => {

@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from lib.client_macropad import MacropadClient, _candidate_ports
 from lib.interfaces import RadioPadPlayer, RadioPadPlayerConfig, RadioPadStation
@@ -23,6 +23,7 @@ class FakePlayer(RadioPadPlayer):
     async def play(self, station):
         self.station = station
         self.played.append(station)
+        return True
 
     async def stop(self):
         self.station = None
@@ -117,13 +118,24 @@ def test_candidate_ports_filters_and_sorts_cdc2_ports():
 
 def test_listen_handles_serial_playback_start():
     player, client, writer = client_with_writer(register=True)
+    switchboard = SimpleNamespace(_send=AsyncMock())
+    player.register_client(switchboard)
     client.reader = FakeReader([b'{"event":"playback_start","data":{"call_sign":"KEXP"}}\n', b""])
 
-    asyncio.run(client._listen())
+    async def listen_and_settle():
+        await client._listen()
+        await player.wait_for_playback_idle()
 
+    asyncio.run(listen_and_settle())
+
+    expected = [
+        event("playback_state", {"call_sign": None, "requested_call_sign": "KEXP"}),
+        event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None}),
+    ]
     assert player.played == [player.kexp]
-    assert written_events(writer) == [event("playback_state", {"call_sign": "KEXP"})]
-    assert writer.drains == 1
+    assert written_events(writer) == expected
+    assert [json.loads(call.args[0]) for call in switchboard._send.await_args_list] == expected
+    assert writer.drains == 2
 
 
 def test_station_menu_request_writes_call_signs_and_current_station():
@@ -134,7 +146,7 @@ def test_station_menu_request_writes_call_signs_and_current_station():
 
     assert written_events(writer) == [
         event("station_menu", ["KEXP", "KGUT"]),
-        event("playback_state", {"call_sign": "KGUT"}),
+        event("playback_state", {"call_sign": "KGUT", "requested_call_sign": None}),
     ]
     assert writer.drains == 2
 
@@ -170,9 +182,25 @@ def test_station_menu_request_replays_status_after_stations():
 
     assert written_events(writer) == [
         event("station_menu", ["KEXP", "KGUT"]),
-        event("playback_state", {"call_sign": None}),
+        event("playback_state", {"call_sign": None, "requested_call_sign": None}),
         player_status("switchboard", "warning", "Switchboard down"),
     ]
+
+
+def test_invalid_call_sign_reports_failure_without_replacing_playback():
+    player, client, writer = client_with_writer(register=True)
+    statuses = []
+
+    async def report(level, summary):
+        statuses.append((level, summary))
+
+    player.status_reporter = report
+    player.station = player.kexp
+
+    asyncio.run(client.handle_message('{"event":"playback_start","data":{"call_sign":"NOPE"}}'))
+
+    assert statuses == [("error", "Station NOPE unavailable")]
+    assert written_events(writer) == [event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None})]
 
 
 def test_send_drops_lost_macropad_connection_without_raising():

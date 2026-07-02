@@ -40,8 +40,10 @@ fi
 name | description | default
 --- | --- | ---
 `RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
+`RADIOPAD_AUDIO_OUTPUT` | Optional mpv audio output driver, such as `null` for headless tests. | `None`
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on `RADIOPAD_PLAYER`. Anything other than "true" disables it. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
+`RADIOPAD_PLAYBACK_TIMEOUT_SECONDS` | Maximum time to wait for mpv IPC and usable audio. | `15`
 `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready`
 `RADIOPAD_MACROPAD_PORT` | Explicit macropad CDC2 serial device. | `auto-detected`
 `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`

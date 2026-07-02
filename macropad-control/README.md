@@ -19,6 +19,7 @@ Use the [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-
 | Waiting for player | `Waiting for Player` | Dim grey skeleton animation |
 | Loading RadioDial | `Loading RadioDial` or a short status | Grey station-slot skeleton animation |
 | Healthy | Station/page name | Blue station keys, with green for the playing station |
+| Starting station | `Starting <call sign>` | Amber requested station key; green remains confirmed-only |
 | RadioDial or switchboard degraded | Station/page name when stations are loaded | Amber warning treatment |
 | Playback issue | Short playback status | Existing station key state |
 
@@ -32,7 +33,7 @@ hardware.
 - **Key Buttons:**  
   Each key on the Macropad is mapped to a specific radio station. Pressing a key will start streaming the corresponding station.
 - **Encoder Button (Knob Press):**  
-  Pressing the encoder (the knob) will stop the currently playing radio station.
+  Pressing the encoder (the knob) will stop confirmed or pending playback.
 - **Encoder Position (Knob Turn):**  
   Turning the encoder knob adjusts the playback volume up or down. If playback is stopped, and there are more than 12 stations, turning the encoder knob will switch station pages.
 

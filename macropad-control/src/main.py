@@ -81,7 +81,7 @@ while True:
     macropad.encoder_switch_debounced.update()
     pressed = macropad.encoder_switch_debounced.pressed
     if pressed and not last_encoder_switch:
-        if keys.playing_station_index is not None:
+        if keys.can_stop:
             player.stop_playback()
             keys.flash_keys()
     last_encoder_switch = pressed

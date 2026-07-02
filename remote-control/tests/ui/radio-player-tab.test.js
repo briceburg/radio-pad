@@ -79,6 +79,7 @@ describe("radio-player-tab", () => {
       player: null,
       radioDial: null,
       currentStation: null,
+      requestedStation: null,
       loading: false,
       connectionState: "idle",
       playerConnected: null,
@@ -98,6 +99,7 @@ describe("radio-player-tab", () => {
         stations: [{ call_sign: "KEXP", stream_url: "https://example.test" }],
       },
       currentStation: "KEXP",
+      requestedStation: null,
       loading: false,
       connectionState: "connected",
       playerConnected: true,
@@ -113,5 +115,19 @@ describe("radio-player-tab", () => {
     expect(title.getAttribute("aria-level")).toBe("1");
     expect(status.getAttribute("aria-live")).toBe("polite");
     expect(station.getAttribute("aria-pressed")).toBe("true");
+
+    controlStore.set({
+      ...controlStore.get(),
+      currentStation: null,
+      requestedStation: "KEXP",
+    });
+    await element.updateComplete;
+
+    expect(title.textContent.trim()).toBe("Living Room: Starting KEXP...");
+    expect(status.textContent.trim()).toBe("Starting KEXP...");
+    expect(station.getAttribute("color")).toBe("warning");
+    expect(station.getAttribute("fill")).toBe("outline");
+    expect(station.getAttribute("aria-busy")).toBe("true");
+    expect(station.getAttribute("aria-pressed")).toBe("false");
   });
 });

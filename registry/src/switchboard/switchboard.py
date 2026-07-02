@@ -168,5 +168,5 @@ async def websocket_endpoint(
                 broadcast,
                 player_key,
                 "playback_state",
-                {"call_sign": None},
+                {"call_sign": None, "requested_call_sign": None},
             )

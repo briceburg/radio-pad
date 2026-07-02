@@ -168,16 +168,18 @@ export class RadioControl extends EventTarget {
       try {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
-          case "playback_state":
+          case "playback_state": {
+            const state = data && typeof data === "object" ? data : {};
             this.dispatchEvent(
               new CustomEvent("playbackstate", {
-                detail:
-                  data && typeof data === "object"
-                    ? data.call_sign || null
-                    : null,
+                detail: {
+                  callSign: state.call_sign || null,
+                  requestedCallSign: state.requested_call_sign || null,
+                },
               }),
             );
             break;
+          }
           case "radio_dial_url":
             if (typeof data === "string" && data) {
               this.dispatchEvent(

@@ -40,6 +40,7 @@ export const controlStore = atom({
   player: null,
   radioDial: null,
   currentStation: null,
+  requestedStation: null,
   loading: false,
   connectionState: "idle",
   playerConnected: null,

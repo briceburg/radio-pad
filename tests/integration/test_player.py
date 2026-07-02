@@ -27,18 +27,25 @@ async def test_real_player_processes_playback_commands(switchboard_url):
     async with websockets.connect(controller_url) as controller:
         await controller.send(json.dumps({"event": "playback_start", "data": {"call_sign": "WWOZ"}}))
 
+        pending = await wait_for_event(
+            controller,
+            "playback_state",
+            predicate=lambda data: data == {"call_sign": None, "requested_call_sign": "WWOZ"},
+        )
+        assert pending["data"] == {"call_sign": None, "requested_call_sign": "WWOZ"}
+
         playing = await wait_for_event(
             controller,
             "playback_state",
-            predicate=lambda data: data == {"call_sign": "WWOZ"},
+            predicate=lambda data: data == {"call_sign": "WWOZ", "requested_call_sign": None},
         )
-        assert playing["data"] == {"call_sign": "WWOZ"}
+        assert playing["data"] == {"call_sign": "WWOZ", "requested_call_sign": None}
 
         await controller.send(json.dumps({"event": "playback_stop", "data": None}))
 
         stopped = await wait_for_event(
             controller,
             "playback_state",
-            predicate=lambda data: data == {"call_sign": None},
+            predicate=lambda data: data == {"call_sign": None, "requested_call_sign": None},
         )
-        assert stopped["data"] == {"call_sign": None}
+        assert stopped["data"] == {"call_sign": None, "requested_call_sign": None}

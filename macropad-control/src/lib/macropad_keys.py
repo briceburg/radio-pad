@@ -22,6 +22,7 @@ from lib.macropad_time import ticks_diff, ticks_ms
 
 DEFAULT_COLOR = 0x000077
 PLAYING_COLOR = 0x015C01
+PENDING_COLOR = 0x805000
 PRESSED_COLOR = 0x999999
 MACROPAD_KEY_COUNT = 12
 DEGRADED_COLOR = 0x402000
@@ -48,6 +49,7 @@ class MacropadKeys:
         self.macropad.pixels.brightness = KEY_PIXEL_BRIGHTNESS
         self.stations = []
         self.playing_station_index = None
+        self.pending_station_index = None
         self.current_page_index = 0
         self.degraded = False
         self.title_override = None
@@ -58,6 +60,7 @@ class MacropadKeys:
 
     def set_stations(self, stations, refresh=True):
         self.playing_station_index = None
+        self.pending_station_index = None
         self.stations = stations
         self.switch_page(0, refresh=refresh)
 
@@ -107,11 +110,14 @@ class MacropadKeys:
 
         page_title = "iCEBURG Radio" if self.page_count == 1 else f"iCEBURG Radio {self.current_page_index + 1}"
         title = self.title_override or page_title
-        if self.title_override is None and self.playing_station_index is not None:
-            station_page_index = self.get_station_page_index(self.playing_station_index)
+        display_station_index = self.pending_station_index
+        if display_station_index is None:
+            display_station_index = self.playing_station_index
+        if self.title_override is None and display_station_index is not None:
+            station_page_index = self.get_station_page_index(display_station_index)
             if self.current_page_index == station_page_index:
-                station_index_on_page = self.playing_station_index % MACROPAD_KEY_COUNT
-                title = stations[station_index_on_page] or "?"
+                station_name = stations[display_station_index % MACROPAD_KEY_COUNT] or "?"
+                title = f"Starting {station_name}" if self.pending_station_index is not None else station_name
 
         self.display.set_title(title, False)
 
@@ -124,6 +130,8 @@ class MacropadKeys:
                 if station_global_index == self.playing_station_index:
                     self.macropad.pixels[i] = PLAYING_COLOR
                     self.display.highlight_group(i)
+                elif station_global_index == self.pending_station_index:
+                    self.macropad.pixels[i] = PENDING_COLOR
                 else:
                     self.macropad.pixels[i] = DEGRADED_COLOR if self.degraded else DEFAULT_COLOR
             else:
@@ -145,19 +153,30 @@ class MacropadKeys:
             self.macropad.pixels[key_index] = color
             self.macropad.pixels.show()
 
-    def set_playing_station(self, call_sign):
-        self.playing_station_index = None
-        if call_sign:
-            for i, station in enumerate(self.stations):
-                if station == call_sign:
-                    self.playing_station_index = i
-                    break
+    def set_playback_state(self, call_sign, requested_call_sign):
+        self.playing_station_index = self._station_index(call_sign)
+        self.pending_station_index = self._station_index(requested_call_sign)
 
-        if self.playing_station_index is not None:
-            page_index = self.get_station_page_index(self.playing_station_index)
+        visible_station_index = self.pending_station_index
+        if visible_station_index is None:
+            visible_station_index = self.playing_station_index
+
+        if visible_station_index is not None:
+            page_index = self.get_station_page_index(visible_station_index)
             self.switch_page(page_index)
         else:
             self.refresh()
+
+    @property
+    def can_stop(self):
+        return self.playing_station_index is not None or self.pending_station_index is not None
+
+    def _station_index(self, call_sign):
+        if call_sign:
+            for i, station in enumerate(self.stations):
+                if station == call_sign:
+                    return i
+        return None
 
     def get_station_page_index(self, station_index):
         return station_index // MACROPAD_KEY_COUNT

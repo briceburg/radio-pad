@@ -121,7 +121,12 @@ describe("RadioControl", () => {
   });
 
   it.each([
-    ["playback_state", { call_sign: "WXXI" }, "playbackstate", "WXXI"],
+    [
+      "playback_state",
+      { call_sign: "WXXI", requested_call_sign: "KEXP" },
+      "playbackstate",
+      { callSign: "WXXI", requestedCallSign: "KEXP" },
+    ],
     [
       "radio_dial_url",
       "https://example.test/radio-dial.json",
