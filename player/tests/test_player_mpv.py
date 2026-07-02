@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -70,7 +71,7 @@ def test_live_process_without_ready_audio_times_out_and_clears_state(tmp_path):
     assert statuses == [("error", "Playback timed out")]
 
 
-def test_process_exit_for_unreachable_stream_reports_failure(tmp_path):
+def test_process_exit_for_unreachable_stream_reports_concise_failure(tmp_path, caplog):
     process = fake_process()
     process.poll.return_value = 2
     player = MpvPlayer(socket_path=str(tmp_path / "mpv.sock"))
@@ -82,6 +83,7 @@ def test_process_exit_for_unreachable_stream_reports_failure(tmp_path):
 
     player.status_reporter = report
     with (
+        caplog.at_level(logging.WARNING, logger="PLAYER"),
         patch("lib.player_mpv.subprocess.Popen", return_value=process),
         patch("lib.player_mpv.asyncio.to_thread", side_effect=directly),
     ):
@@ -89,3 +91,7 @@ def test_process_exit_for_unreachable_stream_reports_failure(tmp_path):
 
     assert player.station is None
     assert statuses == [("error", "Playback failed")]
+    failure = caplog.records[-1]
+    assert failure.levelno == logging.WARNING
+    assert failure.exc_info is None
+    assert failure.message == "playback failed for STALE: mpv exited before playback was ready (code 2)"
