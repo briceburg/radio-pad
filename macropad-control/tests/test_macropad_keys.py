@@ -64,3 +64,21 @@ def test_skeleton_animation_settles_static_after_timeout(monkeypatch):
 
     assert static_values != animated_values
     assert keys.macropad.pixels.values == static_values
+
+
+def test_pending_station_is_distinct_and_recovers_to_confirmed_or_idle():
+    keys = MacropadKeys(FakeMacropad(), FakeDisplay())
+    keys.set_stations(["KEXP"])
+
+    keys.set_playback_state(None, "KEXP")
+    assert keys.macropad.pixels.values[0] == macropad_keys.PENDING_COLOR
+    assert keys.display.title == "Starting KEXP"
+    assert keys.can_stop
+
+    keys.set_playback_state("KEXP", None)
+    assert keys.macropad.pixels.values[0] == macropad_keys.PLAYING_COLOR
+    assert keys.display.title == "KEXP"
+
+    keys.set_playback_state(None, None)
+    assert keys.macropad.pixels.values[0] == macropad_keys.DEFAULT_COLOR
+    assert not keys.can_stop

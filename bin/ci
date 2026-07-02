@@ -3,6 +3,7 @@ set -eu
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-radiopad-ci}"
 export COMPOSE_FILE="${1:-${COMPOSE_FILE:-compose.yaml}}"
+export RADIOPAD_AUDIO_OUTPUT="${RADIOPAD_AUDIO_OUTPUT:-null}"
 
 cd "$(dirname "$0")/.."
 trap 'docker compose down --volumes --remove-orphans' EXIT

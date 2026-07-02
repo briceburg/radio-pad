@@ -17,6 +17,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import abc
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -45,14 +46,18 @@ class RadioPadEvent(TypedDict, total=False):
 
 
 class RadioPadPlayer(abc.ABC):
-    """
-    Interface for RadioPad player implementations.
-    """
+    """Coordinate playback requests and define the audio-backend interface."""
 
     def __init__(self, config: RadioPadPlayerConfig | None = None):
         self._station: RadioPadStation | None = None
         self._config = config
         self._clients: list[RadioPadClient] = []
+        self._playback_revision = 0
+        self._desired_station: RadioPadStation | None = None
+        self._playback_worker: asyncio.Task[None] | None = None
+        self._playback_changed = asyncio.Event()
+        self._broadcast_lock = asyncio.Lock()
+        self.status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None
 
     @property
     def config(self) -> RadioPadPlayerConfig | None:
@@ -65,12 +70,17 @@ class RadioPadPlayer(abc.ABC):
 
     @property
     def station(self) -> RadioPadStation | None:
-        """Get or set the currently playing station."""
+        """Get or set the station with confirmed playback."""
         return self._station
 
     @station.setter
     def station(self, value: RadioPadStation | None):
         self._station = value
+
+    @property
+    def requested_call_sign(self) -> str | None:
+        """Return the latest station request while it is still in flight."""
+        return self._desired_station.call_sign if self._desired_station else None
 
     @property
     def clients(self):
@@ -81,9 +91,140 @@ class RadioPadPlayer(abc.ABC):
         """Register a client with this player."""
         self._clients.append(client)
 
+    async def broadcast(self, event: str, data: object | None = None, limit_to: "RadioPadClient | None" = None):
+        """Broadcast an event to registered local and switchboard clients."""
+        async with self._broadcast_lock:
+            if event == "playback_state":
+                data = {
+                    "call_sign": self.station.call_sign if self.station else None,
+                    "requested_call_sign": self.requested_call_sign,
+                }
+            message = json.dumps({"event": event, "data": data})
+            for client in self.clients:
+                if limit_to is not None and client is not limit_to:
+                    continue
+                try:
+                    await client._send(message)
+                except Exception as e:
+                    logger.error("Broadcast error for %s: %s", client, e)
+
+    async def request_playback(self, station: RadioPadStation):
+        """Set the desired station; duplicate requests are idempotent."""
+        duplicate_request = self.requested_call_sign == station.call_sign or (
+            self._playback_worker is None and self.station is not None and self.station.call_sign == station.call_sign
+        )
+        if not duplicate_request:
+            self._set_desired_station(station)
+        await self.broadcast("playback_state")
+
+    async def reject_playback_request(self, call_sign: str):
+        """Report a rejected call sign without disturbing accepted playback."""
+        await self._report_status("error", f"Station {call_sign} unavailable")
+        await self.broadcast("playback_state")
+
+    async def request_stop(self):
+        """Replace any earlier start request with a stop request."""
+        stop_in_flight = self._desired_station is None and self._playback_worker is not None
+        already_stopped = self._playback_worker is None and self.station is None
+        if not (stop_in_flight or already_stopped):
+            self._set_desired_station(None)
+        await self.broadcast("playback_state")
+
+    async def wait_for_playback_idle(self):
+        """Wait until the latest requested playback state has settled."""
+        while self._playback_worker:
+            await asyncio.shield(self._playback_worker)
+
+    def _set_desired_station(self, station: RadioPadStation | None):
+        # These mutations contain no await, so the event loop applies each request atomically.
+        self._playback_revision += 1
+        self._desired_station = station
+        self._playback_changed.set()
+        if self._playback_worker is None or self._playback_worker.done():
+            self._playback_worker = asyncio.create_task(
+                self._reconcile_playback(),
+                name="playback-worker",
+            )
+
+    async def _reconcile_playback(self):
+        """Move the backend toward the latest desired station until state settles."""
+        while True:
+            revision = self._playback_revision
+            station = self._desired_station
+            had_confirmed_playback = self.station is not None
+            self._playback_changed.clear()
+
+            try:
+                await self.stop()
+            except Exception:
+                logger.error("Unexpected error while replacing playback", exc_info=True)
+                self.station = None
+                await self._report_status("error", "Playback error")
+                if not self._complete_revision(revision):
+                    continue
+                await self.broadcast("playback_state")
+                return
+            if not self._is_current(revision):
+                continue
+            if had_confirmed_playback:
+                await self.broadcast("playback_state")
+                if not self._is_current(revision):
+                    continue
+
+            if station is None:
+                if self._complete_revision(revision):
+                    return
+                continue
+
+            play_task = asyncio.create_task(self.play(station), name=f"playback:{station.call_sign}")
+            changed_task = asyncio.create_task(self._playback_changed.wait(), name="playback-changed")
+            done, _ = await asyncio.wait({play_task, changed_task}, return_when=asyncio.FIRST_COMPLETED)
+
+            if changed_task in done or not self._is_current(revision):
+                play_task.cancel()
+                await asyncio.gather(play_task, return_exceptions=True)
+                changed_task.cancel()
+                await asyncio.gather(changed_task, return_exceptions=True)
+                continue
+
+            changed_task.cancel()
+            await asyncio.gather(changed_task, return_exceptions=True)
+            try:
+                success = play_task.result()
+            except Exception:
+                logger.error("Unexpected playback error for %s", station.call_sign, exc_info=True)
+                success = False
+                await self._report_status("error", "Playback error")
+
+            if not self._is_current(revision):
+                continue
+            if not success:
+                self.station = None
+            if not self._complete_revision(revision):
+                continue
+            await self.broadcast("playback_state")
+            return
+
+    def _is_current(self, revision: int) -> bool:
+        return revision == self._playback_revision
+
+    def _complete_revision(self, revision: int) -> bool:
+        if not self._is_current(revision):
+            return False
+        self._desired_station = None
+        self._playback_worker = None
+        return True
+
+    async def _report_status(self, level: str, summary: str | None):
+        if self.status_reporter:
+            try:
+                await self.status_reporter(level, summary)
+            except Exception:
+                logger.error("Playback status reporting failed", exc_info=True)
+
     @abc.abstractmethod
     async def play(self, station: RadioPadStation):
-        """Play a radio station and return True when playback starts."""
+        """Return True after the backend confirms usable audio for a station."""
 
     @abc.abstractmethod
     async def stop(self):
@@ -129,16 +270,7 @@ class RadioPadClient(abc.ABC):
 
     async def broadcast(self, event, data=None, limit_to_self=False):
         """Broadcast an event to clients registered with the player."""
-        if event == "playback_state":
-            data = {"call_sign": (self.player.station.call_sign if self.player.station else None)}
-        message = json.dumps({"event": event, "data": data})
-        for client in self.player.clients:
-            if limit_to_self and client is not self:
-                continue
-            try:
-                await client._send(message)
-            except Exception as e:
-                logger.error("Broadcast error for %s: %s", client, e)
+        await self.player.broadcast(event, data, limit_to=self if limit_to_self else None)
 
     async def handle_message(self, message: str):
         """Handle incoming messages."""
@@ -180,15 +312,14 @@ class RadioPadClient(abc.ABC):
 
         station = next((station for station in config.stations if station.call_sign == call_sign), None)
         if station:
-            await self.player.play(station)
-            await self.broadcast("playback_state")
+            await self.player.request_playback(station)
             return
 
         logger.warning("Station %r is not on the loaded RadioDial", call_sign)
+        await self.player.reject_playback_request(str(call_sign))
 
     async def _handle_playback_stop(self, event):
-        await self.player.stop()
-        await self.broadcast("playback_state")
+        await self.player.request_stop()
 
     async def _handle_ignored(self, event):
         pass  # Ignore these events

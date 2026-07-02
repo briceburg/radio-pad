@@ -21,6 +21,7 @@ services:
       registry:
         condition: service_healthy
     environment:
+      RADIOPAD_AUDIO_OUTPUT: "${RADIOPAD_AUDIO_OUTPUT:-}"
       RADIOPAD_REGISTRY_URL: "http://registry:1980/api/"
       RADIOPAD_PLAYER: "briceburg/living-room"
     volumes:

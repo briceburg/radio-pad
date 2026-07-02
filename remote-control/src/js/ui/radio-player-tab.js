@@ -67,6 +67,10 @@ export function getControlStatusText(state) {
       : "Disconnected.";
   }
 
+  if (state.requestedStation) {
+    return `Starting ${state.requestedStation}...`;
+  }
+
   const summary = retainedStatusSummary(state);
   if (summary) return summary;
 
@@ -160,7 +164,12 @@ export class RadioPlayerTab extends RadioElement {
     `;
   }
 
-  renderStationButtons(stations, currentStation, visualState) {
+  renderStationButtons(
+    stations,
+    currentStation,
+    requestedStation,
+    visualState,
+  ) {
     const rows = [];
     const stationsList = stations || [];
     for (let i = 0; i < stationsList.length; i += 3) {
@@ -173,9 +182,10 @@ export class RadioPlayerTab extends RadioElement {
           <ion-row>
             ${row.map((station) => {
               const isActive = station.call_sign === currentStation;
+              const isPending = station.call_sign === requestedStation;
               const color = isActive
                 ? "success"
-                : visualState === "warning"
+                : isPending || visualState === "warning"
                   ? "warning"
                   : "primary";
               return html`
@@ -183,7 +193,12 @@ export class RadioPlayerTab extends RadioElement {
                   <ion-button
                     expand="block"
                     color=${color}
+                    fill=${isPending ? "outline" : "solid"}
                     aria-pressed=${String(isActive)}
+                    aria-busy=${String(isPending)}
+                    aria-label=${isPending
+                      ? `${station.call_sign}, starting playback`
+                      : station.call_sign}
                     @click=${() => this._onSelectStation(station.call_sign)}
                   >
                     ${station.call_sign}
@@ -218,6 +233,7 @@ export class RadioPlayerTab extends RadioElement {
       content = this.renderStationButtons(
         s.radioDial.stations,
         s.currentStation,
+        s.requestedStation,
         visualState,
       );
     }
@@ -228,6 +244,7 @@ export class RadioPlayerTab extends RadioElement {
         : s.radioDial?.name || "";
     const nowPlaying =
       s.currentStation ||
+      (s.requestedStation ? `Starting ${s.requestedStation}...` : null) ||
       (s.loading
         ? "Loading..."
         : s.playerConnected === false
@@ -247,7 +264,7 @@ export class RadioPlayerTab extends RadioElement {
               shape="round"
               size="small"
               color="danger"
-              .disabled=${!s.currentStation}
+              .disabled=${!(s.currentStation || s.requestedStation)}
               @click=${() => this._onStopStation()}
               aria-label="Stop playback"
             >

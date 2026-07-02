@@ -5,7 +5,7 @@ from lib.macropad_state import MacropadState
 class FakeKeys:
     def __init__(self):
         self.station_updates = []
-        self.playing_stations = []
+        self.playback_states = []
 
     def set_visual_state(self, degraded, visual_mode, title_override, force=False):
         pass
@@ -13,8 +13,8 @@ class FakeKeys:
     def set_stations(self, stations, refresh=True):
         self.station_updates.append((stations, refresh))
 
-    def set_playing_station(self, station):
-        self.playing_stations.append(station)
+    def set_playback_state(self, call_sign, requested_call_sign):
+        self.playback_states.append((call_sign, requested_call_sign))
 
 
 def assert_view(state, degraded, visual_mode, title_override):
@@ -105,11 +105,14 @@ def test_playback_state_event_updates_keys():
     state, keys = state_keys()
 
     state.handle_event(
-        {"event": "playback_state", "data": {"call_sign": "KEXP"}},
+        {
+            "event": "playback_state",
+            "data": {"call_sign": None, "requested_call_sign": "KEXP"},
+        },
         keys,
     )
 
-    assert keys.playing_stations == ["KEXP"]
+    assert keys.playback_states == [(None, "KEXP")]
 
 
 def test_unavailable_player_clears_session_state():

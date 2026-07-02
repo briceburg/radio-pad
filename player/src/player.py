@@ -40,9 +40,9 @@ CONFIG_RETRY_SECONDS = 10
 
 async def cleanup(player):
     logger.info("Cleaning up before exit...")
-    if hasattr(player, "status_reporter"):
-        player.status_reporter = None
-    await player.stop()
+    player.status_reporter = None
+    await player.request_stop()
+    await player.wait_for_playback_idle()
     for client in player.clients:
         try:
             await client.close()
@@ -168,7 +168,9 @@ if __name__ == "__main__":
         # Initialize player and clients
         player = MpvPlayer(
             audio_channels=os.getenv("RADIOPAD_AUDIO_CHANNELS", "stereo"),
+            audio_output=os.getenv("RADIOPAD_AUDIO_OUTPUT") or None,
             socket_path=os.getenv("RADIOPAD_MPV_SOCKET_PATH", "/tmp/radio-pad-mpv.sock"),
+            playback_timeout_seconds=float(os.getenv("RADIOPAD_PLAYBACK_TIMEOUT_SECONDS", "15")),
         )
         macropad_client = MacropadClient(player)
 
