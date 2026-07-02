@@ -53,9 +53,11 @@ docker compose -f compose.split.yaml up
 ```
 
 `bin/dev` wraps `docker compose` and passes through compose arguments. By
-default it exposes local ALSA devices when `/dev/snd` exists and uses the physical
-macropad overlay when exactly one CDC2 data port is attached; if none are found it
-starts without a local macropad (multiple ports require `RADIOPAD_MACROPAD_DEVICE`):
+default it exposes local ALSA devices when `/dev/snd` exists and uses the
+physical macropad overlay when exactly one CDC2 data port is attached. It adds
+the player to the required host device groups instead of running it as root. If
+no macropad is found it starts without one; multiple ports require
+`RADIOPAD_MACROPAD_DEVICE`:
 
 ```sh
 bin/dev up -d
@@ -66,6 +68,8 @@ RADIOPAD_MACROPAD=off bin/dev up
 Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad
 data port. `bin/dev` does not mount or sync firmware; those steps stay explicit
 because they can prompt for privileges and write to the device.
+Set `RADIOPAD_AUDIO_GID` or `RADIOPAD_MACROPAD_GID` only when using hardware
+overlays directly or when your host device group needs an explicit override.
 
 Registry and switchboard ports default to ephemeral; the web app defaults to
 port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to
@@ -122,12 +126,11 @@ RADIOPAD_MACROPAD=required bin/dev up -d --force-recreate player
 
 The discovery command intentionally fails when it finds zero or multiple data
 ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one
-macropad is attached. The macropad overlay runs the development player as root
-so it can access the host device; it is not intended for production. Sync before
-creating the player container because CircuitPython may reboot and renumber its
-USB interfaces during a firmware update. Use `macropad-control/bin/console` for
-the CircuitPython REPL console; it intentionally selects a different USB CDC
-interface than `macropad-control/bin/data-port`.
+macropad is attached. Sync before creating the player container because
+CircuitPython may reboot and renumber its USB interfaces during a firmware
+update. Use `macropad-control/bin/console` for the CircuitPython REPL console;
+it intentionally selects a different USB CDC interface than
+`macropad-control/bin/data-port`.
 
 ## Architecture
 

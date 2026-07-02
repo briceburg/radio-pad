@@ -1,5 +1,6 @@
 services:
   player:
-    user: root
+    group_add:
+      - "${RADIOPAD_AUDIO_GID:?set RADIOPAD_AUDIO_GID to the host /dev/snd group id or use bin/dev}"
     devices:
       - /dev/snd:/dev/snd
