@@ -82,3 +82,18 @@ def test_pending_station_is_distinct_and_recovers_to_confirmed_or_idle():
     keys.set_playback_state(None, None)
     assert keys.macropad.pixels.values[0] == macropad_keys.DEFAULT_COLOR
     assert not keys.can_stop
+
+
+def test_local_request_immediately_replaces_pending_station():
+    keys = MacropadKeys(FakeMacropad(), FakeDisplay())
+    keys.set_stations(["KEXP", "KGUT"])
+    keys.set_visual_state(False, None, "Playback failed")
+
+    keys.set_pending_station("KEXP")
+    keys.set_pending_station("KGUT")
+
+    assert keys.macropad.pixels.values[:2] == [
+        macropad_keys.DEFAULT_COLOR,
+        macropad_keys.PENDING_COLOR,
+    ]
+    assert keys.display.title == "Starting KGUT"

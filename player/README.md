@@ -40,6 +40,7 @@ fi
 name | description | default
 --- | --- | ---
 `RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
+`RADIOPAD_AUDIO_DEVICE` | Optional mpv device from `mpv --audio-device=help`, such as `alsa/default:CARD=Generic`. | `None`
 `RADIOPAD_AUDIO_OUTPUT` | Optional mpv audio output driver, such as `null` for headless tests. | `None`
 `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on `RADIOPAD_PLAYER`. Anything other than "true" disables it. | `true`
 `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`

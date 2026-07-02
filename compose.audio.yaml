@@ -1,0 +1,5 @@
+services:
+  player:
+    user: root
+    devices:
+      - /dev/snd:/dev/snd

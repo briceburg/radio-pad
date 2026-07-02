@@ -21,7 +21,7 @@ import time
 from adafruit_macropad import MacroPad
 
 from lib.macropad_display import MacropadDisplay
-from lib.macropad_keys import PRESSED_COLOR, MacropadKeys
+from lib.macropad_keys import MacropadKeys
 from lib.macropad_player import MacropadPlayer
 from lib.macropad_state import MacropadState
 
@@ -99,10 +99,10 @@ while True:
         key_number = key_event.key_number
         call_sign = keys.get_call_sign(key_number)
         if call_sign:
-            keys.set_key_color(key_number, PRESSED_COLOR)
             last_pressed_call_sign = call_sign
 
     if last_pressed_call_sign:
+        keys.set_pending_station(last_pressed_call_sign)
         player.start_playback(last_pressed_call_sign)
 
     keys.tick()
