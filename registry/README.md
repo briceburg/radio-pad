@@ -158,6 +158,11 @@ The switchboard partitions connections by request path and expects clients to co
 
 Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
+Controllers must send `{"event":"authenticate","data":{"token":...}}` as their first message. The token is null when
+auth is disabled. The switchboard validates access and replies with `authenticated` before subscribing the controller,
+replaying state, or accepting commands. It closes rejected and expired sessions with WebSocket policy code `1008`.
+Bearer tokens are never placed in switchboard URLs.
+
 The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
 ### Authentication and account-owner seeding

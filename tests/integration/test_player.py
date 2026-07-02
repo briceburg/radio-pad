@@ -29,6 +29,8 @@ async def test_real_player_processes_playback_commands(switchboard_url):
     controller_url = f"{switchboard_url}/{PLAYER_ROOM}"
 
     async with websockets.connect(controller_url) as controller:
+        await controller.send(json.dumps({"event": "authenticate", "data": {"token": None}}))
+        await wait_for_event(controller, "authenticated")
         await controller.send(json.dumps({"event": "playback_start", "data": {"call_sign": "WWOZ"}}))
 
         pending = await wait_for_event(

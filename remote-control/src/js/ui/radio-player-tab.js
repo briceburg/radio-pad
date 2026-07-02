@@ -50,7 +50,8 @@ function retainedStatusSummary(state) {
 }
 
 export function isControlDegraded(state) {
-  if (state.connectionState === "disconnected") return true;
+  if (["disconnected", "unauthorized"].includes(state.connectionState))
+    return true;
   if (state.playerConnected === false) return true;
 
   return (
@@ -60,6 +61,9 @@ export function isControlDegraded(state) {
 }
 
 export function getControlTitleStatus(state) {
+  if (state.connectionState === "unauthorized") {
+    return state.connectionMessage || "Sign-in required.";
+  }
   if (state.playerConnected === false) return "Offline";
   if (state.connectionState === "disconnected") {
     return state.player?.id ? "Reconnecting..." : "Disconnected";

@@ -70,6 +70,7 @@ def current_identity(
     return AuthenticatedIdentity(
         issuer=token.iss,
         subject=token.sub,
+        expires_at=token.exp,
         email=token.email,
         # Treat missing email_verified as True, particularly for Google id_tokens which
         # may omit it when implicit (like via mobile Capacitor SDKs).
@@ -105,11 +106,12 @@ def require_player_control_access(
     ds: DS,
     identity: Annotated[AuthenticatedIdentity | None, Depends(current_identity)],
     services: Annotated[AuthServices, Depends(get_auth_services)],
-) -> None:
-    require_account_owner(account_id, identity, services)
+) -> AuthenticatedIdentity | None:
+    identity = require_account_owner(account_id, identity, services)
     get_or_404(
         ds.players.get(player_id, path_params={"account_id": account_id}),
         "Player not found",
         account_id=account_id,
         player_id=player_id,
     )
+    return identity

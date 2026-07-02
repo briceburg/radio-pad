@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class AuthenticatedIdentity(BaseModel):
     issuer: str
     subject: str
+    expires_at: int | None = None
     email: str | None = None
     email_verified: bool = False
 

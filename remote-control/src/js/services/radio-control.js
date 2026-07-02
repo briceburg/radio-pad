@@ -55,6 +55,7 @@ export class RadioControl extends EventTarget {
     this.reconnectDelay = 1000;
     this._lastUrl = null;
     this._lastToken = null;
+    this.authenticated = false;
   }
 
   connect(url = null, token = null) {
@@ -69,6 +70,7 @@ export class RadioControl extends EventTarget {
   disconnect() {
     this._lastUrl = null;
     this._lastToken = null;
+    this.authenticated = false;
     const hadSocket = Boolean(this.ws);
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
@@ -92,7 +94,11 @@ export class RadioControl extends EventTarget {
   }
 
   sendCommand(event, data = null) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (
+      this.authenticated &&
+      this.ws &&
+      this.ws.readyState === WebSocket.OPEN
+    ) {
       this.ws.send(JSON.stringify({ event, data }));
       return;
     }
@@ -125,42 +131,41 @@ export class RadioControl extends EventTarget {
 
     this.dispatchEvent(new CustomEvent("connecting", { detail: url }));
 
-    let wsUrl = url;
-    if (token) {
-      try {
-        const u = new URL(wsUrl);
-        u.searchParams.set("token", token);
-        wsUrl = u.toString();
-      } catch {}
-    }
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(url);
     this.ws = ws;
+    this.authenticated = false;
 
     this.connectTimer = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
+      if (!this.authenticated) {
         ws.close();
       }
     }, 10000);
 
     ws.onopen = () => {
-      clearTimeout(this.connectTimer);
-      this.reconnectDelay = 1000;
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-      }
-      this.dispatchEvent(new CustomEvent("connect", { detail: url }));
+      ws.send(JSON.stringify({ event: "authenticate", data: { token } }));
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       clearTimeout(this.connectTimer);
+      this.ws = null;
+      this.authenticated = false;
+      if (event.code === 1008) {
+        this._lastUrl = null;
+        this._lastToken = null;
+        const detail =
+          event.reason === "Access denied"
+            ? "You don’t have access to this player."
+            : "Session expired—sign in again.";
+        this.dispatchEvent(new CustomEvent("accessdenied", { detail }));
+        return;
+      }
       this.dispatchEvent(new Event("disconnect"));
       this._scheduleReconnect();
     };
 
     ws.onerror = () => {
-      clearTimeout(this.connectTimer);
       this.dispatchEvent(
-        new CustomEvent("error", { detail: "WebSocket error." }),
+        new CustomEvent("error", { detail: "WebSocket connection error." }),
       );
     };
 
@@ -168,6 +173,13 @@ export class RadioControl extends EventTarget {
       try {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
+          case "authenticated":
+            clearTimeout(this.connectTimer);
+            this.authenticated = true;
+            this.reconnectDelay = 1000;
+            if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+            this.dispatchEvent(new CustomEvent("connect", { detail: url }));
+            break;
           case "playback_state": {
             const state = data && typeof data === "object" ? data : {};
             this.dispatchEvent(

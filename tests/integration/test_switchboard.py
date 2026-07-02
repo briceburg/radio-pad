@@ -30,6 +30,8 @@ async def test_player_connect(switchboard_url):
 async def test_controller_connects_without_token_when_auth_is_disabled(switchboard_url):
     """Local Compose permits tokenless controllers while OIDC is disabled."""
     async with websockets.connect(f"{switchboard_url}/{REGISTERED_PLAYER_ROOM}") as ws:
+        await ws.send(json.dumps({"event": "authenticate", "data": {"token": None}}))
+        assert json.loads(await ws.recv()) == {"event": "authenticated", "data": {"expires_at": None}}
         await ws.send(json.dumps({"event": "ping"}))
         async with asyncio.timeout(3):
             while True:

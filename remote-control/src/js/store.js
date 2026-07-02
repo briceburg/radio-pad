@@ -44,6 +44,7 @@ export const controlStore = atom({
   failedStation: null,
   loading: false,
   connectionState: "idle",
+  connectionMessage: null,
   playerConnected: null,
   playerStatuses: {},
   resourceStatuses: {},
@@ -97,7 +98,6 @@ export function isDegradedStatus(status) {
 if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
   import("@nanostores/logger").then(({ logger }) => {
     logger({
-      authStore,
       preferencesStore,
       settingsUiStore,
       controlStore,

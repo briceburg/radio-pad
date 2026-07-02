@@ -15,6 +15,8 @@ describe("RadioControl", () => {
     const rc = new RadioControl();
     rc.connect(url);
     rc.ws.readyState = WebSocket.OPEN;
+    rc.ws.onopen();
+    receiveEvent(rc, "authenticated", null);
     return rc;
   }
 
@@ -60,22 +62,22 @@ describe("RadioControl", () => {
       "uses an absolute browser override",
       "ws://localhost:8080",
       false,
-      "ws://remote-server:9000/player/foo?token=123",
-      "ws://localhost:8080/player/foo?token=123",
+      "ws://remote-server:9000/player/foo?region=west",
+      "ws://localhost:8080/player/foo?region=west",
     ],
     [
       "resolves a same-origin browser override",
       "/switchboard",
       false,
-      "ws://remote-server:9000/switchboard/player/foo?token=123",
-      "ws://localhost:3000/switchboard/player/foo?token=123",
+      "ws://remote-server:9000/switchboard/player/foo?region=west",
+      "ws://localhost:3000/switchboard/player/foo?region=west",
     ],
     [
       "ignores browser overrides on native platforms",
       "ws://localhost:8080",
       true,
-      "ws://remote-server:9000/player/foo?token=123",
-      "ws://remote-server:9000/player/foo?token=123",
+      "ws://remote-server:9000/player/foo?region=west",
+      "ws://remote-server:9000/player/foo?region=west",
     ],
   ])("%s", (_case, override, isNative, input, expected) => {
     vi.stubEnv("VITE_SWITCHBOARD_URL", override);
@@ -85,6 +87,39 @@ describe("RadioControl", () => {
     rc.connect(input);
 
     expect(global.WebSocket).toHaveBeenCalledWith(expected);
+  });
+
+  it("authenticates in the first message without exposing the token in the URL", () => {
+    const rc = new RadioControl();
+
+    rc.connect("ws://example.com/switchboard/account/player", "secret-token");
+    rc.ws.onopen();
+
+    expect(global.WebSocket).toHaveBeenCalledWith(
+      "ws://example.com/switchboard/account/player",
+    );
+    expect(mockWebSocketInstance.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: "authenticate",
+        data: { token: "secret-token" },
+      }),
+    );
+  });
+
+  it.each([
+    ["Authentication required", "Session expired—sign in again."],
+    ["Access denied", "You don’t have access to this player."],
+  ])("stops reconnecting after %s", (reason, detail) => {
+    const rc = new RadioControl();
+    const listener = vi.fn();
+    rc.addEventListener("accessdenied", listener);
+    rc.connect("ws://example.com/", "token");
+
+    rc.ws.onclose({ code: 1008, reason });
+    vi.advanceTimersByTime(60_000);
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail }));
+    expect(global.WebSocket).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -117,6 +152,19 @@ describe("RadioControl", () => {
       expect.objectContaining({
         detail: "WebSocket not connected. Cannot send playback_start command.",
       }),
+    );
+  });
+
+  it("reports WebSocket connection errors", () => {
+    const rc = new RadioControl();
+    const listener = vi.fn();
+    rc.addEventListener("error", listener);
+    rc.connect("ws://example.com/");
+
+    rc.ws.onerror();
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: "WebSocket connection error." }),
     );
   });
 

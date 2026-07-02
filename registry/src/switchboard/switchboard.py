@@ -1,8 +1,9 @@
 import asyncio
 import json
 import logging
+import time
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketException, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
 
 from auth.socket_auth import validate_socket_client
 from switchboard.broadcast import Broadcast
@@ -10,6 +11,8 @@ from switchboard.broadcast import Broadcast
 router = APIRouter()
 logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
+AUTHENTICATION_REQUIRED_REASON = "Authentication required"
+CONTROLLER_AUTH_TIMEOUT_SECONDS = 10
 RETAINED_EVENTS = {"radio_dial_url", "player_presence", "playback_state"}
 PLAYER_STATUS_SCOPES = {"radio_dial", "switchboard", "playback"}
 PLAYER_COMMAND_EVENTS = {
@@ -23,6 +26,40 @@ PLAYER_STATE_EVENTS = {
     "player_status",
 }
 ACTIVE_PLAYER_CONNECTIONS: set[str] = set()
+
+
+class _SessionExpired(Exception):
+    pass
+
+
+async def _authenticate_controller(websocket: WebSocket, account_id: str, player_id: str) -> tuple[bool, int | None]:
+    try:
+        async with asyncio.timeout(CONTROLLER_AUTH_TIMEOUT_SECONDS):
+            payload = json.loads(await websocket.receive_text())
+        if not isinstance(payload, dict):
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+        data = payload.get("data")
+        if payload.get("event") != "authenticate" or not isinstance(data, dict) or "token" not in data:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+        token = data.get("token")
+        if token is not None and not isinstance(token, str):
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+        expires_at = await validate_socket_client(websocket, account_id, player_id, token or None)
+    except WebSocketDisconnect:
+        return False, None
+    except (TimeoutError, json.JSONDecodeError):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+        return False, None
+    except WebSocketException as exc:
+        await websocket.close(code=exc.code, reason=exc.reason)
+        return False, None
+    except Exception:
+        logger.exception("Unexpected socket auth error for %s/%s", account_id, player_id)
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error")
+        return False, None
+
+    await websocket.send_json({"event": "authenticated", "data": {"expires_at": expires_at}})
+    return True, expires_at
 
 
 def _state_key(event: str, data: object) -> str | None:
@@ -60,7 +97,13 @@ async def publish_event(broadcast: Broadcast, channel: str, event: str, data: ob
     await broadcast.publish(channel, message)
 
 
-async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str, is_player: bool) -> None:
+async def _run_loop(
+    websocket: WebSocket,
+    broadcast: Broadcast,
+    player_key: str,
+    is_player: bool,
+    expires_at: int | None = None,
+) -> None:
     async def sender() -> None:
         async with broadcast.subscribe(player_key, replay=not is_player) as subscriber:
             async for event in subscriber:
@@ -72,9 +115,19 @@ async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str,
 
     async def receiver() -> None:
         while True:
-            msg = await websocket.receive_text()
+            try:
+                if expires_at is None:
+                    msg = await websocket.receive_text()
+                else:
+                    async with asyncio.timeout(max(expires_at - time.time(), 0)):
+                        msg = await websocket.receive_text()
+            except TimeoutError as exc:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+                raise _SessionExpired from exc
             try:
                 payload = json.loads(msg)
+                if not isinstance(payload, dict):
+                    continue
                 event = payload.get("event")
                 data = payload.get("data")
                 if not event:
@@ -94,7 +147,7 @@ async def _run_loop(websocket: WebSocket, broadcast: Broadcast, player_key: str,
         async with asyncio.TaskGroup() as tg:
             tg.create_task(sender())
             tg.create_task(receiver())
-    except* WebSocketDisconnect:
+    except* (_SessionExpired, WebSocketDisconnect):
         pass
 
 
@@ -103,29 +156,24 @@ async def websocket_endpoint(
     websocket: WebSocket,
     account_id: str,
     player_id: str,
-    token: str | None = Query(default=None),
 ) -> None:
     user_agent = websocket.headers.get("User-Agent", "")
     is_player = user_agent.startswith(PLAYER_USER_AGENT_PREFIX)
     player_key = f"{account_id}/{player_id}"
     radio_dial_url: str | None = None
 
-    # Authenticate controllers
-    if not is_player:
-        try:
-            await validate_socket_client(websocket, account_id, player_id, token)
-        except WebSocketException:
-            raise
-        except Exception as exc:
-            logger.exception("Unexpected socket auth error for %s", player_key)
-            raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error") from exc
-    else:
+    if is_player:
         radio_dial_url = websocket.headers.get("RadioPad-Radio-Dial-Url")
         if not radio_dial_url:
             await websocket.close(code=4000, reason="RadioPad-Radio-Dial-Url header required")
             return
 
     await websocket.accept()
+    expires_at = None
+    if not is_player:
+        authenticated, expires_at = await _authenticate_controller(websocket, account_id, player_id)
+        if not authenticated:
+            return
 
     broadcast: Broadcast | None = getattr(websocket.app.state, "broadcast", None)
     if not broadcast:
@@ -153,7 +201,7 @@ async def websocket_endpoint(
                 "radio_dial_url",
                 radio_dial_url,
             )
-        await _run_loop(websocket, broadcast, player_key, is_player=is_player)
+        await _run_loop(websocket, broadcast, player_key, is_player=is_player, expires_at=expires_at)
     finally:
         if is_player:
             ACTIVE_PLAYER_CONNECTIONS.discard(player_key)

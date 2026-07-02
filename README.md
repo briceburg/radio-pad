@@ -179,7 +179,7 @@ flowchart TD
     Remote -- "Read auth status + registered players" --> Registry
     Registry -- "Auth mode + public player data" --> Remote
     User -. "Google OIDC when auth enabled" .-> Remote
-    Remote -- "[?token=] Connect to Switchboard" --> Switchboard
+    Remote -- "Connect + authenticate event" --> Switchboard
     Switchboard -- "Validate account-owner control access" --> Registry
     Player -- "Connect as Player" --> Switchboard
     Switchboard -- "Route controls to Player" --> Player
@@ -188,10 +188,10 @@ flowchart TD
 Player control follows the registry's advertised auth mode:
 
 * Player registry reads remain public.
-* When registry auth is disabled, the remote discovers players and connects to the switchboard without a token.
-* When registry auth is enabled, the remote signs in and supplies its OIDC token during the WebSocket connection.
+* Every controller connection starts with an `authenticate` event; its token is null when registry auth is disabled.
+* When registry auth is enabled, the remote signs in and supplies its OIDC token only in that first WebSocket message, never in the URL.
 * The switchboard validates account-owner control access locally (unified mode) or through the registry API (split mode).
-* Unauthorized connections are rejected.
+* The switchboard sends `authenticated` before replaying state or accepting commands. Unauthorized or expired sessions close with policy code `1008`.
 
 ### Contributing
 

@@ -158,11 +158,13 @@ export function createControlActions({ control, listen }) {
   control.addEventListener("connect", () =>
     updateTab("control", {
       connectionState: "connected",
+      connectionMessage: null,
     }),
   );
   control.addEventListener("connecting", () =>
     updateTab("control", {
       connectionState: "connecting",
+      connectionMessage: null,
       playerConnected: null,
       currentStation: null,
       requestedStation: null,
@@ -172,12 +174,24 @@ export function createControlActions({ control, listen }) {
   control.addEventListener("disconnect", () =>
     updateTab("control", {
       connectionState: "disconnected",
+      connectionMessage: null,
       playerConnected: null,
       currentStation: null,
       requestedStation: null,
       failedStation: null,
     }),
   );
+  control.addEventListener("accessdenied", (event) => {
+    updateTab("control", {
+      connectionState: "unauthorized",
+      connectionMessage: event.detail,
+      playerConnected: null,
+      currentStation: null,
+      requestedStation: null,
+      failedStation: null,
+    });
+    toastWarning(event.detail);
+  });
   control.addEventListener("error", (event) => toastWarning(event.detail));
   control.addEventListener("playbackstate", (event) =>
     updateTab("control", {
@@ -204,15 +218,15 @@ export function createControlActions({ control, listen }) {
   authStore.subscribe((authState) => {
     const newToken = authState.registryBearerToken;
     if (newToken !== lastAuthToken) {
+      const signedOut = Boolean(lastAuthToken && !newToken);
       lastAuthToken = newToken;
-      // Only proactively reconnect if we have a new token.
-      // If we signed out (lost token), we rely on settings sync to gracefully
-      // drop the player if it's no longer accessible.
       if (newToken) {
         const player = controlStore.get().player;
         if (player?.switchboard_url) {
           control.connect(player.switchboard_url, newToken);
         }
+      } else if (signedOut) {
+        control.disconnect();
       }
     }
   });
@@ -233,6 +247,7 @@ export function createControlActions({ control, listen }) {
         requestedStation: null,
         failedStation: null,
         connectionState: player ? "connecting" : "idle",
+        connectionMessage: null,
         playerConnected: null,
         playerStatuses: {},
         resourceStatuses: {},
