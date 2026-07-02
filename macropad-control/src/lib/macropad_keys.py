@@ -23,7 +23,6 @@ from lib.macropad_time import ticks_diff, ticks_ms
 DEFAULT_COLOR = 0x000077
 PLAYING_COLOR = 0x015C01
 PENDING_COLOR = 0x805000
-PRESSED_COLOR = 0x999999
 MACROPAD_KEY_COUNT = 12
 DEGRADED_COLOR = 0x402000
 KEY_PIXEL_BRIGHTNESS = 0.08
@@ -113,11 +112,14 @@ class MacropadKeys:
         display_station_index = self.pending_station_index
         if display_station_index is None:
             display_station_index = self.playing_station_index
-        if self.title_override is None and display_station_index is not None:
+        if display_station_index is not None:
             station_page_index = self.get_station_page_index(display_station_index)
             if self.current_page_index == station_page_index:
                 station_name = stations[display_station_index % MACROPAD_KEY_COUNT] or "?"
-                title = f"Starting {station_name}" if self.pending_station_index is not None else station_name
+                if self.pending_station_index is not None:
+                    title = f"Starting {station_name}"
+                elif self.title_override is None:
+                    title = station_name
 
         self.display.set_title(title, False)
 
@@ -148,14 +150,13 @@ class MacropadKeys:
         if self.visual_mode:
             self._animate_skeleton()
 
-    def set_key_color(self, key_index, color):
-        if 0 <= key_index < MACROPAD_KEY_COUNT:
-            self.macropad.pixels[key_index] = color
-            self.macropad.pixels.show()
-
     def set_playback_state(self, call_sign, requested_call_sign):
         self.playing_station_index = self._station_index(call_sign)
-        self.pending_station_index = self._station_index(requested_call_sign)
+        self.set_pending_station(requested_call_sign)
+
+    def set_pending_station(self, call_sign):
+        """Show the latest local or authoritative playback request."""
+        self.pending_station_index = self._station_index(call_sign)
 
         visible_station_index = self.pending_station_index
         if visible_station_index is None:

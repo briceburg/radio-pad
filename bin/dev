@@ -5,6 +5,10 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mode="${RADIOPAD_MACROPAD:-auto}"
 compose_files=(-f "$root/compose.yaml")
 
+if [ -d /dev/snd ]; then
+  compose_files+=(-f "$root/compose.audio.yaml")
+fi
+
 die() {
   echo "[error] $*" >&2
   exit 1

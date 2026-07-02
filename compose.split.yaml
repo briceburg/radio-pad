@@ -28,6 +28,9 @@ services:
     extends:
       file: compose.yaml
       service: remote-control
+    depends_on:
+      switchboard:
+        condition: service_healthy
     environment:
       RADIOPAD_SWITCHBOARD_PROXY_TARGET: "ws://switchboard:1980"
 

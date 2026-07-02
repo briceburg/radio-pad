@@ -21,6 +21,7 @@ services:
       registry:
         condition: service_healthy
     environment:
+      RADIOPAD_AUDIO_DEVICE: "${RADIOPAD_AUDIO_DEVICE:-}"
       RADIOPAD_AUDIO_OUTPUT: "${RADIOPAD_AUDIO_OUTPUT:-}"
       RADIOPAD_REGISTRY_URL: "http://registry:1980/api/"
       RADIOPAD_PLAYER: "briceburg/living-room"
@@ -31,6 +32,9 @@ services:
     build:
       context: ./remote-control
       target: dev
+    depends_on:
+      registry:
+        condition: service_healthy
     environment:
       VITE_REGISTRY_URL: "/api/"
       VITE_SWITCHBOARD_URL: "/switchboard"

@@ -36,12 +36,14 @@ class MpvPlayer(RadioPadPlayer):
         self,
         config: RadioPadPlayerConfig | None = None,
         audio_channels: str = "stereo",
+        audio_device: str | None = None,
         audio_output: str | None = None,
         socket_path: str = "/tmp/radio-pad-mpv.sock",
         playback_timeout_seconds: float = 15,
     ):
         super().__init__(config)
         self.audio_channels = audio_channels
+        self.audio_device = audio_device
         self.audio_output = audio_output
         self.socket_path = socket_path
         self.playback_timeout_seconds = playback_timeout_seconds
@@ -72,6 +74,7 @@ class MpvPlayer(RadioPadPlayer):
                     "--stream-lavf-o=reconnect_streamed=1",
                     "--profile=low-latency",
                     f"--audio-channels={self.audio_channels}",
+                    *([f"--audio-device={self.audio_device}"] if self.audio_device else []),
                     *([f"--ao={self.audio_output}"] if self.audio_output else []),
                 ],
                 stdin=subprocess.DEVNULL,
