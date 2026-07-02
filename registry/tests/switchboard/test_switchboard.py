@@ -7,20 +7,25 @@ TestClient context.
 Those flows are covered by the compose-based integration tests instead.
 """
 
+import asyncio
 import time
 from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import WebSocketException
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
+from api.auth import AuthServices
+from auth import AccountOwners, AuthzStore, RegistryIDToken
+from datastore import LocalBackend
 from registry import create_app
 from switchboard.broadcast import Broadcast
 from switchboard.switchboard import (
     ACTIVE_PLAYER_CONNECTIONS,
     _cleared_state_key,
+    _run_loop,
     _state_key,
     websocket_endpoint,
 )
@@ -66,29 +71,121 @@ async def test_controller_auth_validation_receives_missing_token(monkeypatch: py
     websocket = AsyncMock()
     websocket.headers = {}
     websocket.app.state.broadcast = Broadcast()
+    websocket.receive_text.return_value = '{"event":"authenticate","data":{"token":null}}'
     validate = AsyncMock()
+    validate.return_value = None
     run_loop = AsyncMock()
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
     monkeypatch.setattr("switchboard.switchboard._run_loop", run_loop)
 
-    await websocket_endpoint(websocket, "acct", "player1", token=None)
+    await websocket_endpoint(websocket, "acct", "player1")
 
     validate.assert_awaited_once_with(websocket, "acct", "player1", None)
     websocket.accept.assert_awaited_once()
+    websocket.send_json.assert_awaited_once_with({"event": "authenticated", "data": {"expires_at": None}})
 
 
 async def test_controller_auth_internal_error_closes_1011(monkeypatch: pytest.MonkeyPatch) -> None:
     websocket = AsyncMock()
     websocket.headers = {}
+    websocket.receive_text.return_value = '{"event":"authenticate","data":{"token":"token"}}'
     validate = AsyncMock(side_effect=RuntimeError("auth backend unavailable"))
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
 
-    with pytest.raises(WebSocketException) as exc:
-        await websocket_endpoint(websocket, "acct", "player1", token=None)
+    await websocket_endpoint(websocket, "acct", "player1")
 
-    assert exc.value.code == 1011
-    assert exc.value.reason == "Validation internal error"
-    websocket.accept.assert_not_awaited()
+    websocket.accept.assert_awaited_once()
+    websocket.close.assert_awaited_once_with(code=1011, reason="Validation internal error")
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        '{"event":"authenticate","data":"token"}',
+        '{"event":"authenticate","data":{}}',
+        '{"event":"authenticate","data":{"token":123}}',
+    ],
+)
+async def test_controller_auth_rejects_malformed_messages(
+    monkeypatch: pytest.MonkeyPatch,
+    message: str,
+) -> None:
+    websocket = AsyncMock()
+    websocket.headers = {}
+    websocket.receive_text.return_value = message
+    validate = AsyncMock()
+    monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
+
+    await websocket_endpoint(websocket, "acct", "player1")
+
+    validate.assert_not_awaited()
+    websocket.accept.assert_awaited_once()
+    websocket.close.assert_awaited_once_with(code=1008, reason="Authentication required")
+
+
+def test_authenticated_controller_receives_retained_player_state(tmp_path: Path) -> None:
+    from tests.api._app import build_store
+
+    store = build_store(tmp_path / "data", seed=True)
+    authz = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
+    authz.save_account_owners(AccountOwners(id="testuser1", emails=["owner@example.com"]))
+
+    def authenticate(token: str) -> RegistryIDToken:
+        if token != "valid-token":
+            raise ValueError("Invalid bearer token")
+        return RegistryIDToken(
+            iss="https://issuer.example",
+            sub="owner",
+            aud="radio-pad-remote-control",
+            exp=4_102_444_800,
+            iat=1_700_000_000,
+            email="owner@example.com",
+            email_verified=True,
+        )
+
+    app = create_app(profiles=["api", "switchboard"])
+    app.state.store = store
+    app.state.auth = AuthServices(authenticate_user=authenticate, authz_store=authz)
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/switchboard/testuser1/player1", headers=PLAYER_HEADERS) as player:
+            player.send_json({"event": "playback_state", "data": {"call_sign": "KEXP"}})
+            player.send_json({"event": "ping"})
+            while player.receive_json().get("event") != "pong":
+                pass
+
+            with client.websocket_connect("/switchboard/testuser1/player1") as controller:
+                controller.send_json({"event": "authenticate", "data": {"token": "valid-token"}})
+                assert controller.receive_json() == {
+                    "event": "authenticated",
+                    "data": {"expires_at": 4_102_444_800},
+                }
+                while (message := controller.receive_json()).get("event") != "playback_state":
+                    pass
+                assert message["data"] == {"call_sign": "KEXP"}
+
+            with client.websocket_connect("/switchboard/testuser1/player1") as signed_out:
+                signed_out.send_json({"event": "authenticate", "data": {"token": None}})
+                with pytest.raises(WebSocketDisconnect) as error:
+                    signed_out.receive_json()
+                assert error.value.code == 1008
+                assert error.value.reason == "Authentication required"
+
+            _close_player(player, "testuser1/player1")
+
+
+async def test_controller_session_closes_at_token_expiry() -> None:
+    websocket = AsyncMock()
+
+    async def wait_for_message() -> str:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    websocket.receive_text.side_effect = wait_for_message
+
+    await _run_loop(websocket, Broadcast(), "acct/player1", is_player=False, expires_at=0)
+
+    websocket.close.assert_awaited_once_with(code=1008, reason="Authentication required")
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:
@@ -118,6 +215,16 @@ def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
     """Messages without an 'event' field are ignored."""
     with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
         ws.send_json({"data": "should be ignored"})
+        ws.send_json({"event": "ping"})
+        resp = ws.receive_json()
+        assert resp["event"] == "pong"
+        _close_player(ws)
+
+
+def test_non_object_json_ignored(switchboard_client: TestClient) -> None:
+    """Valid JSON messages without object shape are ignored."""
+    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
+        ws.send_text("[]")
         ws.send_json({"event": "ping"})
         resp = ws.receive_json()
         assert resp["event"] == "pong"

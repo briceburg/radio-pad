@@ -13,12 +13,18 @@ from datastore import LocalBackend
 from tests.api._app import build_client, build_store
 
 
-def _token(*, subject: str, email: str | None = None, email_verified: bool = False) -> RegistryIDToken:
+def _token(
+    *,
+    subject: str,
+    email: str | None = None,
+    email_verified: bool = False,
+    exp: int = 4_102_444_800,
+) -> RegistryIDToken:
     return RegistryIDToken(
         iss="https://issuer.example",
         sub=subject,
         aud="radio-pad-remote-control",
-        exp=4_102_444_800,
+        exp=exp,
         iat=1_700_000_000,
         email=email,
         email_verified=email_verified,
@@ -107,6 +113,7 @@ def test_control_access_is_open_when_auth_is_disabled(tmp_path: Path) -> None:
 
     assert response.status_code == 204
     assert response.headers["cache-control"] == "no-store"
+    assert "radiopad-token-expires-at" not in response.headers
 
 
 def test_control_access_requires_bearer_token_when_auth_is_enabled(tmp_path: Path) -> None:
@@ -138,6 +145,24 @@ def test_account_owners_have_control_access(tmp_path: Path, token: str, email: s
 
     assert response.status_code == 204
     assert response.headers["cache-control"] == "no-store"
+    assert response.headers["radiopad-token-expires-at"] == "4102444800"
+
+
+def test_control_access_returns_zero_token_expiry(tmp_path: Path) -> None:
+    client = _auth_client(
+        tmp_path,
+        {"owner": _token(subject="owner", email="owner@example.com", email_verified=True, exp=0)},
+        _with_account_owners("testuser1", "owner@example.com"),
+    )
+
+    with client:
+        response = client.get(
+            "auth/players/testuser1/player1/control",
+            headers=_bearer("owner"),
+        )
+
+    assert response.status_code == 204
+    assert response.headers["radiopad-token-expires-at"] == "0"
 
 
 @pytest.mark.parametrize(

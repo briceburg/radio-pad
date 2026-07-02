@@ -10,8 +10,9 @@ import { controlStore } from "../../src/js/store.js";
 afterEach(() => document.body.replaceChildren());
 
 describe("radio-player-tab", () => {
-  it("treats disconnected and offline control states as degraded", () => {
+  it("treats disconnected, unauthorized, and offline control states as degraded", () => {
     expect(isControlDegraded({ connectionState: "disconnected" })).toBe(true);
+    expect(isControlDegraded({ connectionState: "unauthorized" })).toBe(true);
     expect(isControlDegraded({ playerConnected: false })).toBe(true);
   });
 
@@ -55,6 +56,12 @@ describe("radio-player-tab", () => {
         },
       }),
     ).toBe("RadioDial unavailable.");
+    expect(
+      getControlTitleStatus({
+        connectionState: "unauthorized",
+        connectionMessage: "Session expired—sign in again.",
+      }),
+    ).toBe("Session expired—sign in again.");
   });
 
   it("derives station visual states", () => {
@@ -83,6 +90,7 @@ describe("radio-player-tab", () => {
       failedStation: null,
       loading: false,
       connectionState: "idle",
+      connectionMessage: null,
       playerConnected: null,
       playerStatuses: {},
       resourceStatuses: {},

@@ -7,4 +7,9 @@ export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 uv run mypy src/ tests/
 uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
-REGISTRY_PROFILES=api uv run pytest
+
+# Keep component CI auth-disabled even when local shell env enables OIDC.
+export REGISTRY_AUTH_OIDC_CLIENT_IDS=""
+export REGISTRY_AUTH_OIDC_ISSUER=""
+export REGISTRY_PROFILES=api
+uv run pytest

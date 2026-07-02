@@ -97,18 +97,27 @@ async def test_validate_remote_forwards_optional_token(
     token: str | None,
     headers: dict[str, str],
 ) -> None:
-    mock_response = httpx2.Response(204, request=httpx2.Request("GET", "http://test"))
+    response_headers = {"RadioPad-Token-Expires-At": "4102444800"} if token else {}
+    mock_response = httpx2.Response(204, headers=response_headers, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
-    await validate_remote(mock_request, "acct", "player1", token)
+    expires_at = await validate_remote(mock_request, "acct", "player1", token)
+    assert expires_at == (4_102_444_800 if token else None)
     mock_request.app.state.http_client.get.assert_called_once_with(
         "http://localhost:8000/api/auth/players/acct/player1/control",
         headers=headers,
     )
 
 
-@pytest.mark.parametrize("response_status", [401, 403, 404])
-async def test_validate_remote_rejects_denied_access(mock_request: AsyncMock, response_status: int) -> None:
+@pytest.mark.parametrize(
+    ("response_status", "reason"),
+    [(401, "Authentication required"), (403, "Access denied"), (404, "Access denied")],
+)
+async def test_validate_remote_rejects_denied_access(
+    mock_request: AsyncMock,
+    response_status: int,
+    reason: str,
+) -> None:
     mock_response = httpx2.Response(response_status, request=httpx2.Request("GET", "http://test"))
     mock_request.app.state.http_client.get.return_value = mock_response
 
@@ -116,7 +125,7 @@ async def test_validate_remote_rejects_denied_access(mock_request: AsyncMock, re
         await validate_remote(mock_request, "acct", "player1", "bad-token")
 
     assert exc.value.code == 1008
-    assert "Unauthorized" in exc.value.reason
+    assert exc.value.reason == reason
 
 
 @pytest.mark.parametrize(

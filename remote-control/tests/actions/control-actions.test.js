@@ -45,6 +45,7 @@ describe("control-actions", () => {
       failedStation: null,
       loading: false,
       connectionState: "idle",
+      connectionMessage: null,
       playerConnected: null,
       playerStatuses: {},
       resourceStatuses: {},
@@ -191,6 +192,21 @@ describe("control-actions", () => {
       currentStation: null,
       requestedStation: null,
       failedStation: null,
+    });
+  });
+
+  it("shows terminal authentication failures", () => {
+    const { control } = createActions();
+
+    control.dispatchEvent(
+      new CustomEvent("accessdenied", {
+        detail: "Session expired—sign in again.",
+      }),
+    );
+
+    expect(controlStore.get()).toMatchObject({
+      connectionState: "unauthorized",
+      connectionMessage: "Session expired—sign in again.",
     });
   });
 

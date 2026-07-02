@@ -28,6 +28,8 @@ Set `VITE_GOOGLE_CLIENT_ID` in `.env` to enable sign-in on the web app.
 
 The remote reads the registry's auth status at runtime. When registry auth is disabled, public player discovery and
 tokenless switchboard control remain available for local development.
+Controllers authenticate in their first WebSocket message so OIDC tokens never appear in switchboard URLs or access
+logs. Authentication and authorization failures stop reconnecting and remain visible in the Control title.
 
 Settings edits remain local drafts until you select `Save`. Changing the Account hides its Player and RadioDial choices
 until Save refreshes discovery; the current Control player remains active until that save completes.
