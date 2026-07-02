@@ -1,6 +1,7 @@
 services:
   player:
-    user: root
+    group_add:
+      - "${RADIOPAD_MACROPAD_GID:?set RADIOPAD_MACROPAD_GID to the macropad device group id or use bin/dev}"
     environment:
       RADIOPAD_MACROPAD_PORT: /dev/macropad
     devices:

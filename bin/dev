@@ -5,13 +5,38 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mode="${RADIOPAD_MACROPAD:-auto}"
 compose_files=(-f "$root/compose.yaml")
 
-if [ -d /dev/snd ]; then
-  compose_files+=(-f "$root/compose.audio.yaml")
-fi
-
 die() {
   echo "[error] $*" >&2
   exit 1
+}
+
+set_device_gid() {
+  local var_name="$1"
+  local device="$2"
+  local gid
+
+  if [ -n "${!var_name:-}" ] || [ -z "$device" ]; then
+    return 0
+  fi
+
+  gid="$(stat -c "%g" "$device" 2>/dev/null || true)"
+  if [ -n "$gid" ]; then
+    export "$var_name=$gid"
+  fi
+}
+
+use_audio() {
+  local audio_device
+
+  audio_device="$(find /dev/snd -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null || true)"
+  set_device_gid RADIOPAD_AUDIO_GID "$audio_device"
+
+  compose_files+=(-f "$root/compose.audio.yaml")
+  if [ -n "${RADIOPAD_AUDIO_GID:-}" ]; then
+    echo "[info] exposing ALSA devices with group $RADIOPAD_AUDIO_GID" >&2
+  else
+    echo "[info] exposing ALSA devices" >&2
+  fi
 }
 
 usage() {
@@ -38,9 +63,19 @@ macropad_device() {
 
 use_macropad() {
   export RADIOPAD_MACROPAD_DEVICE="$1"
+  set_device_gid RADIOPAD_MACROPAD_GID "$RADIOPAD_MACROPAD_DEVICE"
+
   compose_files+=(-f "$root/compose.macropad.yaml")
-  echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
+  if [ -n "${RADIOPAD_MACROPAD_GID:-}" ]; then
+    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE with group $RADIOPAD_MACROPAD_GID" >&2
+  else
+    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
+  fi
 }
+
+if [ -d /dev/snd ]; then
+  use_audio
+fi
 
 case "$mode" in
   auto|required)
