@@ -31,6 +31,10 @@ READINESS_POLL_SECONDS = 0.2
 PROCESS_STOP_TIMEOUT_SECONDS = 2
 
 
+class PlaybackStartError(RuntimeError):
+    """Expected failure while establishing usable playback."""
+
+
 class MpvPlayer(RadioPadPlayer):
     def __init__(
         self,
@@ -91,10 +95,15 @@ class MpvPlayer(RadioPadPlayer):
         except asyncio.CancelledError:
             await self.stop()
             raise
-        except TimeoutError as e:
+        except TimeoutError:
             await self.stop()
-            logger.error("playback timed out for %s: %s", station.call_sign, e)
+            logger.warning("playback timed out for %s", station.call_sign)
             await self._report_status("error", "Playback timed out")
+            return False
+        except PlaybackStartError as e:
+            await self.stop()
+            logger.warning("playback failed for %s: %s", station.call_sign, e)
+            await self._report_status("error", "Playback failed")
             return False
         except Exception as e:
             await self.stop()
@@ -170,7 +179,7 @@ class MpvPlayer(RadioPadPlayer):
             self._require_running_process()
             sock = self.mpv_sock
             if sock is None:
-                raise RuntimeError("mpv IPC disconnected before playback was ready")
+                raise PlaybackStartError("mpv IPC disconnected before playback was ready")
             try:
                 idle_active, audio_params = await asyncio.to_thread(
                     lambda: (sock.idle_active, sock.audio_params),
@@ -185,7 +194,7 @@ class MpvPlayer(RadioPadPlayer):
         process = self.mpv_process
         if process is None or process.poll() is not None:
             return_code = process.poll() if process else None
-            raise RuntimeError(f"mpv exited before playback was ready (code {return_code})")
+            raise PlaybackStartError(f"mpv exited before playback was ready (code {return_code})")
 
     def _remove_stale_socket(self):
         try:
