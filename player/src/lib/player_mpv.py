@@ -87,7 +87,6 @@ class MpvPlayer(RadioPadPlayer):
                 await self._wait_for_audio_ready()
             self.station = station
             logger.info("confirmed playback for station %s", station.call_sign)
-            await self._report_status("ok", None)
             return True
         except asyncio.CancelledError:
             await self.stop()
@@ -106,7 +105,6 @@ class MpvPlayer(RadioPadPlayer):
     async def stop(self):
         """Stop playback of the current station."""
         self.station = None
-        await self._report_status("ok", None)
         if self.mpv_sock:
             try:
                 self.mpv_sock.stop()

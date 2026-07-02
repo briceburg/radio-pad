@@ -129,8 +129,8 @@ def test_listen_handles_serial_playback_start():
     asyncio.run(listen_and_settle())
 
     expected = [
-        event("playback_state", {"call_sign": None, "requested_call_sign": "KEXP"}),
-        event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None}),
+        event("playback_state", {"call_sign": None, "requested_call_sign": "KEXP", "failed_call_sign": None}),
+        event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None, "failed_call_sign": None}),
     ]
     assert player.played == [player.kexp]
     assert written_events(writer) == expected
@@ -146,7 +146,7 @@ def test_station_menu_request_writes_call_signs_and_current_station():
 
     assert written_events(writer) == [
         event("station_menu", ["KEXP", "KGUT"]),
-        event("playback_state", {"call_sign": "KGUT", "requested_call_sign": None}),
+        event("playback_state", {"call_sign": "KGUT", "requested_call_sign": None, "failed_call_sign": None}),
     ]
     assert writer.drains == 2
 
@@ -182,7 +182,7 @@ def test_station_menu_request_replays_status_after_stations():
 
     assert written_events(writer) == [
         event("station_menu", ["KEXP", "KGUT"]),
-        event("playback_state", {"call_sign": None, "requested_call_sign": None}),
+        event("playback_state", {"call_sign": None, "requested_call_sign": None, "failed_call_sign": None}),
         player_status("switchboard", "warning", "Switchboard down"),
     ]
 
@@ -200,7 +200,9 @@ def test_invalid_call_sign_reports_failure_without_replacing_playback():
     asyncio.run(client.handle_message('{"event":"playback_start","data":{"call_sign":"NOPE"}}'))
 
     assert statuses == [("error", "Station NOPE unavailable")]
-    assert written_events(writer) == [event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None})]
+    assert written_events(writer) == [
+        event("playback_state", {"call_sign": "KEXP", "requested_call_sign": None, "failed_call_sign": None})
+    ]
 
 
 def test_send_drops_lost_macropad_connection_without_raising():

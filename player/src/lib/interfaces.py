@@ -54,6 +54,7 @@ class RadioPadPlayer(abc.ABC):
         self._clients: list[RadioPadClient] = []
         self._playback_revision = 0
         self._desired_station: RadioPadStation | None = None
+        self._failed_call_sign: str | None = None
         self._playback_worker: asyncio.Task[None] | None = None
         self._playback_changed = asyncio.Event()
         self._broadcast_lock = asyncio.Lock()
@@ -83,6 +84,11 @@ class RadioPadPlayer(abc.ABC):
         return self._desired_station.call_sign if self._desired_station else None
 
     @property
+    def failed_call_sign(self) -> str | None:
+        """Return the station whose latest playback attempt failed."""
+        return self._failed_call_sign
+
+    @property
     def clients(self):
         """Get the list of connected clients (read-only)."""
         return self._clients
@@ -98,6 +104,7 @@ class RadioPadPlayer(abc.ABC):
                 data = {
                     "call_sign": self.station.call_sign if self.station else None,
                     "requested_call_sign": self.requested_call_sign,
+                    "failed_call_sign": self.failed_call_sign,
                 }
             message = json.dumps({"event": event, "data": data})
             for client in self.clients:
@@ -124,6 +131,7 @@ class RadioPadPlayer(abc.ABC):
 
     async def request_stop(self):
         """Replace any earlier start request with a stop request."""
+        self._failed_call_sign = None
         stop_in_flight = self._desired_station is None and self._playback_worker is not None
         already_stopped = self._playback_worker is None and self.station is None
         if not (stop_in_flight or already_stopped):
@@ -139,6 +147,7 @@ class RadioPadPlayer(abc.ABC):
         # These mutations contain no await, so the event loop applies each request atomically.
         self._playback_revision += 1
         self._desired_station = station
+        self._failed_call_sign = None
         self._playback_changed.set()
         if self._playback_worker is None or self._playback_worker.done():
             self._playback_worker = asyncio.create_task(
@@ -148,71 +157,79 @@ class RadioPadPlayer(abc.ABC):
 
     async def _reconcile_playback(self):
         """Move the backend toward the latest desired station until state settles."""
-        while True:
-            revision = self._playback_revision
-            station = self._desired_station
-            had_confirmed_playback = self.station is not None
-            self._playback_changed.clear()
+        try:
+            while True:
+                revision = self._playback_revision
+                station = self._desired_station
+                had_confirmed_playback = self.station is not None
+                self._playback_changed.clear()
 
-            try:
-                await self.stop()
-            except Exception:
-                logger.error("Unexpected error while replacing playback", exc_info=True)
-                self.station = None
-                await self._report_status("error", "Playback error")
-                if not self._complete_revision(revision):
+                try:
+                    await self.stop()
+                except Exception:
+                    logger.error("Unexpected error while replacing playback", exc_info=True)
+                    self.station = None
+                    await self._report_status("error", "Playback error")
+                    if not self._clear_request(revision):
+                        continue
+                    await self.broadcast("playback_state")
+                    if self._is_current(revision):
+                        return
                     continue
-                await self.broadcast("playback_state")
-                return
-            if not self._is_current(revision):
-                continue
-            if had_confirmed_playback:
-                await self.broadcast("playback_state")
                 if not self._is_current(revision):
                     continue
+                await self._report_status("ok", None)
+                if not self._is_current(revision):
+                    continue
+                if had_confirmed_playback:
+                    await self.broadcast("playback_state")
+                    if not self._is_current(revision):
+                        continue
 
-            if station is None:
-                if self._complete_revision(revision):
-                    return
-                continue
+                if station is None:
+                    if self._clear_request(revision):
+                        return
+                    continue
 
-            play_task = asyncio.create_task(self.play(station), name=f"playback:{station.call_sign}")
-            changed_task = asyncio.create_task(self._playback_changed.wait(), name="playback-changed")
-            done, _ = await asyncio.wait({play_task, changed_task}, return_when=asyncio.FIRST_COMPLETED)
+                play_task = asyncio.create_task(self.play(station), name=f"playback:{station.call_sign}")
+                changed_task = asyncio.create_task(self._playback_changed.wait(), name="playback-changed")
+                done, _ = await asyncio.wait({play_task, changed_task}, return_when=asyncio.FIRST_COMPLETED)
 
-            if changed_task in done or not self._is_current(revision):
-                play_task.cancel()
-                await asyncio.gather(play_task, return_exceptions=True)
+                if changed_task in done:
+                    play_task.cancel()
+                    await asyncio.gather(play_task, return_exceptions=True)
+                    continue
+
                 changed_task.cancel()
                 await asyncio.gather(changed_task, return_exceptions=True)
-                continue
+                try:
+                    success = play_task.result()
+                except Exception:
+                    logger.error("Unexpected playback error for %s", station.call_sign, exc_info=True)
+                    success = False
+                    await self._report_status("error", "Playback error")
 
-            changed_task.cancel()
-            await asyncio.gather(changed_task, return_exceptions=True)
-            try:
-                success = play_task.result()
-            except Exception:
-                logger.error("Unexpected playback error for %s", station.call_sign, exc_info=True)
-                success = False
-                await self._report_status("error", "Playback error")
-
-            if not self._is_current(revision):
-                continue
-            if not success:
-                self.station = None
-            if not self._complete_revision(revision):
-                continue
-            await self.broadcast("playback_state")
-            return
+                if not self._is_current(revision):
+                    continue
+                if not success:
+                    self.station = None
+                    self._failed_call_sign = station.call_sign
+                if not self._clear_request(revision):
+                    continue
+                await self.broadcast("playback_state")
+                if self._is_current(revision):
+                    return
+        finally:
+            if self._playback_worker is asyncio.current_task():
+                self._playback_worker = None
 
     def _is_current(self, revision: int) -> bool:
         return revision == self._playback_revision
 
-    def _complete_revision(self, revision: int) -> bool:
+    def _clear_request(self, revision: int) -> bool:
         if not self._is_current(revision):
             return False
         self._desired_station = None
-        self._playback_worker = None
         return True
 
     async def _report_status(self, level: str, summary: str | None):

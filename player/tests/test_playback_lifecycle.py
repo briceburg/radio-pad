@@ -1,5 +1,7 @@
 import asyncio
+import json
 from functools import wraps
+from types import SimpleNamespace
 
 from lib.interfaces import RadioPadPlayer, RadioPadStation
 
@@ -83,6 +85,14 @@ async def test_failed_playback_clears_pending_without_confirming():
 
     assert player.station is None
     assert player.requested_call_sign is None
+    assert player.failed_call_sign == "KEXP"
+
+    retry = PlaybackAttempt()
+    player.attempts.append(retry)
+    await player.request_playback(KEXP)
+    assert player.failed_call_sign is None
+    retry.release.set()
+    await player.wait_for_playback_idle()
 
 
 @async_test
@@ -118,3 +128,34 @@ async def test_stop_cancels_pending_request_and_clears_state():
     assert attempt.cancelled
     assert player.station is None
     assert player.requested_call_sign is None
+
+
+@async_test
+async def test_idle_waits_for_terminal_state_broadcast():
+    attempt = PlaybackAttempt()
+    player = ControlledPlayer([attempt])
+    terminal_started = asyncio.Event()
+    release_terminal = asyncio.Event()
+
+    async def send(message):
+        if json.loads(message)["data"] == {
+            "call_sign": "KEXP",
+            "requested_call_sign": None,
+            "failed_call_sign": None,
+        }:
+            terminal_started.set()
+            await release_terminal.wait()
+
+    player.register_client(SimpleNamespace(_send=send))
+
+    await player.request_playback(KEXP)
+    await attempt.started.wait()
+    attempt.release.set()
+    await terminal_started.wait()
+
+    wait = asyncio.create_task(player.wait_for_playback_idle())
+    await asyncio.sleep(0)
+    assert not wait.done()
+
+    release_terminal.set()
+    await wait

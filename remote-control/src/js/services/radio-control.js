@@ -175,6 +175,7 @@ export class RadioControl extends EventTarget {
                 detail: {
                   callSign: state.call_sign || null,
                   requestedCallSign: state.requested_call_sign || null,
+                  failedCallSign: state.failed_call_sign || null,
                 },
               }),
             );

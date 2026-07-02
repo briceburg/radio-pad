@@ -5,7 +5,7 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 ## Overview
 
 - connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
-  - remote controls publish playback commands and render requested and confirmed playback state
+  - remote controls publish playback commands and render requested, confirmed, and failed playback state
   - players arbitrate playback commands and publish authoritative playback and status state
 - discovers players and RadioDials from the [registry](../registry/)
   - RadioDial choices include the selected account and discoverable community dials

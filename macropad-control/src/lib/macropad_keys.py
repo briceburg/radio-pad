@@ -23,6 +23,7 @@ from lib.macropad_time import ticks_diff, ticks_ms
 DEFAULT_COLOR = 0x000077
 PLAYING_COLOR = 0x015C01
 PENDING_COLOR = 0x805000
+FAILED_COLOR = 0x800000
 MACROPAD_KEY_COUNT = 12
 DEGRADED_COLOR = 0x402000
 KEY_PIXEL_BRIGHTNESS = 0.08
@@ -49,6 +50,7 @@ class MacropadKeys:
         self.stations = []
         self.playing_station_index = None
         self.pending_station_index = None
+        self.failed_station_index = None
         self.current_page_index = 0
         self.degraded = False
         self.title_override = None
@@ -60,6 +62,7 @@ class MacropadKeys:
     def set_stations(self, stations, refresh=True):
         self.playing_station_index = None
         self.pending_station_index = None
+        self.failed_station_index = None
         self.stations = stations
         self.switch_page(0, refresh=refresh)
 
@@ -112,12 +115,16 @@ class MacropadKeys:
         display_station_index = self.pending_station_index
         if display_station_index is None:
             display_station_index = self.playing_station_index
+        if display_station_index is None:
+            display_station_index = self.failed_station_index
         if display_station_index is not None:
             station_page_index = self.get_station_page_index(display_station_index)
             if self.current_page_index == station_page_index:
                 station_name = stations[display_station_index % MACROPAD_KEY_COUNT] or "?"
-                if self.pending_station_index is not None:
+                if display_station_index == self.pending_station_index and self.pending_station_index is not None:
                     title = f"Starting {station_name}"
+                elif display_station_index == self.failed_station_index and self.failed_station_index is not None:
+                    title = f"Failed {station_name}"
                 elif self.title_override is None:
                     title = station_name
 
@@ -134,6 +141,8 @@ class MacropadKeys:
                     self.display.highlight_group(i)
                 elif station_global_index == self.pending_station_index:
                     self.macropad.pixels[i] = PENDING_COLOR
+                elif station_global_index == self.failed_station_index:
+                    self.macropad.pixels[i] = FAILED_COLOR
                 else:
                     self.macropad.pixels[i] = DEGRADED_COLOR if self.degraded else DEFAULT_COLOR
             else:
@@ -150,17 +159,24 @@ class MacropadKeys:
         if self.visual_mode:
             self._animate_skeleton()
 
-    def set_playback_state(self, call_sign, requested_call_sign):
+    def set_playback_state(self, call_sign, requested_call_sign, failed_call_sign):
         self.playing_station_index = self._station_index(call_sign)
-        self.set_pending_station(requested_call_sign)
+        self.pending_station_index = self._station_index(requested_call_sign)
+        self.failed_station_index = self._station_index(failed_call_sign)
+        self._show_playback_station()
 
     def set_pending_station(self, call_sign):
         """Show the latest local or authoritative playback request."""
         self.pending_station_index = self._station_index(call_sign)
+        self.failed_station_index = None
+        self._show_playback_station()
 
+    def _show_playback_station(self):
         visible_station_index = self.pending_station_index
         if visible_station_index is None:
             visible_station_index = self.playing_station_index
+        if visible_station_index is None:
+            visible_station_index = self.failed_station_index
 
         if visible_station_index is not None:
             page_index = self.get_station_page_index(visible_station_index)

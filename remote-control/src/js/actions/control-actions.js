@@ -111,6 +111,7 @@ export function createControlActions({ control, listen }) {
         radioDial: null,
         currentStation: null,
         requestedStation: null,
+        failedStation: null,
         loading: false,
       });
       return null;
@@ -165,6 +166,7 @@ export function createControlActions({ control, listen }) {
       playerConnected: null,
       currentStation: null,
       requestedStation: null,
+      failedStation: null,
     }),
   );
   control.addEventListener("disconnect", () =>
@@ -173,6 +175,7 @@ export function createControlActions({ control, listen }) {
       playerConnected: null,
       currentStation: null,
       requestedStation: null,
+      failedStation: null,
     }),
   );
   control.addEventListener("error", (event) => toastWarning(event.detail));
@@ -180,6 +183,7 @@ export function createControlActions({ control, listen }) {
     updateTab("control", {
       currentStation: event.detail.callSign,
       requestedStation: event.detail.requestedCallSign,
+      failedStation: event.detail.failedCallSign,
     }),
   );
   control.addEventListener("radiodialurl", (event) => {
@@ -227,6 +231,7 @@ export function createControlActions({ control, listen }) {
         radioDial: null,
         currentStation: null,
         requestedStation: null,
+        failedStation: null,
         connectionState: player ? "connecting" : "idle",
         playerConnected: null,
         playerStatuses: {},

@@ -158,7 +158,7 @@ The switchboard partitions connections by request path and expects clients to co
 
 Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
-The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Player-owned `playback_state` contains confirmed `call_sign` and in-flight `requested_call_sign` values; either may be null. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
+The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
 ### Authentication and account-owner seeding
 

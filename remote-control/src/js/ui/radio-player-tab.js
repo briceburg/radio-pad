@@ -70,6 +70,7 @@ export function getControlStatusText(state) {
   if (state.requestedStation) {
     return `Starting ${state.requestedStation}...`;
   }
+  if (state.failedStation) return `Failed to play ${state.failedStation}.`;
 
   const summary = retainedStatusSummary(state);
   if (summary) return summary;
@@ -168,6 +169,7 @@ export class RadioPlayerTab extends RadioElement {
     stations,
     currentStation,
     requestedStation,
+    failedStation,
     visualState,
   ) {
     const rows = [];
@@ -183,11 +185,16 @@ export class RadioPlayerTab extends RadioElement {
             ${row.map((station) => {
               const isActive = station.call_sign === currentStation;
               const isPending = station.call_sign === requestedStation;
+              const isFailed = station.call_sign === failedStation;
               const color = isActive
                 ? "success"
-                : isPending || visualState === "warning"
+                : isPending
                   ? "warning"
-                  : "primary";
+                  : isFailed
+                    ? "danger"
+                    : visualState === "warning"
+                      ? "warning"
+                      : "primary";
               return html`
                 <ion-col size="4">
                   <ion-button
@@ -196,9 +203,12 @@ export class RadioPlayerTab extends RadioElement {
                     fill=${isPending ? "outline" : "solid"}
                     aria-pressed=${String(isActive)}
                     aria-busy=${String(isPending)}
+                    aria-invalid=${String(isFailed)}
                     aria-label=${isPending
                       ? `${station.call_sign}, starting playback`
-                      : station.call_sign}
+                      : isFailed
+                        ? `${station.call_sign}, playback failed`
+                        : station.call_sign}
                     @click=${() => this._onSelectStation(station.call_sign)}
                   >
                     ${station.call_sign}
@@ -234,6 +244,7 @@ export class RadioPlayerTab extends RadioElement {
         s.radioDial.stations,
         s.currentStation,
         s.requestedStation,
+        s.failedStation,
         visualState,
       );
     }
@@ -245,6 +256,7 @@ export class RadioPlayerTab extends RadioElement {
     const nowPlaying =
       s.currentStation ||
       (s.requestedStation ? `Starting ${s.requestedStation}...` : null) ||
+      (s.failedStation ? `Failed ${s.failedStation}` : null) ||
       (s.loading
         ? "Loading..."
         : s.playerConnected === false

@@ -42,6 +42,7 @@ describe("control-actions", () => {
       radioDial: null,
       currentStation: null,
       requestedStation: null,
+      failedStation: null,
       loading: false,
       connectionState: "idle",
       playerConnected: null,
@@ -172,18 +173,24 @@ describe("control-actions", () => {
 
     control.dispatchEvent(
       new CustomEvent("playbackstate", {
-        detail: { callSign: "KEXP", requestedCallSign: "KGUT" },
+        detail: {
+          callSign: "KEXP",
+          requestedCallSign: "KGUT",
+          failedCallSign: "LOFI",
+        },
       }),
     );
     expect(controlStore.get()).toMatchObject({
       currentStation: "KEXP",
       requestedStation: "KGUT",
+      failedStation: "LOFI",
     });
 
     control.dispatchEvent(new Event("disconnect"));
     expect(controlStore.get()).toMatchObject({
       currentStation: null,
       requestedStation: null,
+      failedStation: null,
     });
   });
 
