@@ -89,33 +89,6 @@ export function createControlActions({ localPlayback, control }) {
     });
   }
 
-  const stationCommands = {
-    control: {
-      async start(callSign) {
-        control.startPlayback(callSign);
-      },
-      async stop() {
-        control.stopPlayback();
-      },
-    },
-    listen: {
-      async start(callSign) {
-        const station = listenStore
-          .get()
-          .radioDial?.stations?.find(
-            (candidate) => candidate.call_sign === callSign,
-          );
-        const started = await localPlayback.play(station);
-        if (!started) return toastWarning("Couldn’t start station playback.");
-        updateTab("listen", { currentStation: callSign });
-      },
-      async stop() {
-        await localPlayback.stop();
-        updateTab("listen", { currentStation: null });
-      },
-    },
-  };
-
   async function loadRadioDial(url, tabName = "control") {
     if (!url) {
       abortRadioDialLoad(tabName);
@@ -280,13 +253,25 @@ export function createControlActions({ localPlayback, control }) {
     },
 
     async clickStation(tabName, callSign) {
-      await (stationCommands[tabName] || stationCommands.control).start(
-        callSign,
-      );
+      if (tabName === "listen") {
+        const station = listenStore
+          .get()
+          .radioDial?.stations?.find(
+            (candidate) => candidate.call_sign === callSign,
+          );
+        const started = await localPlayback.play(station);
+        if (!started) return toastWarning("Couldn’t start station playback.");
+        return updateTab("listen", { currentStation: callSign });
+      }
+      control.startPlayback(callSign);
     },
 
     async stopStation(tabName) {
-      await (stationCommands[tabName] || stationCommands.control).stop();
+      if (tabName === "listen") {
+        await localPlayback.stop();
+        return updateTab("listen", { currentStation: null });
+      }
+      control.stopPlayback();
     },
   };
 }
