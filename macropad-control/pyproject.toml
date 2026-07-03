@@ -2,6 +2,7 @@
 name = "radio-pad-macropad-control"
 version = "2025.01.0"
 description = "CircuitPython macropad controller for radio-pad"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.13,<3.14"
 dependencies = []
 
