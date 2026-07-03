@@ -99,6 +99,18 @@ def test_local_request_immediately_replaces_pending_station():
     assert keys.display.title == "Starting KGUT"
 
 
+def test_local_request_for_playing_station_stays_confirmed():
+    keys = MacropadKeys(FakeMacropad(), FakeDisplay())
+    keys.set_stations(["KEXP"])
+    keys.set_playback_state("KEXP", None, None)
+
+    keys.set_pending_station("KEXP")
+
+    assert keys.macropad.pixels.values[0] == macropad_keys.PLAYING_COLOR
+    assert keys.display.title == "KEXP"
+    assert keys.pending_station_index is None
+
+
 def test_failed_station_turns_red_and_retry_turns_amber():
     keys = MacropadKeys(FakeMacropad(), FakeDisplay())
     keys.set_stations(["LOFI"])
