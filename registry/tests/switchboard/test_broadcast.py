@@ -7,8 +7,12 @@ import pytest
 from switchboard.broadcast import Broadcast, Event
 
 RADIO_DIAL_EVENT = '{"event":"radio_dial_url","data":"http://example.com/dial"}'
-PLAYING_KEXP = '{"event":"playback_state","data":{"call_sign":"KEXP"}}'
-PLAYING_WWOZ = '{"event":"playback_state","data":{"call_sign":"WWOZ"}}'
+PLAYING_KEXP = (
+    '{"event":"playback_state","data":{"call_sign":"KEXP","requested_call_sign":null,"failed_call_sign":null}}'
+)
+PLAYING_WWOZ = (
+    '{"event":"playback_state","data":{"call_sign":"WWOZ","requested_call_sign":null,"failed_call_sign":null}}'
+)
 
 
 @pytest.fixture
@@ -123,10 +127,10 @@ async def test_set_state_replaces_existing_key(broadcast: Broadcast) -> None:
 
 async def test_clear_state_key_removes_one_retained_item(broadcast: Broadcast) -> None:
     broadcast.set_state("ch", "player_status:switchboard", "switchboard")
-    broadcast.set_state("ch", "playback_state", "playing")
+    broadcast.set_state("ch", "playback_state", PLAYING_KEXP)
     broadcast.clear_state_key("ch", "player_status:switchboard")
 
     async with broadcast.subscribe("ch", replay=True) as sub:
         event = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert event.message == "playing"
+    assert event.message == PLAYING_KEXP
