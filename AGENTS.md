@@ -28,11 +28,9 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 ## Toolchain policy
 
 - Treat the root [README toolchain policy](README.md#toolchain-and-dependency-policy) as the source of truth for version and dependency-update scope.
-- Do not add a root `pyproject.toml`, `package.json`, `uv` workspace, or `npm` workspace just to coordinate components; the root orchestrates Compose and CI while components keep independent build contexts and locks.
-- Python runtime and development dependencies, `requires-python`, and tool settings live in each Python project's `pyproject.toml`; the matching `uv.lock` belongs beside it.
-- The `uv` binary version is pinned where it is installed: Python Dockerfiles and the GitHub Actions Python setup step.
-- Remote-control dependencies and the Node engine live in `remote-control/package.json` and `remote-control/package-lock.json`; Node runtime pins live in the remote-control Dockerfile and GitHub Actions node setup step.
-- Scope dependency updates to the component being changed: edit only that manifest and lockfile, plus matching Dockerfile or CI pins only when the runtime or package-manager version intentionally changes.
+- Keep dependency updates component-local: Python projects own `pyproject.toml` plus `uv.lock`; `remote-control` owns `package.json` plus `package-lock.json`.
+- Do not add root Python or npm workspaces, root lockfiles, or shared requirements files unless intentionally changing repo topology.
+- Update Dockerfile or GitHub Actions runtime/tool pins only when the runtime or package-manager version intentionally changes.
 
 ## Agent workflow
 
