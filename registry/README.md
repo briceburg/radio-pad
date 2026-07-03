@@ -36,7 +36,7 @@ Registry resources are account-scoped:
 
 ### Dependency workflow
 
-Project-wide toolchain and update policy lives in the [root README](../README.md#toolchain-and-dependency-policy). For registry changes, edit runtime and development dependencies in `pyproject.toml`, regenerate only `uv.lock` with `uv lock`, and keep Docker or CI pins unchanged unless the registry runtime or `uv` version is intentionally changing.
+See the [root README](../README.md#toolchain-and-dependency-policy) for project-wide toolchain and dependency policy. For registry dependency changes, edit `pyproject.toml` and regenerate only `uv.lock` with `uv lock`.
 
 ### Environment Variables
 
