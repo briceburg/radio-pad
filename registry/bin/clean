@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+set -euo pipefail
 
-cd "$PROJECT_ROOT"
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd "$project_root"
 find src tests -type d -name "__pycache__" -exec rm -rf {} +
 find src tests -type f -name "*.pyc" -exec rm -f {} +
-rm -rf "$PROJECT_ROOT/tmp"
+rm -rf "$project_root/tmp"

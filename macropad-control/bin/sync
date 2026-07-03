@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source_dir="$(git rev-parse --show-toplevel)/macropad-control/src"
+source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../src" && pwd)"
 target="/mnt/CIRCUITPY"
 device="$(readlink -f /dev/disk/by-label/CIRCUITPY 2>/dev/null || true)"
 mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true)"

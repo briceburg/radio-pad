@@ -79,16 +79,18 @@ docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
 See each component README for standalone usage and additional configuration:
 [player](./player/README.md) · [registry](./registry/README.md) · [remote-control](./remote-control/README.md) · [macropad-control](./macropad-control/README.md)
 
-### Running integration tests
+### Running checks
 
 Integration tests validate cross-service behavior (reachability, handshakes, message routing, seeded data).
 Individual project tests live within each component folder.
 
+Use `bin/check` to run all component check suites from the repo root. It runs the Python component checks, remote-control checks, and integration test static checks/collection without starting the Compose stack.
+
 Root `bin/ci` keeps compose integration runs isolated from local `.env` development settings by defaulting registry, switchboard, and remote-control host ports to ephemeral values, forcing headless audio output, and clearing `GOOGLE_CLIENT_ID` so auth stays disabled unless a test explicitly enables it.
 
 ```sh
-# Integration test static checks and collection
-tests/integration/bin/ci
+# Component checks
+bin/check
 
 # Unified mode
 bin/ci

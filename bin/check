@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+checks=(
+  player
+  registry
+  remote-control
+  macropad-control
+  tests/integration
+)
+
+for component in "${checks[@]}"; do
+  echo
+  echo "==> $component/bin/ci"
+  "$root/$component/bin/ci"
+done
