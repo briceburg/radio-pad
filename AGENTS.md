@@ -25,15 +25,9 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
   - `integration-ci`: matrix over all three compose files — runs root `bin/ci`.
 - Use `bin/check` for local all-component checks; use root `bin/ci` for compose integration.
 
-## Toolchain policy
-
-- Treat the root [README toolchain policy](README.md#toolchain-and-dependency-policy) as the source of truth for version and dependency-update scope.
-- Keep dependency updates component-local: Python projects own `pyproject.toml` plus `uv.lock`; `remote-control` owns `package.json` plus `package-lock.json`.
-- Do not add root Python or npm workspaces, root lockfiles, or shared requirements files unless intentionally changing repo topology.
-- Update Dockerfile or GitHub Actions runtime/tool pins only when the runtime or package-manager version intentionally changes.
-
 ## Agent workflow
 
+- Use the root [README toolchain policy](README.md#toolchain-and-dependency-policy) for dependency-update scope; keep updates component-local and do not add root workspaces or lockfiles unless intentionally changing repo topology.
 - Prefer starting PR work in a dedicated git worktree created from the latest
   `origin/main`, for example: `git fetch origin` then
   `git worktree add ../radio-pad-<topic> -b <topic> origin/main`.
