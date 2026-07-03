@@ -167,7 +167,10 @@ class MacropadKeys:
 
     def set_pending_station(self, call_sign):
         """Show the latest local or authoritative playback request."""
-        self.pending_station_index = self._station_index(call_sign)
+        requested_station_index = self._station_index(call_sign)
+        self.pending_station_index = (
+            None if requested_station_index == self.playing_station_index else requested_station_index
+        )
         self.failed_station_index = None
         self._show_playback_station()
 
