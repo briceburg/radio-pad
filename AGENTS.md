@@ -17,12 +17,13 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 
 ## Runtime and tooling
 
+- Root `bin/check` runs component checks without starting Compose: `player`, `registry`, `remote-control`, `macropad-control`, and `tests/integration` static checks/collection.
 - Root `bin/ci` runs compose-based integration tests (`tests/integration/`).
 - GitHub Actions CI (`.github/workflows/ci.yml`) runs three parallel jobs:
   - `python-ci`: matrix over the three Python components plus `tests/integration` — runs each `bin/ci`.
   - `node-ci`: `remote-control` — runs `bin/ci` (prettier + vitest).
   - `integration-ci`: matrix over all three compose files — runs root `bin/ci`.
-- There is no `bin/ci-all`. Run component checks individually or rely on CI.
+- Use `bin/check` for local all-component checks; use root `bin/ci` for compose integration.
 
 ## Agent workflow
 

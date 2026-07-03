@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-PROJECT_ROOT="$(git rev-parse --show-toplevel)/remote-control"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 npm run build
