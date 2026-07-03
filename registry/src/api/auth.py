@@ -27,7 +27,7 @@ class AuthServices:
         if config is None:
             logger.warning("Registry auth disabled: OIDC client_ids/issuer not configured")
             return cls(authenticate_user=None, authz_store=None)
-        logger.info("Registry auth enabled: issuer=%s, client_ids=%s", config.issuer, config.client_ids)
+        logger.info("Registry auth enabled: issuer=%s, client_id_count=%s", config.issuer, len(config.client_ids))
         authz_store = AuthzStore()
         authz_store.seed()
         return cls(authenticate_user=config.build_auth_dependency(), authz_store=authz_store)

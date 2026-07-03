@@ -86,18 +86,6 @@ To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a
 }
 ```
 
-## Troubleshooting Sound
-
-If plugging in the Macropad interferes with your Alsa sound configuration (because it is also registered as a snd-usb-audio device), follow the "[How to choose a particular order for multiple installed cards](https://alsa.opensrc.org/MultipleCards#The_newer_.22slots.3D.22_method)" section of the Alsa docs.
-
-For example, add the following to `/etc/modprobe.d/soundcard-order.conf`, where you get the vendor and product IDs from `lsusb` output:
-
-```sh
-# creative labs soundblaster: vid 0x041e pid 0x324d 
-# adafruit macropad: vid 0x239a pid 0x8108
-options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
-```
-
 ## Development
 
 For compose-based development with all services, see the [root README](../README.md#development).
@@ -107,14 +95,6 @@ Run player checks with:
 ```sh
 bin/ci
 ```
-
-### Contributing
-
-Pull requests and bug reports are welcome! Please [open an issue](https://github.com/briceburg/radio-pad/issues) or submit a PR.
-
-## Support
-
-For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
 
 ## License
 

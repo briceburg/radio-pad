@@ -1,4 +1,4 @@
-# radio-pad 
+# radio-pad
 
 A 🎵 radio station player 🎵 with real-time syncing controllers.
 
@@ -52,12 +52,7 @@ bin/dev up
 docker compose -f compose.split.yaml up
 ```
 
-`bin/dev` wraps `docker compose` and passes through compose arguments. By
-default it exposes local ALSA devices when `/dev/snd` exists and uses the
-physical macropad overlay when exactly one CDC2 data port is attached. It adds
-the player to the required host device groups instead of running it as root. If
-no macropad is found it starts without one; multiple ports require
-`RADIOPAD_MACROPAD_DEVICE`:
+`bin/dev` wraps `docker compose` and passes through compose arguments. By default it exposes local ALSA devices when `/dev/snd` exists and uses the physical macropad overlay when exactly one CDC2 data port is attached. It adds the player to the required host device groups instead of running it as root. If no macropad is found it starts without one; multiple ports require `RADIOPAD_MACROPAD_DEVICE`:
 
 ```sh
 bin/dev up -d
@@ -65,18 +60,11 @@ RADIOPAD_MACROPAD=required bin/dev up -d --force-recreate player
 RADIOPAD_MACROPAD=off bin/dev up
 ```
 
-Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad
-data port. `bin/dev` does not mount or sync firmware; those steps stay explicit
-because they can prompt for privileges and write to the device.
-Set `RADIOPAD_AUDIO_GID` or `RADIOPAD_MACROPAD_GID` only when using hardware
-overlays directly or when your host device group needs an explicit override.
+Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad data port. `bin/dev` does not mount or sync firmware; those steps stay explicit because they can prompt for privileges and write to the device.
 
-Registry and switchboard ports default to ephemeral; the web app defaults to
-port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to
-configure overrides or to enable Google sign-in, registry write auth, and authenticated player control —
-see [remote-control](./remote-control/README.md#web-development) for OAuth client
-setup and [registry](./registry/README.md#authentication-and-account-owner-seeding)
-for authz seeding.
+Use `compose.audio.yaml` or `compose.macropad.yaml` directly only when you need explicit compose overlays outside `bin/dev`; in that case set `RADIOPAD_AUDIO_GID`, `RADIOPAD_MACROPAD_GID`, and `RADIOPAD_MACROPAD_DEVICE` yourself.
+
+Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to configure overrides or to enable Google sign-in, registry write auth, and authenticated player control. See [remote-control](./remote-control/README.md#web-development) for OAuth client setup and [registry](./registry/README.md#authentication-and-account-owner-seeding) for authz seeding.
 
 ```sh
 cp .env.example .env
@@ -96,6 +84,8 @@ See each component README for standalone usage and additional configuration:
 Integration tests validate cross-service behavior (reachability, handshakes, message routing, seeded data).
 Individual project tests live within each component folder.
 
+Root `bin/ci` keeps compose integration runs isolated from local `.env` development settings by defaulting registry, switchboard, and remote-control host ports to ephemeral values, forcing headless audio output, and clearing `GOOGLE_CLIENT_ID` so auth stays disabled unless a test explicitly enables it.
+
 ```sh
 # Integration test static checks and collection
 tests/integration/bin/ci
@@ -112,9 +102,7 @@ bin/ci compose.prod-smoke.yaml
 
 ### Testing with a macropad
 
-Mount the macropad once after attaching it, sync local firmware changes, verify
-the device state, then discover the post-sync CDC2 data port and recreate the
-player:
+Mount the macropad once after attaching it, sync local firmware changes, verify the device state, then discover the post-sync CDC2 data port and recreate the player:
 
 ```sh
 macropad-control/bin/mount
@@ -124,13 +112,7 @@ macropad-control/bin/doctor
 RADIOPAD_MACROPAD=required bin/dev up -d --force-recreate player
 ```
 
-The discovery command intentionally fails when it finds zero or multiple data
-ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one
-macropad is attached. Sync before creating the player container because
-CircuitPython may reboot and renumber its USB interfaces during a firmware
-update. Use `macropad-control/bin/console` for the CircuitPython REPL console;
-it intentionally selects a different USB CDC interface than
-`macropad-control/bin/data-port`.
+The discovery command intentionally fails when it finds zero or multiple data ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one macropad is attached. Sync before creating the player container because CircuitPython may reboot and renumber its USB interfaces during a firmware update. Use `macropad-control/bin/console` for the CircuitPython REPL console; it intentionally selects a different USB CDC interface than `macropad-control/bin/data-port`.
 
 ## Architecture
 

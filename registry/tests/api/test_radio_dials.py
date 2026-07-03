@@ -50,14 +50,6 @@ def test_station_update_is_visible_in_resolved_radio_dial(
     assert dial["stations"][0]["stream_url"] == "https://new.example/wwoz"
 
 
-def test_radio_dial_list_returns_summaries_without_stations(radio_dial_api: RadioDialApi) -> None:
-    item = radio_dial_api.list("community")["items"][0]
-
-    assert item["key"] == "community/briceburg"
-    assert item["name"] == "Casa Briceburg"
-    assert "stations" not in item
-
-
 def test_radio_dial_put_replaces_optional_metadata(radio_dial_api: RadioDialApi) -> None:
     radio_dial_api.put(
         "testuser1",

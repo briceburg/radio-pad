@@ -94,15 +94,3 @@ export function applyRetainedStatus(statuses = {}, status = {}) {
 export function isDegradedStatus(status) {
   return ["warning", "error"].includes(status?.level);
 }
-
-if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
-  import("@nanostores/logger").then(({ logger }) => {
-    logger({
-      preferencesStore,
-      settingsUiStore,
-      controlStore,
-      listenStore,
-      toastStore,
-    });
-  });
-}

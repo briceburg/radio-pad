@@ -14,7 +14,6 @@ services:
       - "${RADIOPAD_SWITCHBOARD_PORT:-0}:1980"
     environment:
       REGISTRY_PROFILES: "switchboard"
-      REGISTRY_BIND_PORT: "1980"
       REGISTRY_URL: "http://registry:1980/api/"
 
   player:
@@ -44,8 +43,6 @@ services:
       player:
         condition: service_healthy
       remote-control:
-        condition: service_healthy
-      switchboard:
         condition: service_healthy
     environment:
       REGISTRY_URL: "http://registry:1980/api"

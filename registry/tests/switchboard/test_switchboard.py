@@ -200,31 +200,18 @@ def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient)
 # -- protocol behavior --
 
 
-def test_invalid_json_ignored(switchboard_client: TestClient) -> None:
-    """Malformed JSON messages are silently ignored, connection stays open."""
+@pytest.mark.parametrize(
+    "message",
+    [
+        "not-json",
+        '{"data":"should be ignored"}',
+        "[]",
+    ],
+    ids=["invalid-json", "missing-event", "non-object"],
+)
+def test_ignored_messages_keep_connection_open(switchboard_client: TestClient, message: str) -> None:
     with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
-        ws.send_text("not-json")
-        # Connection should still be alive — ping/pong proves it
-        ws.send_json({"event": "ping"})
-        resp = ws.receive_json()
-        assert resp["event"] == "pong"
-        _close_player(ws)
-
-
-def test_missing_event_field_ignored(switchboard_client: TestClient) -> None:
-    """Messages without an 'event' field are ignored."""
-    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
-        ws.send_json({"data": "should be ignored"})
-        ws.send_json({"event": "ping"})
-        resp = ws.receive_json()
-        assert resp["event"] == "pong"
-        _close_player(ws)
-
-
-def test_non_object_json_ignored(switchboard_client: TestClient) -> None:
-    """Valid JSON messages without object shape are ignored."""
-    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
-        ws.send_text("[]")
+        ws.send_text(message)
         ws.send_json({"event": "ping"})
         resp = ws.receive_json()
         assert resp["event"] == "pong"
