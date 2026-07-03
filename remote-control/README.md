@@ -122,9 +122,7 @@ Open the iOS project in Xcode and run it there.
 
 ## Development
 
-For compose-based development with all services, see the [root README](../README.md#development).
-
-See the [root README](../README.md#toolchain-and-dependency-policy) for project-wide toolchain and dependency policy. For dependency changes, edit `package.json` and `package-lock.json` together.
+For compose-based development with all services, see the [root README](../README.md#development); for dependency changes, see the root [toolchain policy](../README.md#toolchain-and-dependency-policy).
 
 ## License
 
