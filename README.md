@@ -58,17 +58,18 @@ bin/dev up
 docker compose -f compose.split.yaml up
 ```
 
-`bin/dev` wraps `docker compose` and passes through compose arguments. By default it exposes local ALSA devices when `/dev/snd` exists and uses the physical macropad overlay when exactly one CDC2 data port is attached. It adds the player to the required host device groups instead of running it as root. If no macropad is found it starts without one; multiple ports require `RADIOPAD_MACROPAD_DEVICE`:
+`bin/dev` wraps `docker compose` and passes through compose arguments. By default it routes player audio through the host Pulse-compatible or native PipeWire socket and uses the physical macropad overlay when exactly one CDC2 data port is attached. If no macropad is found it starts without one; multiple ports require `RADIOPAD_MACROPAD_DEVICE`:
 
 ```sh
 bin/dev up -d
+RADIOPAD_AUDIO=off bin/dev up
 RADIOPAD_MACROPAD=required bin/dev up -d --force-recreate player
 RADIOPAD_MACROPAD=off bin/dev up
 ```
 
-Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad data port. `bin/dev` does not mount or sync firmware; those steps stay explicit because they can prompt for privileges and write to the device.
+Set `RADIOPAD_AUDIO=off` to start without container audio. Set `RADIOPAD_PULSE_SOCKET=/run/user/.../pulse/native` or `RADIOPAD_PIPEWIRE_SOCKET=/run/user/.../pipewire-0` to choose a specific audio socket. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` to choose a specific macropad data port. `bin/dev` does not mount or sync firmware; those steps stay explicit because they can prompt for privileges and write to the device.
 
-Use `compose.audio.yaml` or `compose.macropad.yaml` directly only when you need explicit compose overlays outside `bin/dev`; in that case set `RADIOPAD_AUDIO_GID`, `RADIOPAD_MACROPAD_GID`, and `RADIOPAD_MACROPAD_DEVICE` yourself.
+Use `compose.audio.yaml` or `compose.macropad.yaml` directly only when you need explicit compose overlays outside `bin/dev`; in that case set the required variables from those overlay files yourself.
 
 Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to configure overrides or to enable Google sign-in, registry write auth, and authenticated player control. See [remote-control](./remote-control/README.md#web-development) for OAuth client setup and [registry](./registry/README.md#authentication-and-account-owner-seeding) for authz seeding.
 

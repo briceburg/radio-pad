@@ -12,7 +12,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - `bin/dev` wraps local compose usage and auto-adds `compose.macropad.yaml` only
   when a macropad CDC2 data port is available, unless `RADIOPAD_MACROPAD=off` or
   `RADIOPAD_MACROPAD=required` is set.
-- `bin/dev` also adds `compose.audio.yaml` when host ALSA devices are available.
+- `bin/dev` also adds `compose.audio.yaml` for host Pulse-compatible or native PipeWire audio unless `RADIOPAD_AUDIO=off` is set.
 - Each component has its own `bin/ci`, `README.md`, and (where applicable) `AGENTS.md`.
 
 ## Runtime and tooling
