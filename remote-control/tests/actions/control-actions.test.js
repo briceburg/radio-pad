@@ -11,17 +11,17 @@ function createMockControl() {
   return control;
 }
 
-function createMockListen() {
+function createMockLocalPlayback() {
   return { play: vi.fn(), stop: vi.fn() };
 }
 
 function createActions() {
   const control = createMockControl();
-  const listen = createMockListen();
+  const localPlayback = createMockLocalPlayback();
   return {
-    actions: createControlActions({ control, listen }),
+    actions: createControlActions({ localPlayback, control }),
+    localPlayback,
     control,
-    listen,
   };
 }
 
@@ -215,13 +215,13 @@ describe("control-actions", () => {
       call_sign: "KEXP",
       stream_url: "https://example.test/kexp",
     };
-    const { actions, listen } = createActions();
-    listen.play.mockResolvedValue(true);
+    const { actions, localPlayback } = createActions();
+    localPlayback.play.mockResolvedValue(true);
     listenStore.set({ radioDial: { stations: [station] } });
 
     await actions.clickStation("listen", "KEXP");
 
-    expect(listen.play).toHaveBeenCalledWith(station);
+    expect(localPlayback.play).toHaveBeenCalledWith(station);
     expect(listenStore.get().currentStation).toBe("KEXP");
   });
 });

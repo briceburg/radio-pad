@@ -66,7 +66,7 @@ function resolveReportedRadioDialUrl(player, reportedUrl) {
     : reportedUrl;
 }
 
-export function createControlActions({ control, listen }) {
+export function createControlActions({ localPlayback, control }) {
   const getTabStore = (tabName) =>
     tabName === "listen" ? listenStore : controlStore;
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
@@ -88,6 +88,33 @@ export function createControlActions({ control, listen }) {
       [statusMap]: applyRetainedStatus(controlState[statusMap], status),
     });
   }
+
+  const stationCommands = {
+    control: {
+      async start(callSign) {
+        control.startPlayback(callSign);
+      },
+      async stop() {
+        control.stopPlayback();
+      },
+    },
+    listen: {
+      async start(callSign) {
+        const station = listenStore
+          .get()
+          .radioDial?.stations?.find(
+            (candidate) => candidate.call_sign === callSign,
+          );
+        const started = await localPlayback.play(station);
+        if (!started) return toastWarning("Couldn’t start station playback.");
+        updateTab("listen", { currentStation: callSign });
+      },
+      async stop() {
+        await localPlayback.stop();
+        updateTab("listen", { currentStation: null });
+      },
+    },
+  };
 
   async function loadRadioDial(url, tabName = "control") {
     if (!url) {
@@ -253,25 +280,13 @@ export function createControlActions({ control, listen }) {
     },
 
     async clickStation(tabName, callSign) {
-      if (tabName === "listen") {
-        const station = listenStore
-          .get()
-          .radioDial?.stations?.find(
-            (candidate) => candidate.call_sign === callSign,
-          );
-        const started = await listen.play(station);
-        if (!started) return toastWarning("Couldn’t start station playback.");
-        return updateTab("listen", { currentStation: callSign });
-      }
-      control.startPlayback(callSign);
+      await (stationCommands[tabName] || stationCommands.control).start(
+        callSign,
+      );
     },
 
     async stopStation(tabName) {
-      if (tabName === "listen") {
-        await listen.stop();
-        return updateTab("listen", { currentStation: null });
-      }
-      control.stopPlayback();
+      await (stationCommands[tabName] || stationCommands.control).stop();
     },
   };
 }

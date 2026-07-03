@@ -120,7 +120,7 @@ const createNativeAudioPlayer = () => {
   };
 };
 
-export class RadioListen {
+export class LocalPlayback {
   constructor() {
     this.player = Capacitor.isNativePlatform()
       ? createNativeAudioPlayer()

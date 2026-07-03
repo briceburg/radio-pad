@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Capacitor } from "@capacitor/core";
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
-import { RadioListen } from "../../src/js/services/radio-listen.js";
+import { LocalPlayback } from "../../src/js/services/local-playback.js";
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: { isNativePlatform: vi.fn() },
@@ -25,7 +25,7 @@ const STATION = {
   stream_url: "https://example.test/kexp",
 };
 
-describe("RadioListen", () => {
+describe("LocalPlayback", () => {
   let audioInstances;
   let onAudioReady;
   let readyListener;
@@ -59,11 +59,11 @@ describe("RadioListen", () => {
 
   it("plays and cleans up browser audio", async () => {
     Capacitor.isNativePlatform.mockReturnValue(false);
-    const listen = new RadioListen();
+    const playback = new LocalPlayback();
 
-    await expect(listen.play({})).resolves.toBe(false);
-    await expect(listen.play(STATION)).resolves.toBe(true);
-    await listen.stop();
+    await expect(playback.play({})).resolves.toBe(false);
+    await expect(playback.play(STATION)).resolves.toBe(true);
+    await playback.stop();
 
     expect(global.Audio).toHaveBeenCalledWith(STATION.stream_url);
     expect(audioInstances[0].play).toHaveBeenCalledOnce();
@@ -74,9 +74,9 @@ describe("RadioListen", () => {
 
   it("initializes, reuses, and tears down native audio", async () => {
     Capacitor.isNativePlatform.mockReturnValue(true);
-    const listen = new RadioListen();
+    const playback = new LocalPlayback();
 
-    await listen.play(STATION);
+    await playback.play(STATION);
     expect(AudioPlayer.create).toHaveBeenCalledWith({
       audioId: "radio-pad-stream",
       audioSource: STATION.stream_url,
@@ -94,7 +94,7 @@ describe("RadioListen", () => {
       audioId: "radio-pad-stream",
     });
 
-    await listen.play({
+    await playback.play({
       call_sign: "WXXI",
       stream_url: "https://example.test/wxxi",
     });
@@ -107,7 +107,7 @@ describe("RadioListen", () => {
       friendlyTitle: "WXXI",
     });
 
-    await listen.stop();
+    await playback.stop();
     expect(AudioPlayer.stop).toHaveBeenCalledWith({
       audioId: "radio-pad-stream",
     });
