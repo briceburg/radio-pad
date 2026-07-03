@@ -25,6 +25,15 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
   - `integration-ci`: matrix over all three compose files — runs root `bin/ci`.
 - Use `bin/check` for local all-component checks; use root `bin/ci` for compose integration.
 
+## Toolchain policy
+
+- Treat the root [README toolchain policy](README.md#toolchain-and-dependency-policy) as the source of truth for version and dependency-update scope.
+- Do not add a root `pyproject.toml`, `package.json`, `uv` workspace, or `npm` workspace just to coordinate components; the root orchestrates Compose and CI while components keep independent build contexts and locks.
+- Python runtime and development dependencies, `requires-python`, and tool settings live in each Python project's `pyproject.toml`; the matching `uv.lock` belongs beside it.
+- The `uv` binary version is pinned where it is installed: Python Dockerfiles and the GitHub Actions Python setup step.
+- Remote-control dependencies and the Node engine live in `remote-control/package.json` and `remote-control/package-lock.json`; Node runtime pins live in the remote-control Dockerfile and GitHub Actions node setup step.
+- Scope dependency updates to the component being changed: edit only that manifest and lockfile, plus matching Dockerfile or CI pins only when the runtime or package-manager version intentionally changes.
+
 ## Agent workflow
 
 - Prefer starting PR work in a dedicated git worktree created from the latest

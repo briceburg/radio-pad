@@ -36,9 +36,7 @@ Registry resources are account-scoped:
 
 ### Dependency workflow
 
-- Runtime and development dependencies live in `pyproject.toml`.
-- `uv.lock` is the frozen dependency lockfile used by Docker and CI.
-- After changing dependencies, run `uv lock`.
+Project-wide toolchain and update policy lives in the [root README](../README.md#toolchain-and-dependency-policy). For registry changes, edit runtime and development dependencies in `pyproject.toml`, regenerate only `uv.lock` with `uv lock`, and keep Docker or CI pins unchanged unless the registry runtime or `uv` version is intentionally changing.
 
 ### Environment Variables
 
