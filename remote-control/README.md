@@ -17,7 +17,7 @@ A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
 ### Local configuration
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 ```
 
@@ -123,6 +123,8 @@ Open the iOS project in Xcode and run it there.
 ## Development
 
 For compose-based development with all services, see the [root README](../README.md#development).
+
+Project-wide toolchain and update policy lives in the [root README](../README.md#toolchain-and-dependency-policy). For remote-control changes, edit `package.json` and `package-lock.json` together and keep Docker or CI Node pins unchanged unless the Node runtime itself is intentionally changing.
 
 ## License
 

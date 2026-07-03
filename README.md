@@ -42,6 +42,16 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 ## Development
 
+### Toolchain and dependency policy
+
+Tool versions live at the smallest project boundary that consumes them. Python components (`player`, `registry`, `macropad-control`, and `tests/integration`) own their `pyproject.toml` and `uv.lock`; those files declare `requires-python`, runtime and development dependencies, and project-local cache settings. The remote-control app owns `package.json` and `package-lock.json`; Docker and CI read those files from `remote-control/`.
+
+CI and Docker pins are part of the policy surface. Python images copy `uv` from `ghcr.io/astral-sh/uv` and install from component-local `pyproject.toml` and `uv.lock`; the GitHub Actions Python job pins the same `uv` version for each Python project. The web image and CI job use Node 22, while `remote-control/package.json` declares the app's minimum Node engine.
+
+Dependency updates should be scoped to the component being changed. Edit that component's manifest, regenerate only its lockfile, and run its `bin/ci` or the cheapest relevant check; update matching Dockerfile or GitHub Actions pins only when the runtime or package-manager version itself changes. Do not refresh unrelated locks as part of feature work.
+
+There is intentionally no root `uv` or `npm` workspace. The components build and deploy from separate Docker contexts, and the repo root orchestrates Compose and CI rather than owning a shared package graph; keeping locks independent avoids accidental cross-component upgrades and keeps production image inputs explicit.
+
 Docker Compose provides the local development environment. All services mount source for live reloading.
 
 ```sh
