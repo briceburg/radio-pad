@@ -1,6 +1,10 @@
 services:
   player:
-    group_add:
-      - "${RADIOPAD_AUDIO_GID:?set RADIOPAD_AUDIO_GID to the host /dev/snd group id or use bin/dev}"
-    devices:
-      - /dev/snd:/dev/snd
+    user: "${RADIOPAD_HOST_UID:?set RADIOPAD_HOST_UID or use bin/dev}:${RADIOPAD_HOST_GID:?set RADIOPAD_HOST_GID or use bin/dev}"
+    environment:
+      HOME: /tmp
+      XDG_RUNTIME_DIR: /tmp/radio-pad-audio
+      RADIOPAD_AUDIO_OUTPUT: "${RADIOPAD_AUDIO_OUTPUT:?set RADIOPAD_AUDIO_OUTPUT or use bin/dev}"
+      PULSE_SERVER: "${RADIOPAD_PULSE_SERVER:-}"
+    volumes:
+      - "${RADIOPAD_AUDIO_SOCKET:?set RADIOPAD_AUDIO_SOCKET or use bin/dev}:${RADIOPAD_AUDIO_SOCKET_TARGET:?set RADIOPAD_AUDIO_SOCKET_TARGET or use bin/dev}"

@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mode="${RADIOPAD_MACROPAD:-auto}"
+audio_mode="${RADIOPAD_AUDIO:-auto}"
 compose_files=(-f "$root/compose.yaml")
 
 die() {
@@ -26,24 +27,64 @@ set_device_gid() {
 }
 
 use_audio() {
-  local audio_device
+  local runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  local pulse_socket="${RADIOPAD_PULSE_SOCKET:-}"
+  local pipewire_socket="${RADIOPAD_PIPEWIRE_SOCKET:-}"
 
-  audio_device="$(find /dev/snd -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null || true)"
-  if [ -z "$audio_device" ]; then
-    return 0
+  if [ -z "$pulse_socket" ]; then
+    pulse_socket="$runtime_dir/pulse/native"
   fi
-  set_device_gid RADIOPAD_AUDIO_GID "$audio_device"
-  if [ -z "${RADIOPAD_AUDIO_GID:-}" ]; then
-    die "could not determine /dev/snd group id; set RADIOPAD_AUDIO_GID"
+  if [ -z "$pipewire_socket" ]; then
+    pipewire_socket="$runtime_dir/pipewire-0"
+  fi
+
+  export RADIOPAD_HOST_UID="${RADIOPAD_HOST_UID:-$(id -u)}"
+  export RADIOPAD_HOST_GID="${RADIOPAD_HOST_GID:-$(id -g)}"
+
+  if [ -S "$pulse_socket" ]; then
+    export RADIOPAD_AUDIO_OUTPUT="pulse"
+    export RADIOPAD_AUDIO_SOCKET="$pulse_socket"
+    export RADIOPAD_AUDIO_SOCKET_TARGET="/tmp/radio-pad-audio/pulse-native"
+    export RADIOPAD_PULSE_SERVER="unix:$RADIOPAD_AUDIO_SOCKET_TARGET"
+    echo "[info] using Pulse/PipeWire Pulse socket: $pulse_socket" >&2
+  elif [ -S "$pipewire_socket" ]; then
+    export RADIOPAD_AUDIO_OUTPUT="pipewire"
+    export RADIOPAD_AUDIO_SOCKET="$pipewire_socket"
+    export RADIOPAD_AUDIO_SOCKET_TARGET="/tmp/radio-pad-audio/pipewire-0"
+    export RADIOPAD_PULSE_SERVER=""
+    echo "[info] using PipeWire socket: $pipewire_socket" >&2
+  else
+    die "Pulse/PipeWire audio socket not found at $pulse_socket or $pipewire_socket; set RADIOPAD_AUDIO=off to start without container audio"
   fi
 
   compose_files+=(-f "$root/compose.audio.yaml")
-  echo "[info] exposing ALSA devices with group $RADIOPAD_AUDIO_GID" >&2
+}
+
+configure_audio() {
+  case "$audio_mode" in
+    auto)
+      use_audio
+      ;;
+    off)
+      echo "[info] leaving player audio routing unmanaged; RADIOPAD_AUDIO_OUTPUT will pass through unchanged" >&2
+      ;;
+    *)
+      usage
+      die "invalid RADIOPAD_AUDIO mode: $audio_mode"
+      ;;
+  esac
 }
 
 usage() {
   cat >&2 <<'EOF'
 usage: bin/dev [docker compose args...]
+
+Audio modes:
+  RADIOPAD_AUDIO=auto   use the host Pulse/PipeWire audio socket (default)
+  RADIOPAD_AUDIO=off    leave audio routing unmanaged
+
+Set RADIOPAD_PULSE_SOCKET=/run/user/.../pulse/native to choose a Pulse socket.
+Set RADIOPAD_PIPEWIRE_SOCKET=/run/user/.../pipewire-0 to choose a PipeWire socket.
 
 Macropad modes:
   RADIOPAD_MACROPAD=auto      use the macropad overlay when one data port is found (default)
@@ -74,9 +115,12 @@ use_macropad() {
   echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE with group $RADIOPAD_MACROPAD_GID" >&2
 }
 
-if [ -d /dev/snd ]; then
-  use_audio
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+  usage
+  exit 0
 fi
+
+configure_audio
 
 case "$mode" in
   auto|required)
@@ -89,10 +133,6 @@ case "$mode" in
     fi
     ;;
   off)
-    ;;
-  -h|--help|help)
-    usage
-    exit 0
     ;;
   *)
     usage
