@@ -114,14 +114,6 @@ options snd-usb-audio index=0,1 vid=0x041e,0x239a pid=0x324d,0x8108
 ```
 
 
-### Contributing
-
-Pull requests and bug reports are welcome! Please [open an issue](https://github.com/briceburg/radio-pad/issues) or submit a PR.
-
-## Support
-
-For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
-
 ## License
 
 [GNU General Public License v3.0](./LICENSE)

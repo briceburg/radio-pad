@@ -51,6 +51,7 @@ export class RadioControl extends EventTarget {
   constructor() {
     super();
     this.ws = null;
+    this.authTimer = null;
     this.reconnectTimer = null;
     this.reconnectDelay = 1000;
     this._lastUrl = null;
@@ -72,9 +73,9 @@ export class RadioControl extends EventTarget {
     this._lastToken = null;
     this.authenticated = false;
     const hadSocket = Boolean(this.ws);
-    if (this.connectTimer) {
-      clearTimeout(this.connectTimer);
-      this.connectTimer = null;
+    if (this.authTimer) {
+      clearTimeout(this.authTimer);
+      this.authTimer = null;
     }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -135,7 +136,7 @@ export class RadioControl extends EventTarget {
     this.ws = ws;
     this.authenticated = false;
 
-    this.connectTimer = setTimeout(() => {
+    this.authTimer = setTimeout(() => {
       if (!this.authenticated) {
         ws.close();
       }
@@ -146,7 +147,8 @@ export class RadioControl extends EventTarget {
     };
 
     ws.onclose = (event) => {
-      clearTimeout(this.connectTimer);
+      clearTimeout(this.authTimer);
+      this.authTimer = null;
       this.ws = null;
       this.authenticated = false;
       if (event.code === 1008) {
@@ -174,10 +176,14 @@ export class RadioControl extends EventTarget {
         const { event, data } = JSON.parse(msg.data);
         switch (event) {
           case "authenticated":
-            clearTimeout(this.connectTimer);
+            clearTimeout(this.authTimer);
+            this.authTimer = null;
             this.authenticated = true;
             this.reconnectDelay = 1000;
-            if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+            if (this.reconnectTimer) {
+              clearTimeout(this.reconnectTimer);
+              this.reconnectTimer = null;
+            }
             this.dispatchEvent(new CustomEvent("connect", { detail: url }));
             break;
           case "playback_state": {
@@ -229,13 +235,11 @@ export class RadioControl extends EventTarget {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
     }
-    // Only schedule a reconnect if we still have an active URL and haven't explicitly disconnected
     if (!this._lastUrl) return;
 
     this.reconnectTimer = setTimeout(() => {
       if (this._lastUrl) {
         this._connectWebSocket(this._lastUrl, this._lastToken);
-        // Exponential backoff with a bit of random jitter (up to 1s) to avoid server stampedes
         const jitter = Math.random() * 1000;
         this.reconnectDelay = Math.min(
           this.reconnectDelay * 1.5 + jitter,

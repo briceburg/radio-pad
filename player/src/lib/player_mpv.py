@@ -58,7 +58,7 @@ class MpvPlayer(RadioPadPlayer):
     async def play(self, station: RadioPadStation):
         """Play a station and return only after mpv reports usable audio."""
 
-        logger.info("starting station %s (%s)", station.call_sign, station.stream_url)
+        logger.info("starting station %s", station.call_sign)
         try:
             self._remove_stale_socket()
             process = subprocess.Popen(

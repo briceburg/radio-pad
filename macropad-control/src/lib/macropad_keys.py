@@ -112,11 +112,7 @@ class MacropadKeys:
 
         page_title = "iCEBURG Radio" if self.page_count == 1 else f"iCEBURG Radio {self.current_page_index + 1}"
         title = self.title_override or page_title
-        display_station_index = self.pending_station_index
-        if display_station_index is None:
-            display_station_index = self.playing_station_index
-        if display_station_index is None:
-            display_station_index = self.failed_station_index
+        display_station_index = self._visible_station_index()
         if display_station_index is not None:
             station_page_index = self.get_station_page_index(display_station_index)
             if self.current_page_index == station_page_index:
@@ -175,17 +171,19 @@ class MacropadKeys:
         self._show_playback_station()
 
     def _show_playback_station(self):
-        visible_station_index = self.pending_station_index
-        if visible_station_index is None:
-            visible_station_index = self.playing_station_index
-        if visible_station_index is None:
-            visible_station_index = self.failed_station_index
-
+        visible_station_index = self._visible_station_index()
         if visible_station_index is not None:
             page_index = self.get_station_page_index(visible_station_index)
             self.switch_page(page_index)
         else:
             self.refresh()
+
+    def _visible_station_index(self):
+        if self.pending_station_index is not None:
+            return self.pending_station_index
+        if self.playing_station_index is not None:
+            return self.playing_station_index
+        return self.failed_station_index
 
     @property
     def can_stop(self):

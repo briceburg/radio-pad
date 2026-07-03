@@ -48,21 +48,7 @@ class Subscriber:
 
 
 class Broadcast:
-    """In-memory channel pub-sub.
-
-    Usage::
-
-        broadcast = Broadcast()
-        await broadcast.connect()
-
-        await broadcast.publish("acme/player1", '{"event": "hello"}')
-
-        async with broadcast.subscribe("acme/player1") as sub:
-            async for event in sub:
-                print(event.message)
-
-        await broadcast.disconnect()
-    """
+    """In-memory channel pub-sub."""
 
     def __init__(self) -> None:
         self._channels: dict[str, set[asyncio.Queue[Event | None]]] = {}

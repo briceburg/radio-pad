@@ -67,8 +67,18 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - The integration test service is `integration-tests` (profile: `tests`).
 - Root `bin/ci` accepts a compose file argument; `COMPOSE_FILE` and
   `COMPOSE_PROJECT_NAME` remain available for overrides.
-- Ports default to ephemeral. Pin them via `.env` (`RADIOPAD_REGISTRY_PORT`, `RADIOPAD_REMOTE_CONTROL_PORT`).
+- Root `bin/ci` defaults registry, switchboard, and remote-control host ports to
+  ephemeral values and clears `GOOGLE_CLIENT_ID` so local `.env` development
+  auth and pinned ports do not affect integration CI.
+- Registry and switchboard ports default to ephemeral. The remote-control dev
+  server defaults to port 5173 for stable OAuth redirects. Pin them via `.env`
+  (`RADIOPAD_REGISTRY_PORT`, `RADIOPAD_SWITCHBOARD_PORT`,
+  `RADIOPAD_REMOTE_CONTROL_PORT`).
 - Services use healthchecks; the integration test container `depends_on` with `condition: service_healthy`.
+- In split mode, `remote-control` depends on both `registry` and `switchboard`
+  because its dev server proxies both. `integration-tests` should depend on the
+  user-facing services it exercises; avoid adding internal dependencies unless a
+  test needs that service directly before those user-facing healthchecks pass.
 - `bin/dev` must not mount or sync macropad firmware; use the macropad-control
   helpers explicitly before starting a hardware-backed player.
 

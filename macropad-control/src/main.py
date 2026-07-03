@@ -38,7 +38,6 @@ state.apply(keys, force=True)
 while True:
     event = player.read_event() if player.connected else None
     if event:
-        print(f"Received event: {event}")
         state.handle_event(event, keys)
 
     # --- Player Connection ---

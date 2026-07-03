@@ -29,14 +29,16 @@ use_audio() {
   local audio_device
 
   audio_device="$(find /dev/snd -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null || true)"
+  if [ -z "$audio_device" ]; then
+    return 0
+  fi
   set_device_gid RADIOPAD_AUDIO_GID "$audio_device"
+  if [ -z "${RADIOPAD_AUDIO_GID:-}" ]; then
+    die "could not determine /dev/snd group id; set RADIOPAD_AUDIO_GID"
+  fi
 
   compose_files+=(-f "$root/compose.audio.yaml")
-  if [ -n "${RADIOPAD_AUDIO_GID:-}" ]; then
-    echo "[info] exposing ALSA devices with group $RADIOPAD_AUDIO_GID" >&2
-  else
-    echo "[info] exposing ALSA devices" >&2
-  fi
+  echo "[info] exposing ALSA devices with group $RADIOPAD_AUDIO_GID" >&2
 }
 
 usage() {
@@ -64,13 +66,12 @@ macropad_device() {
 use_macropad() {
   export RADIOPAD_MACROPAD_DEVICE="$1"
   set_device_gid RADIOPAD_MACROPAD_GID "$RADIOPAD_MACROPAD_DEVICE"
+  if [ -z "${RADIOPAD_MACROPAD_GID:-}" ]; then
+    die "could not determine macropad device group id; set RADIOPAD_MACROPAD_GID"
+  fi
 
   compose_files+=(-f "$root/compose.macropad.yaml")
-  if [ -n "${RADIOPAD_MACROPAD_GID:-}" ]; then
-    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE with group $RADIOPAD_MACROPAD_GID" >&2
-  else
-    echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE" >&2
-  fi
+  echo "[info] using macropad data port: $RADIOPAD_MACROPAD_DEVICE with group $RADIOPAD_MACROPAD_GID" >&2
 }
 
 if [ -d /dev/snd ]; then
