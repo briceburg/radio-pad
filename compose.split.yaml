@@ -29,6 +29,8 @@ services:
       file: compose.yaml
       service: remote-control
     depends_on:
+      registry:
+        condition: service_healthy
       switchboard:
         condition: service_healthy
     environment:
@@ -39,6 +41,10 @@ services:
       file: compose.yaml
       service: integration-tests
     depends_on:
+      player:
+        condition: service_healthy
+      remote-control:
+        condition: service_healthy
       switchboard:
         condition: service_healthy
     environment:
