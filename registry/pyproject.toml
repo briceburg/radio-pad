@@ -2,7 +2,6 @@
 name = "radio-pad-registry"
 version = "2025.01.0"
 description = "FastAPI registry and switchboard service for radio-pad"
-license = "AGPL-3.0-or-later"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "boto3",
