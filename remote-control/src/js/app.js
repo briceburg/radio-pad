@@ -10,7 +10,7 @@ import { createControlActions } from "./actions/control-actions.js";
 import { createSettingsActions } from "./actions/settings-actions.js";
 import { toastDanger, initNotifications } from "./notifications.js";
 import { RadioPadAuth } from "./services/auth.js";
-import { RadioListen } from "./services/radio-listen.js";
+import { LocalPlayback } from "./services/local-playback.js";
 import { RadioControl } from "./services/radio-control.js";
 import { RadioPadPreferences } from "./services/preferences.js";
 
@@ -25,10 +25,10 @@ defineCustomElements(window);
 async function bootstrap() {
   const prefs = new RadioPadPreferences();
   const auth = new RadioPadAuth();
-  const listen = new RadioListen();
+  const localPlayback = new LocalPlayback();
   const control = new RadioControl();
 
-  const controlActions = createControlActions({ control, listen });
+  const controlActions = createControlActions({ localPlayback, control });
   const settingsActions = createSettingsActions({
     prefs,
     auth,
