@@ -1,8 +1,7 @@
 [project]
 name = "radio-pad-player"
 version = "2025.01.0"
-description = "radio-pad player client"
-license = "GPL-3.0-or-later"
+description = "Radio-Pad player client"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "httpx2==2.5.0",
