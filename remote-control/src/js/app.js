@@ -1,8 +1,14 @@
 // SPDX-FileCopyrightText: 2025 Brice Burgess (github.com/briceburg)
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import "@ionic/core/css/ionic.bundle.css";
-import { defineCustomElements } from "@ionic/core/loader/index.js";
+import "@ionic/core/css/core.css";
+import "@ionic/core/css/normalize.css";
+import "@ionic/core/css/structure.css";
+import "@ionic/core/css/typography.css";
+// Ionic ships margin utilities, including ion-margin-top, in padding.css.
+import "@ionic/core/css/padding.css";
+import "@ionic/core/css/text-alignment.css";
+import "@ionic/core/css/flex-utils.css";
 import { addIcons } from "ionicons";
 import * as appIcons from "./ui/icons.js";
 import { createAuthActions } from "./actions/auth-actions.js";
@@ -19,10 +25,13 @@ import "./ui/radio-auth.js";
 import "./ui/radio-player-tab.js";
 import "./ui/radio-settings.js";
 
+const ionicReady = customElements.whenDefined("ion-app");
+
 addIcons(appIcons);
-defineCustomElements(window);
 
 async function bootstrap() {
+  await ionicReady;
+
   const prefs = new RadioPadPreferences();
   const auth = new RadioPadAuth();
   const localPlayback = new LocalPlayback();

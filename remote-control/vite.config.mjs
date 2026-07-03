@@ -7,9 +7,16 @@ function trimEnv(name) {
 export default defineConfig({
   root: "./src",
   envDir: "..",
+  publicDir: "../node_modules/@ionic/core/dist/ionic",
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+      external: ["/ionic.esm.js"],
+    },
   },
   server: {
     host: "0.0.0.0",
