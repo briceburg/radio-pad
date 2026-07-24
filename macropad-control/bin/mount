@@ -13,16 +13,23 @@ mounted_source="$(findmnt -nro SOURCE --mountpoint "$target" 2>/dev/null || true
 mounted_disk="$(readlink -f "$mounted_source" 2>/dev/null || true)"
 mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || true),"
 
-if [ "$mounted_disk" = "$disk" ] && [[ "$mount_options" == *,rw,* ]]; then
-  echo "[ok] $disk is already mounted read/write at $target"
-  exit 0
+if [ "$mounted_disk" = "$disk" ] && [[ "$mount_options" == *,rw,* ]] && [[ "$mount_options" == *,sync,* ]]; then
+  echo "[ok] $disk is already mounted read/write synchronously at $target"
+else
+  if mountpoint -q "$target"; then
+    echo "[info] replacing stale, read-only, or asynchronous mount at $target"
+    sudo umount "$target"
+  fi
+
+  [ -d "$target" ] || sudo mkdir -p "$target"
+  sudo mount "$disk" "$target" -o "uid=$(id -u),rw,sync"
 fi
 
-if mountpoint -q "$target"; then
-  echo "[info] replacing stale or read-only mount at $target"
-  sudo umount "$target"
-fi
+probe="$(mktemp "$target/.radio-pad-write-test.XXXXXX")"
+trap 'rm -f -- "$probe" 2>/dev/null || true' EXIT
 
-[ -d "$target" ] || sudo mkdir -p "$target"
-sudo mount "$disk" "$target" -o "uid=$(id -u),rw"
-echo "[ok] mounted $disk read/write at $target"
+printf 'radio-pad storage write test\n' >"$probe"
+sync -f "$probe"
+rm -f -- "$probe"
+
+echo "[ok] $disk accepts synchronized writes at $target"

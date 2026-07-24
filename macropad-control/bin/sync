@@ -23,15 +23,21 @@ if [ "$mounted_device" != "$device" ]; then
   exit 1
 fi
 
-if [[ "$mount_options" != *,rw,* ]]; then
-  echo "$target is mounted read-only; run macropad-control/bin/mount" >&2
+if [[ "$mount_options" != *,rw,* ]] || [[ "$mount_options" != *,sync,* ]]; then
+  echo "$target is not mounted read/write synchronously; run macropad-control/bin/mount" >&2
   exit 1
 fi
 
+staging="$(mktemp -d "$target/.radio-pad-sync.XXXXXX")"
+trap 'rm -rf -- "$staging" 2>/dev/null || true' EXIT
+
+cp -R "$source_dir"/{boot.py,lib,main.py} "$staging/"
+sync -f "$staging"
+diff -qr "$source_dir" "$staging"
+
 rm -rf "$target"/{boot.py,lib,main.py}
-cp -R "$source_dir"/{boot.py,lib} "$target/"
-cp -R "$source_dir/main.py" "$target/main.py"
-sync
+mv "$staging"/{boot.py,lib,main.py} "$target/"
+sync -f "$target"
 
 diff -q "$source_dir/boot.py" "$target/boot.py"
 diff -qr "$source_dir/lib" "$target/lib"
