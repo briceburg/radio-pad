@@ -98,6 +98,19 @@ After a reset, safe-mode session, or unplug/replug cycle, USB device names and
 the CIRCUITPY block device may change. Run `bin/mount` and `bin/doctor` again
 before syncing or recreating the compose player.
 
+### Troubleshooting CIRCUITPY Writes
+
+A running display does not prove that CIRCUITPY is writable. If `bin/mount`
+fails its write probe, do not sync. Unmount and inspect without making changes:
+
+```sh
+sudo umount /mnt/CIRCUITPY
+sudo fsck.vfat -n /dev/disk/by-label/CIRCUITPY
+```
+
+A dirty bit alone is not structural corruption. If no damage is reported, reset
+or reconnect while unmounted, then rerun `bin/mount` and `bin/doctor`.
+
 ## Development
 
 Run Python-side checks for the macropad control code with:
