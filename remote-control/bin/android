@@ -4,5 +4,10 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 npm run build
-npx cap sync
+npx cap sync android
+
+if [ -z "${CAPACITOR_ANDROID_STUDIO_PATH:-}" ] && command -v android-studio >/dev/null; then
+  export CAPACITOR_ANDROID_STUDIO_PATH="$(command -v android-studio)"
+fi
+
 npx cap open android

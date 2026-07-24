@@ -18,6 +18,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 - Google sign-in uses `@capawesome/capacitor-google-sign-in` across web, Android, and iOS.
 - `VITE_GOOGLE_CLIENT_ID` should be the Google web client ID.
+- Android OAuth clients register package/signing-certificate pairs in Google Auth Platform; their IDs are not application configuration.
 - `VITE_GOOGLE_REDIRECT_URL` is optional on web. By default, the app uses the current page URL.
 - The Settings tab's `Copy API test token` action is intentionally web-only.
 - iOS also needs native Google SDK metadata in `ios/App/App/Info.plist`.
@@ -32,10 +33,8 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - `remote-control/.env.example` is the checked-in template.
 - `VITE_SWITCHBOARD_URL` is a web-only override for switchboard testing.
   - Web preserves the player-specific path from the registry `switchboard_url`.
-  - Native must not apply the web override; it uses the explicit or inferred
-    URL from player discovery.
-- Player discovery preserves an explicit `switchboard_url` and otherwise infers
-  the same-origin switchboard path from the registry URL.
+  - Native must not apply the web override; it uses the explicit or inferred URL from player discovery.
+- Player discovery preserves an explicit `switchboard_url` and otherwise infers the same-origin switchboard path from the registry URL.
 
 ## Testing/debugging preferences
 
@@ -45,15 +44,12 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 ## Change preferences
 
 - Keep platform-specific behavior explicit only where the plugin or native project metadata requires it.
+- Keep `dev.radiopad.remote` aligned across Capacitor, the Android namespace/application ID and Java package, and the iOS bundle identifier.
+- Never sign release builds with the debug key or commit keystores.
+- Use `bin/android-bundle` for signed release bundles. It prompts locally and accepts `RADIOPAD_RELEASE_*` environment variables for non-interactive CI; publishing remains a separate step.
 - Prefer small helpers over broad auth rewrites; the shared Google sign-in path should stay easy to reason about.
-- Keep Settings edits as component-local drafts until explicit Save; account-dependent discovery and active Control changes
-  occur only after Save.
-- Preserve the grouped Settings UI. Standard groups use `ion-item-group` + `ion-item-divider`; Advanced uses Ionic's
-  `ion-accordion` within an item group.
-- Persist qualified RadioDial identities in preferences and derive resource URLs
-  from the current registry URL. Do not persist URLs as RadioDial identity.
-- Treat `radio_dial_url` as the source URL reported by a running player.
-  `configured_radio_dial_url` is the remote's initial URL derived from registry
-  configuration. Retain the configured URL when both URLs identify the same
-  RadioDial resource; a different running-player report may supersede it.
+- Keep Settings edits as component-local drafts until explicit Save; account-dependent discovery and active Control changes occur only after Save.
+- Preserve the grouped Settings UI. Standard groups use `ion-item-group` + `ion-item-divider`; Advanced uses Ionic's `ion-accordion` within an item group.
+- Persist qualified RadioDial identities in preferences and derive resource URLs from the current registry URL. Do not persist URLs as RadioDial identity.
+- Treat `radio_dial_url` as the source URL reported by a running player. `configured_radio_dial_url` is the remote's initial URL derived from registry configuration. Retain the configured URL when both URLs identify the same RadioDial resource; a different running-player report may supersede it.
 - Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.

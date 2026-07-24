@@ -1,2 +1,6 @@
 name = "radio-pad"
 pages_build_output_dir = "./dist"
+
+[vars]
+# Public OAuth client ID; keep it aligned with registry/fly.toml.
+VITE_GOOGLE_CLIENT_ID = "106477477593-2uj1ft1e8hi4eiq38tl9ldehjfg4evcl.apps.googleusercontent.com"

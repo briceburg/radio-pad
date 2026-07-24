@@ -1,10 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Capacitor } from "@capacitor/core";
 import {
   getVisiblePreferences,
   preferenceValues,
   RadioSettings,
 } from "../../src/js/ui/radio-settings.js";
 import { preferencesStore, settingsUiStore } from "../../src/js/store.js";
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: vi.fn() },
+}));
 
 const SETTINGS_DEFINITIONS = {
   accountId: {
@@ -40,6 +45,7 @@ const SETTINGS_DEFINITIONS = {
   },
 };
 
+beforeEach(() => Capacitor.isNativePlatform.mockReturnValue(false));
 afterEach(() => document.body.replaceChildren());
 
 async function renderSettings(overrides = {}) {
@@ -201,6 +207,18 @@ describe("radio-settings", () => {
     expect(select.querySelector("ion-select-option").textContent).toContain(
       "Kitchen",
     );
+  });
+
+  it.each([
+    ["web", false, "/privacy/"],
+    ["native", true, "https://remote.radiopad.dev/privacy/"],
+  ])("links to the %s privacy policy from Settings", async (_, native, url) => {
+    Capacitor.isNativePlatform.mockReturnValue(native);
+    const element = await renderSettings();
+    const link = element.querySelector("#privacy-policy-link");
+
+    expect(link.getAttribute("href")).toBe(url);
+    expect(link.textContent).toContain("Privacy policy");
   });
 
   it("shows empty states for account-dependent options", async () => {

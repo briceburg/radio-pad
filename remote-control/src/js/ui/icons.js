@@ -10,5 +10,6 @@ export {
   radio,
   radioOutline,
   settingsOutline,
+  shieldCheckmarkOutline,
   stop,
 } from "ionicons/icons";

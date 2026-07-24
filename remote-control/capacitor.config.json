@@ -1,6 +1,6 @@
 {
-  "appId": "net.iceburg.radio",
-  "appName": "radio-pad-control",
+  "appId": "dev.radiopad.remote",
+  "appName": "RadioPad",
   "webDir": "dist",
   "plugins": {
     "SplashScreen": {

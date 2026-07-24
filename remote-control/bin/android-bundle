@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AAB_PATH="$PROJECT_ROOT/android/app/build/outputs/bundle/release/app-release.aab"
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+prompt_required() {
+  local name="$1"
+  local environment_name="$2"
+  local prompt="$3"
+  local secret="${4:-false}"
+  local default="${5:-}"
+
+  [ -n "${!name:-}" ] && return
+  if [ ! -t 0 ]; then
+    [ -n "$default" ] || die "$environment_name is required in non-interactive environments"
+    printf -v "$name" "%s" "$default"
+    return
+  fi
+
+  if [ "$secret" = true ]; then
+    read -r -s -p "$prompt: " "$name"
+    echo >&2
+  else
+    read -r -p "$prompt${default:+ [$default]}: " "$name"
+  fi
+  [ -n "${!name}" ] || printf -v "$name" "%s" "$default"
+  [ -n "${!name}" ] || die "$environment_name cannot be empty"
+}
+
+default_store_file="$HOME/.android/radiopad.jks"
+default_key_alias="radiopad"
+store_file="${RADIOPAD_RELEASE_STORE_FILE:-}"
+store_password="${RADIOPAD_RELEASE_STORE_PASSWORD:-}"
+key_alias="${RADIOPAD_RELEASE_KEY_ALIAS:-}"
+key_password="${RADIOPAD_RELEASE_KEY_PASSWORD:-}"
+unset RADIOPAD_RELEASE_STORE_FILE RADIOPAD_RELEASE_STORE_PASSWORD
+unset RADIOPAD_RELEASE_KEY_ALIAS RADIOPAD_RELEASE_KEY_PASSWORD
+
+if [ -z "${JAVA_HOME:-}" ] && [ -x /opt/android-studio/jbr/bin/java ]; then
+  export JAVA_HOME=/opt/android-studio/jbr
+fi
+
+command -v jarsigner >/dev/null || die "jarsigner is required; install a JDK"
+prompt_required store_file RADIOPAD_RELEASE_STORE_FILE "Upload keystore path" false "$default_store_file"
+prompt_required key_alias RADIOPAD_RELEASE_KEY_ALIAS "Upload key alias" false "$default_key_alias"
+prompt_required store_password RADIOPAD_RELEASE_STORE_PASSWORD "Keystore password" true
+
+if [ -z "$key_password" ] && [ -t 0 ]; then
+  read -r -s -p "Key password (Enter to reuse keystore password): " key_password
+  echo >&2
+fi
+key_password="${key_password:-$store_password}"
+
+[ -f "$store_file" ] || die "keystore not found: $store_file"
+store_file="$(cd "$(dirname "$store_file")" && pwd -P)/$(basename "$store_file")"
+
+cd "$PROJECT_ROOT"
+npm run build
+npx cap sync android
+
+(
+  cd android
+  ORG_GRADLE_PROJECT_radioPadReleaseStoreFile="$store_file" \
+    ORG_GRADLE_PROJECT_radioPadReleaseStorePassword="$store_password" \
+    ORG_GRADLE_PROJECT_radioPadReleaseKeyAlias="$key_alias" \
+    ORG_GRADLE_PROJECT_radioPadReleaseKeyPassword="$key_password" \
+    ./gradlew --no-daemon bundleRelease
+)
+
+unset store_password key_password
+
+[ -f "$AAB_PATH" ] || die "Gradle did not create $AAB_PATH"
+verification_log="$(mktemp "${TMPDIR:-/tmp}/radiopad-aab-verify.XXXXXX")"
+trap 'rm -f "$verification_log"' EXIT
+if ! LC_ALL=C jarsigner -verify "$AAB_PATH" >"$verification_log" 2>&1; then
+  cat "$verification_log" >&2
+  die "AAB signature verification failed"
+fi
+grep -Fqx "jar verified." "$verification_log" || {
+  cat "$verification_log" >&2
+  die "AAB signature verification failed"
+}
+
+echo
+echo "Created signed Android App Bundle:"
+echo "  $AAB_PATH"
+if command -v sha256sum >/dev/null; then
+  sha256sum "$AAB_PATH"
+elif command -v shasum >/dev/null; then
+  shasum -a 256 "$AAB_PATH"
+else
+  die "sha256sum or shasum is required to checksum the AAB"
+fi

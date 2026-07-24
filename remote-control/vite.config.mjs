@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 function trimEnv(name) {
   return process.env[name]?.trim();
@@ -12,6 +13,12 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL("./src/index.html", import.meta.url)),
+        privacy: fileURLToPath(
+          new URL("./src/privacy/index.html", import.meta.url),
+        ),
+      },
       output: {
         manualChunks: undefined,
       },
