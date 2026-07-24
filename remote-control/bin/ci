@@ -4,6 +4,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
+bash -n bin/*
+
 GREEN='\033[1;32m'
 RED='\033[1;31m'
 NC='\033[0m'

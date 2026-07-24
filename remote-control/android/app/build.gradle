@@ -1,14 +1,36 @@
 apply plugin: 'com.android.application'
 
+def releaseSigning = [
+    storeFile: providers.gradleProperty("radioPadReleaseStoreFile").orNull,
+    storePassword: providers.gradleProperty("radioPadReleaseStorePassword").orNull,
+    keyAlias: providers.gradleProperty("radioPadReleaseKeyAlias").orNull,
+    keyPassword: providers.gradleProperty("radioPadReleaseKeyPassword").orNull,
+]
+def releaseSigningConfigured = releaseSigning.values().every { it }
+
+if (releaseSigning.values().any { it } && !releaseSigningConfigured) {
+    throw new GradleException("Configure all radioPadRelease signing properties or none of them.")
+}
+
 android {
-    namespace = "net.iceburg.radio"
+    namespace = "dev.radiopad.remote"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile rootProject.file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
     defaultConfig {
-        applicationId "net.iceburg.radio"
+        applicationId "dev.radiopad.remote"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.0.1"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -19,7 +41,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

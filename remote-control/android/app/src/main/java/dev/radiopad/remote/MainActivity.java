@@ -1,4 +1,4 @@
-package net.iceburg.radio;
+package dev.radiopad.remote;
 
 import com.getcapacitor.BridgeActivity;
 

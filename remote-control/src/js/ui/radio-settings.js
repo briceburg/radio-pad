@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { html } from "lit";
+import { Capacitor } from "@capacitor/core";
 import { RadioElement } from "./radio-element.js";
 import { StoreController } from "@nanostores/lit";
 import { preferencesStore, settingsUiStore } from "../store.js";
 import { PREFERENCE_GROUPS } from "../services/preferences.js";
 
+const PUBLIC_PRIVACY_POLICY_URL = "https://remote.radiopad.dev/privacy/";
 const ACCOUNT_GROUP_KEY = "radio-account";
 const ADVANCED_GROUP_KEY = "radio-advanced";
 const ACCOUNT_DEPENDENT_KEYS = new Set(["playerId", "radioDial"]);
@@ -243,6 +245,9 @@ export class RadioSettings extends RadioElement {
     const hasChanges = hasPreferenceChanges(preferences, values);
     const accountChangePending =
       values.accountId !== (preferences.accountId?.value ?? "");
+    const privacyPolicyUrl = Capacitor.isNativePlatform()
+      ? PUBLIC_PRIVACY_POLICY_URL
+      : "/privacy/";
 
     const preferenceList = Object.entries(preferences).map(([key, pref]) => ({
       ...pref,
@@ -272,6 +277,16 @@ export class RadioSettings extends RadioElement {
       >
         ${saveState.label}
       </ion-button>
+      <ion-list>
+        <ion-item id="privacy-policy-link" href=${privacyPolicyUrl} detail>
+          <ion-icon
+            aria-hidden="true"
+            name="shield-checkmark-outline"
+            slot="start"
+          ></ion-icon>
+          <ion-label>Privacy policy</ion-label>
+        </ion-item>
+      </ion-list>
     `;
   }
 }

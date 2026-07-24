@@ -52,7 +52,7 @@ REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS | read-side fetch freshness window; write
 REGISTRY_BACKEND_GIT_AUTHOR_NAME | commit author name for registry-managed writes. | `briceburg`
 REGISTRY_BACKEND_GIT_AUTHOR_EMAIL | commit author email for registry-managed writes. Use a GitHub-linked address (for example a GitHub noreply email) if you want GitHub to attribute commits to your account. | `briceburg@users.noreply.github.com`
 REGISTRY_BACKEND_GIT_SSH_KEY_PATH | optional SSH private key path used to configure `GIT_SSH_COMMAND` for deploy-key authentication. | `None`
-REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client ids for write and player-control auth. | `None`
+REGISTRY_AUTH_OIDC_CLIENT_IDS | comma-separated allowed OIDC client IDs for write and player-control auth. | `None`
 REGISTRY_AUTH_OIDC_ISSUER | OIDC issuer used to verify bearer tokens for writes and player control. | `None`
 REGISTRY_AUTH_OIDC_BASE_URI | optional OIDC discovery base URI for `fastapi-oidc`; defaults to `REGISTRY_AUTH_OIDC_ISSUER`. | same as issuer
 REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL | JWKS/discovery cache TTL in seconds for bearer token verification. | `3600`
@@ -172,14 +172,9 @@ Resource reads remain public. Writes and player control become protected when bo
 
 The registry verifies OIDC bearer tokens against an allowed client-id list and then applies account-owner ACL checks from a separate private local authz store.
 
-For Google OIDC, use one issuer and list the web, Android, and iOS client ids used by `remote-control`:
-
-```sh
-REGISTRY_AUTH_OIDC_ISSUER=https://accounts.google.com
-REGISTRY_AUTH_OIDC_CLIENT_IDS=web-client-id.apps.googleusercontent.com,android-client-id.apps.googleusercontent.com,ios-client-id.apps.googleusercontent.com
-```
-
-Match this with the Google client setup documented in `radio-pad/remote-control/README.md`.
+For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build;
+native Android and iOS client IDs are not token audiences. The canonical client creation, `.env`, and Fly configuration
+steps live in the root [Google sign-in setup](../README.md#google-sign-in).
 
 The checked-in seed documents live under a dedicated `seed-data/` root:
 

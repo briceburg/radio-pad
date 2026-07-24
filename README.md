@@ -71,11 +71,40 @@ Set `RADIOPAD_AUDIO=off` to start without container audio. Set `RADIOPAD_PULSE_S
 
 Use `compose.audio.yaml` or `compose.macropad.yaml` directly only when you need explicit compose overlays outside `bin/dev`; in that case set the required variables from those overlay files yourself.
 
-Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to configure overrides or to enable Google sign-in, registry write auth, and authenticated player control. See [remote-control](./remote-control/README.md#web-development) for OAuth client setup and [registry](./registry/README.md#authentication-and-account-owner-seeding) for authz seeding.
+Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs.
+Copy `.env.example` to `.env` to configure overrides. See
+[registry authentication](./registry/README.md#authentication-and-account-owner-seeding) for account-owner seeding.
 
 ```sh
 cp .env.example .env
 ```
+
+### Google sign-in
+
+RadioPad uses one Google **Web application** OAuth client ID as the ID-token audience on every platform. In
+[Google Auth Platform](https://console.developers.google.com/auth/clients), create:
+
+- Name: `RadioPad Web` (a private label shown only in Google Cloud)
+- Authorized JavaScript origins: `http://localhost:5173` and `https://remote.radiopad.dev`
+- Authorized redirect URIs: `http://localhost:5173/` and `https://remote.radiopad.dev/`
+
+Do not add `https://registry.radiopad.dev`: the registry validates tokens but does not host the browser sign-in flow.
+
+Use that same Web client ID in each environment:
+
+| Environment | Configuration |
+|---|---|
+| Local Compose | `GOOGLE_CLIENT_ID` in the root `.env` |
+| Standalone and native builds | `VITE_GOOGLE_CLIENT_ID` in `remote-control/.env` |
+| Cloudflare Pages | `VITE_GOOGLE_CLIENT_ID` in `remote-control/wrangler.toml` |
+| Fly registry | `REGISTRY_AUTH_OIDC_CLIENT_IDS` in `registry/fly.toml` |
+
+Vite embeds the ID at build time. Client IDs, the issuer, and CORS origins are public configuration; the downloaded OAuth
+JSON and client secret are not used.
+
+Android also requires an OAuth client for each package/signing-certificate pair; that client ID stays in Google Auth
+Platform. Follow the [Android debug setup](./remote-control/README.md#android-development) and
+[Google Play setup](./remote-control/README.md#google-play-release) for the required SHA-1 fingerprints and ownership step.
 
 View assigned ports:
 
