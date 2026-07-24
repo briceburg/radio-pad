@@ -1,65 +1,66 @@
-# radio-pad player
+# RadioPad player
 
-A 🎵 radio station player 🎵 with real-time syncing controllers.
+Streams a player's assigned RadioDial through the host audio system and keeps connected controllers synchronized.
 
 ## Usage
 
-### Host Dependencies
+### Requirements
 
-- [mpv](https://mpv.io/)
-- [python-mpv-jsonipc](https://github.com/iwalton3/python-mpv-jsonipc)
-- [python-websockets](https://github.com/python-websockets/websockets)
+- [uv](https://docs.astral.sh/uv/) for the Python environment
+- [mpv](https://mpv.io/) for audio playback
 
-### Running the Player
+Python packages are installed from `pyproject.toml` and `uv.lock`; they are not separate host dependencies.
 
-Start the player through the project script, which uses `uv run` with the
-dependencies from `pyproject.toml`.
+### Running the player
+
+Start the player through the project script:
 
 ```sh
 ./bin/player
 
-# or to run as a particular player, use:
+# Select a registered player explicitly
 RADIOPAD_PLAYER="briceburg/living-room" ./bin/player
 ```
 
-On a Raspberry Pi, you can start the listener at boot in a tmux session by adding the following to your auto-logged-in user's `.bashrc` file. the example assumes `radio-pad` exists it your PATH:
+On a Raspberry Pi with console auto-login, this `.bashrc` snippet starts the player in tmux. Adjust `RADIOPAD_ROOT` to the checkout path:
 
 ```sh
+RADIOPAD_ROOT="$HOME/git/radio-pad"
+
 if tmux has-session -t radio-pad 2>/dev/null; then
-  echo "radio-pad running. to attach:"
+  echo "RadioPad is running. To attach:"
   echo "  tmux attach-session -t radio-pad"
 else
-  tmux new-session -s radio-pad radio-pad
+  tmux new-session -s radio-pad -c "$RADIOPAD_ROOT/player" ./bin/player
 fi
 ```
 
-> tmux maintains the tty1 attachment whereas screen drops it if you attach via ssh.
+> tmux keeps the player session available when you later attach over SSH.
 
-### Environment Variables
+### Environment variables
 
-name | description | default
---- | --- | ---
-`RADIOPAD_AUDIO_CHANNELS` | 'stereo' or 'mono' | `stereo`
-`RADIOPAD_AUDIO_DEVICE` | Optional mpv device from `mpv --audio-device=help`, such as `alsa/default:CARD=Generic`. | `None`
-`RADIOPAD_AUDIO_OUTPUT` | Optional mpv audio output driver, such as `null` for headless tests. | `None`
-`RADIOPAD_ENABLE_DISCOVERY` | Enables discovery based on `RADIOPAD_PLAYER`. Anything other than "true" disables it. | `true`
-`RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock`
-`RADIOPAD_PLAYBACK_TIMEOUT_SECONDS` | Maximum time to wait for mpv IPC and usable audio. | `15`
-`RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready`
-`RADIOPAD_MACROPAD_PORT` | Explicit macropad CDC2 serial device. | `auto-detected`
-`RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room`
-`RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api`
-`RADIOPAD_RADIO_DIAL_URL` | URL returning a complete RadioDial resource. Derived from the registry player configuration if not set. | `None`
-`RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control syncing. Discovered from the registry if not set. | `None`
+| Name | Description | Default |
+| --- | --- | --- |
+| `RADIOPAD_AUDIO_CHANNELS` | Audio channel mode: `stereo` or `mono`. | `stereo` |
+| `RADIOPAD_AUDIO_DEVICE` | Optional mpv device from `mpv --audio-device=help`, such as `alsa/default:CARD=Generic`. | unset |
+| `RADIOPAD_AUDIO_OUTPUT` | Optional mpv output driver, such as `null` for headless tests. | unset |
+| `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery through `RADIOPAD_PLAYER`; any value other than `true` disables it. | `true` |
+| `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock` |
+| `RADIOPAD_PLAYBACK_TIMEOUT_SECONDS` | Maximum time to wait for mpv IPC and usable audio. | `15` |
+| `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready` |
+| `RADIOPAD_MACROPAD_PORT` | Explicit Macropad CDC2 serial device. | `auto-detected` |
+| `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room` |
+| `RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api` |
+| `RADIOPAD_RADIO_DIAL_URL` | URL returning a complete RadioDial; derived from the registry player when unset. | unset |
+| `RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control synchronization; discovered from the registry when unset. | unset |
 
-### Registry Discovery
+### Registry discovery
 
-The player discovers its RadioDial and switchboard URL from the [registry](../registry/) using `RADIOPAD_PLAYER`.
-The USB macropad client starts before discovery completes, so a headless player can report loading or degraded startup state when the registry or RadioDial is unavailable.
+The player discovers its RadioDial and switchboard URL from the [registry](../registry/) using `RADIOPAD_PLAYER`. The USB Macropad client starts before discovery completes, so a headless player can report loading or degraded startup state when the registry or RadioDial is unavailable.
 
 For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 
-```
+```text
 https://registry.radiopad.dev/api/accounts/briceburg/players/living-room
 ```
 
@@ -88,7 +89,7 @@ To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a
 
 ## Development
 
-For compose-based development with all services, see the [root README](../README.md#development).
+For Compose-based development with all services, see the [root README](../README.md#development).
 
 Run player checks with:
 

@@ -1,0 +1,15 @@
+{
+  "name": "radio-pad",
+  "private": true,
+  "scripts": {
+    "format": "prettier . --write",
+    "lint": "prettier . --check"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.4",
+    "prettier": "3.9.6"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

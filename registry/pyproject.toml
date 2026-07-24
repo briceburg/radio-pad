@@ -1,7 +1,7 @@
 [project]
 name = "radio-pad-registry"
 version = "2025.01.0"
-description = "FastAPI registry and switchboard service for radio-pad"
+description = "FastAPI registry and switchboard service for RadioPad"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "boto3",
@@ -30,6 +30,8 @@ package = false
 asyncio_mode = "auto"
 addopts = "-m 'not performance'"
 cache_dir = "tmp/.pytest_cache"
+faulthandler_timeout = 30
+faulthandler_exit_on_timeout = true
 pythonpath = ["src", "tests"]
 markers = [
     "functional: marks tests as functional (requires a running server)",

@@ -2,62 +2,49 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  python-ci:
+  components:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - macropad-control
-          - player
-          - registry
-          - tests/integration
-    defaults:
-      run:
-        working-directory: ./${{ matrix.project }}
     steps:
       - uses: actions/checkout@v6
       - name: Setup uv
         uses: astral-sh/setup-uv@v8.2.0
         with:
           version: "0.11.24"
-          working-directory: ./${{ matrix.project }}
           enable-cache: true
-          cache-dependency-glob: uv.lock
-          cache-local-path: ${{ github.workspace }}/${{ matrix.project }}/tmp/.uv_cache
-      - name: Run CI checks
-        run: bin/ci
-
-  node-ci:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./remote-control
-    steps:
-      - uses: actions/checkout@v6
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./remote-control/package-lock.json
-      - name: Install dependencies
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            remote-control/package-lock.json
+      - name: Install repository tooling
         run: npm ci
+      - name: Install remote-control dependencies
+        run: npm ci
+        working-directory: ./remote-control
       - name: Run CI
         run: bin/ci
 
-  integration-ci:
+  integration:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        compose_file: [compose.yaml, compose.split.yaml, compose.prod-smoke.yaml]
+        compose_file:
+          [compose.yaml, compose.split.yaml, compose.prod-smoke.yaml]
     steps:
       - uses: actions/checkout@v6
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: "0.11.24"
+          enable-cache: false
       - name: Run compose integration tests
-        run: bin/ci ${{ matrix.compose_file }}
+        run: bin/ci integration ${{ matrix.compose_file }}

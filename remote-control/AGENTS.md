@@ -1,3 +1,5 @@
+# AGENTS.md
+
 Guidance for coding agents working in `radio-pad/remote-control`.
 
 ## Project shape
@@ -11,7 +13,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 - Run local web dev with `npm start`.
 - Validate production bundling with `npm run build`.
-- Formatting/linting uses `npm run lint` (Prettier checks source, tests, config, and component Markdown).
+- Repository formatting is owned by the root tooling package. Run `npm run format` from the repository root to write changes; root `bin/ci` verifies them.
 - Run headless logic tests via `npm test` or `npm run test:watch`.
 
 ## Auth conventions
@@ -36,7 +38,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
   - Native must not apply the web override; it uses the explicit or inferred URL from player discovery.
 - Player discovery preserves an explicit `switchboard_url` and otherwise infers the same-origin switchboard path from the registry URL.
 
-## Testing/debugging preferences
+## Testing and debugging
 
 - `vitest` is used for isolated logical tests. Prefer `npm test` over UI checks for domain logic correctness.
 - Place structural logic / service unit tests inside the `tests/` directory at the project root.
@@ -52,4 +54,3 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - Preserve the grouped Settings UI. Standard groups use `ion-item-group` + `ion-item-divider`; Advanced uses Ionic's `ion-accordion` within an item group.
 - Persist qualified RadioDial identities in preferences and derive resource URLs from the current registry URL. Do not persist URLs as RadioDial identity.
 - Treat `radio_dial_url` as the source URL reported by a running player. `configured_radio_dial_url` is the remote's initial URL derived from registry configuration. Retain the configured URL when both URLs identify the same RadioDial resource; a different running-player report may supersede it.
-- Keep change summaries and "main changes" sections concise; avoid overly technical detail unless it is needed to act on the change.

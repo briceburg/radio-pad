@@ -1,36 +1,23 @@
-# radio-pad
+# RadioPad
 
-A 🎵 radio station player 🎵 with real-time syncing controllers.
+An internet radio player with physical, web, and mobile controllers that stay in sync.
 
 ![radio-pad-logo](./shared/assets/logo-dark.svg)
 
-## Overview
+## How it works
 
-* The [player](./player/) streams internet radio through a host's audio output and owns playback and volume.
-* Controllers — a USB [macropad](./macropad-control/) or the web/mobile [remote control](./remote-control/) — tell a player what to play.
-* The [registry](./registry/) assigns players curated, shareable [RadioDials](./registry/seed-data/store/accounts/community/radio-dials/) of account-owned Stations.
+- The [player](./player/) streams internet radio through a host's audio output and owns playback and volume.
+- A USB [Macropad](./macropad-control/) or the web/mobile [remote control](./remote-control/) tells the player what to play.
+- The [registry](./registry/) assigns players curated, shareable [RadioDials](./registry/seed-data/store/accounts/community/radio-dials/) of account-owned Stations and relays remote commands over WebSockets.
 
-### Local control
-
-**radio-pad** lets you use a USB-connected [macropad](./macropad-control/) as a controller for playing internet radio stations on your computer (such as a Raspberry Pi).
-
-* Each Macropad button is mapped to a different station.
-* The encoder knob adjusts volume if a station is playing, or switches station pages if there are more than 12 stations.
-* Pressing the encoder knob will stop playing.
+Macropad keys select Stations, the encoder adjusts volume or changes pages, and pressing the encoder stops playback. Remote controls discover players and RadioDials through the registry, then stay synchronized with the player's authoritative playback state.
 
 ![ai-enhanced-macropad-image](./shared/assets/radio-macropad-ai-image.webp)
-
-### Remote control
-
-**radio-pad** is optionally controlled through the [registry's](./registry/) built-in switchboard and connected [remote controls](./remote-control/), such as mobile apps or web browsers.
-
-* Remote controls and the player connect to the switchboard via WebSockets to request and broadcast station changes in real time.
-* The registry is a [dual-mode service](#deployment-modes) (API + switchboard) that can also be split for independent scaling.
 
 ## Components
 
 | Component | Description |
-|-----------|-------------|
+| --- | --- |
 | [player](./player/) | Audio runtime that loads its assigned RadioDial, streams the selected Station, and reports playback status. |
 | [macropad-control](./macropad-control/) | Physical USB controller for Station selection, stop, and volume. |
 | [registry](./registry/) | Stores accounts, Stations, RadioDials, and player assignments; serves the API and switchboard. |
@@ -44,9 +31,11 @@ A 🎵 radio station player 🎵 with real-time syncing controllers.
 
 ### Toolchain and dependency policy
 
-Tool versions live at the smallest project boundary that consumes them. Python components (`player`, `registry`, `macropad-control`, and `tests/integration`) own their `pyproject.toml` and `uv.lock`; `remote-control` owns `package.json` and `package-lock.json`.
+Tool versions live at the smallest project boundary that consumes them. Python projects (`player`, `registry`, `macropad-control`, and `tests/integration`) own their `pyproject.toml` and `uv.lock`; `remote-control` owns its application `package.json` and `package-lock.json`; the root package owns repository-wide development tools.
 
-Dependency updates should stay component-local: edit that component's manifest, regenerate only its lockfile, and run its `bin/ci` or the cheapest relevant check. Change Dockerfile or GitHub Actions runtime/tool pins only when the runtime or package-manager version intentionally changes. There is intentionally no root `uv` or `npm` workspace; the root orchestrates Compose and CI while components keep separate Docker contexts and locks.
+Dependency updates should stay within that boundary: edit its manifest, regenerate only its lockfile, and run its `bin/ci` or the cheapest relevant check. Change Dockerfile or GitHub Actions runtime/tool pins only when the runtime or package-manager version intentionally changes. The root npm package is tooling-only, not a workspace; `remote-control` remains independently installable for Cloudflare and Capacitor builds.
+
+Prettier discovers Markdown and supported first-party files across the repository; generated native projects, build output, tool caches, and lockfiles are ignored. Run `npm run format` to write canonical formatting; `bin/ci` verifies it.
 
 Docker Compose provides the local development environment. All services mount source for live reloading.
 
@@ -71,18 +60,21 @@ Set `RADIOPAD_AUDIO=off` to start without container audio. Set `RADIOPAD_PULSE_S
 
 Use `compose.audio.yaml` or `compose.macropad.yaml` directly only when you need explicit compose overlays outside `bin/dev`; in that case set the required variables from those overlay files yourself.
 
-Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs.
-Copy `.env.example` to `.env` to configure overrides. See
-[registry authentication](./registry/README.md#authentication-and-account-owner-seeding) for account-owner seeding.
+Registry and switchboard ports default to ephemeral; the web app defaults to port 5173 for stable OAuth redirect URIs. Copy `.env.example` to `.env` to configure overrides.
 
 ```sh
 cp .env.example .env
 ```
 
+View assigned ports with:
+
+```sh
+docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
+```
+
 ### Google sign-in
 
-RadioPad uses one Google **Web application** OAuth client ID as the ID-token audience on every platform. In
-[Google Auth Platform](https://console.developers.google.com/auth/clients), create:
+RadioPad uses one Google **Web application** OAuth client ID as the ID-token audience on every platform. In [Google Auth Platform](https://console.developers.google.com/auth/clients), create:
 
 - Name: `RadioPad Web` (a private label shown only in Google Cloud)
 - Authorized JavaScript origins: `http://localhost:5173` and `https://remote.radiopad.dev`
@@ -93,54 +85,37 @@ Do not add `https://registry.radiopad.dev`: the registry validates tokens but do
 Use that same Web client ID in each environment:
 
 | Environment | Configuration |
-|---|---|
+| --- | --- |
 | Local Compose | `GOOGLE_CLIENT_ID` in the root `.env` |
 | Standalone and native builds | `VITE_GOOGLE_CLIENT_ID` in `remote-control/.env` |
 | Cloudflare Pages | `VITE_GOOGLE_CLIENT_ID` in `remote-control/wrangler.toml` |
 | Fly registry | `REGISTRY_AUTH_OIDC_CLIENT_IDS` in `registry/fly.toml` |
 
-Vite embeds the ID at build time. Client IDs, the issuer, and CORS origins are public configuration; the downloaded OAuth
-JSON and client secret are not used.
+Vite embeds the ID at build time. Client IDs, the issuer, and CORS origins are public configuration; the downloaded OAuth JSON and client secret are not used.
 
-Android also requires an OAuth client for each package/signing-certificate pair; that client ID stays in Google Auth
-Platform. Follow the [Android debug setup](./remote-control/README.md#android-development) and
-[Google Play setup](./remote-control/README.md#google-play-release) for the required SHA-1 fingerprints and ownership step.
+Android also requires an OAuth client for each package/signing-certificate pair; that client ID stays in Google Auth Platform. Follow the [Android debug setup](./remote-control/README.md#android-development) and [Google Play setup](./remote-control/README.md#google-play-release) for the required SHA-1 fingerprints and ownership step.
 
-View assigned ports:
+See [registry authentication and account-owner seeding](./registry/README.md#authentication-and-account-owner-seeding) for server authorization setup.
+
+### Validation
+
+Install the root tooling and remote-control dependencies once:
 
 ```sh
-docker compose ps --format 'table {{.Service}}\t{{.Ports}}'
+npm ci
+(cd remote-control && npm ci)
 ```
 
-See each component README for standalone usage and additional configuration:
-[player](./player/README.md) · [registry](./registry/README.md) · [remote-control](./remote-control/README.md) · [macropad-control](./macropad-control/README.md)
-
-### Running checks
-
-Integration tests validate cross-service behavior (reachability, handshakes, message routing, seeded data).
-Individual project tests live within each component folder.
-
-Use `bin/check` to run all component check suites from the repo root. It runs the Python component checks, remote-control checks, and integration test static checks/collection without starting the Compose stack.
-
-Root `bin/ci` keeps compose integration runs isolated from local `.env` development settings by defaulting registry, switchboard, and remote-control host ports to ephemeral values, forcing headless audio output, and clearing `GOOGLE_CLIENT_ID` so auth stays disabled unless a test explicitly enables it.
+Use `bin/ci` for routine repository validation: it verifies formatting and runs every component's CI concurrently without starting Docker. Run static integration validation and cross-service tests explicitly with `bin/ci integration`; without a file it runs the unified, split, and production-smoke Compose configurations. Passing a Compose file targets one configuration. Integration runs are isolated from local `.env` settings with ephemeral host ports, headless audio, and disabled Google auth unless a test explicitly enables it.
 
 ```sh
-# Component checks
-bin/check
-
-# Unified mode
 bin/ci
-
-# Split mode
-bin/ci compose.split.yaml
-
-# Production images and healthchecks
-bin/ci compose.prod-smoke.yaml
+bin/ci integration
 ```
 
-### Testing with a macropad
+### Testing with a Macropad
 
-Mount the macropad once after attaching it, sync local firmware changes, verify the device state, then discover the post-sync CDC2 data port and recreate the player:
+Follow the [Macropad programming guide](./macropad-control/README.md#programming-the-macropad) for detailed setup and recovery. The normal hardware-backed development loop is:
 
 ```sh
 macropad-control/bin/mount
@@ -150,7 +125,7 @@ macropad-control/bin/doctor
 RADIOPAD_MACROPAD=required bin/dev up -d --force-recreate player
 ```
 
-The discovery command intentionally fails when it finds zero or multiple data ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` directly when more than one macropad is attached. Sync before creating the player container because CircuitPython may reboot and renumber its USB interfaces during a firmware update. Use `macropad-control/bin/console` for the CircuitPython REPL console; it intentionally selects a different USB CDC interface than `macropad-control/bin/data-port`.
+The discovery command intentionally fails when it finds zero or multiple data ports. Set `RADIOPAD_MACROPAD_DEVICE=/dev/ttyACM...` when more than one Macropad is attached. Sync before creating the player container because CircuitPython may reboot and renumber its USB interfaces. Use `macropad-control/bin/console` for the CircuitPython REPL; it selects a different USB CDC interface than `macropad-control/bin/data-port`.
 
 ## Architecture
 
@@ -159,11 +134,11 @@ The discovery command intentionally fails when it finds zero or multiple data po
 The registry is controlled by the `REGISTRY_PROFILES` environment variable:
 
 | Mode | `REGISTRY_PROFILES` | Description |
-|------|---------------------|-------------|
+| --- | --- | --- |
 | **Unified** | `api,switchboard` (default) | Single process serves the REST API and WebSocket switchboard. Simplest to deploy and operate. |
 | **Split** | `api` / `switchboard` separately | API and switchboard run as independent services. The switchboard validates controller access via an HTTP call back to the API. Allows independent scaling of stateless API replicas vs. long-lived WebSocket connections. |
 
-`compose.yaml` runs unified mode. `compose.split.yaml` demonstrates the split topology and is also tested in CI.
+`compose.yaml` runs unified mode. `compose.split.yaml` demonstrates the split configuration and is also tested in CI.
 
 ### Core control flow
 
@@ -207,16 +182,12 @@ flowchart TD
 
 Player control follows the registry's advertised auth mode:
 
-* Player registry reads remain public.
-* Every controller connection starts with an `authenticate` event; its token is null when registry auth is disabled.
-* When registry auth is enabled, the remote signs in and supplies its OIDC token only in that first WebSocket message, never in the URL.
-* The switchboard validates account-owner control access locally (unified mode) or through the registry API (split mode).
-* The switchboard sends `authenticated` before replaying state or accepting commands. Unauthorized or expired sessions close with policy code `1008`.
+- Player registry reads remain public.
+- Every controller connection starts with an `authenticate` event; its token is null when registry auth is disabled.
+- When registry auth is enabled, the remote signs in and supplies its OIDC token only in that first WebSocket message, never in the URL.
+- The switchboard validates account-owner control access locally (unified mode) or through the registry API (split mode).
+- The switchboard sends `authenticated` before replaying state or accepting commands. Unauthorized or expired sessions close with policy code `1008`.
 
-### Contributing
+## Contributing and support
 
-Pull requests and bug reports are welcome! Please [open an issue](https://github.com/briceburg/radio-pad/issues) or submit a PR.
-
-## Support
-
-For questions or help, please open an issue on the [GitHub repository](https://github.com/briceburg/radio-pad/issues).
+Pull requests and bug reports are welcome. For questions, help, or feature requests, [open an issue](https://github.com/briceburg/radio-pad/issues).

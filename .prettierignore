@@ -1,0 +1,11 @@
+**/package-lock.json
+**/.hypothesis/
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.venv/
+**/dist/
+**/tmp/
+**/venv/
+remote-control/android/
+remote-control/ios/

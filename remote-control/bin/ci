@@ -1,24 +1,7 @@
-#!/usr/bin/env bash
-set -eo pipefail
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#!/usr/bin/env sh
+set -eu
 
-cd "$PROJECT_ROOT"
+cd "$(dirname "$0")/.."
 
 bash -n bin/*
-
-GREEN='\033[1;32m'
-RED='\033[1;31m'
-NC='\033[0m'
-CHECK_MARK="\xE2\x9C\x94"
-CROSS_MARK="\xE2\x9D\x8C"
-
-log(){ echo -e "$*" >&2; }
-die(){ log "\n${RED}${CROSS_MARK} [ERROR] $*${NC}"; exit 1; }
-
-npm run lint || \
-  die "Prettier check failed. Use 'npm run lint:fix' to fix."
-
-npm test || \
-  die "Unit tests failed."
-
-log "\n${GREEN}${CHECK_MARK} All checks passed!${NC}"
+npm test

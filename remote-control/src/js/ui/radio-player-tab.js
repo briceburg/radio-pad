@@ -133,13 +133,15 @@ export class RadioPlayerTab extends RadioElement {
           <h2>No ${noun} selected</h2>
         </ion-text>
         <p>Choose a ${noun} in <strong>Settings</strong> to begin.</p>
-        ${this.tabName === "control"
-          ? html`<ion-text color="medium">
-              <p class="ion-margin-top text-sm">
-                You may need to sign in to access private players.
-              </p>
-            </ion-text>`
-          : ""}
+        ${
+          this.tabName === "control"
+            ? html`<ion-text color="medium">
+                <p class="ion-margin-top text-sm">
+                  You may need to sign in to access private players.
+                </p>
+              </ion-text>`
+            : ""
+        }
       </div>
     `;
   }
@@ -183,11 +185,13 @@ export class RadioPlayerTab extends RadioElement {
                     aria-pressed=${String(isActive)}
                     aria-busy=${String(isPending)}
                     aria-invalid=${String(isFailed)}
-                    aria-label=${isPending
-                      ? `${station.call_sign}, starting playback`
-                      : isFailed
-                        ? `${station.call_sign}, playback failed`
-                        : station.call_sign}
+                    aria-label=${
+                      isPending
+                        ? `${station.call_sign}, starting playback`
+                        : isFailed
+                          ? `${station.call_sign}, playback failed`
+                          : station.call_sign
+                    }
                     @click=${() => this._onSelectStation(station.call_sign)}
                   >
                     ${station.call_sign}

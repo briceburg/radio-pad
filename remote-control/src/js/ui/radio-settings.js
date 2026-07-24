@@ -173,19 +173,21 @@ export class RadioSettings extends RadioElement {
 
     const content = html`
       ${this.renderPreferenceItems(visiblePrefs, values)}
-      ${emptyPreference
-        ? html`
-            <ion-item
-              id="empty-${emptyPreference.key}"
-              lines="none"
-              color="light"
-            >
-              <ion-label color="medium">
-                ${EMPTY_OPTION_MESSAGES[emptyPreference.key]}
-              </ion-label>
-            </ion-item>
-          `
-        : ""}
+      ${
+        emptyPreference
+          ? html`
+              <ion-item
+                id="empty-${emptyPreference.key}"
+                lines="none"
+                color="light"
+              >
+                <ion-label color="medium">
+                  ${EMPTY_OPTION_MESSAGES[emptyPreference.key]}
+                </ion-label>
+              </ion-item>
+            `
+          : ""
+      }
     `;
 
     if (groupKey === ADVANCED_GROUP_KEY) {
@@ -213,24 +215,26 @@ export class RadioSettings extends RadioElement {
         ${this.renderGroupHeader(label, icon)}
         ${groupKey === ACCOUNT_GROUP_KEY ? html`<radio-auth></radio-auth>` : ""}
         ${content}
-        ${groupKey === ACCOUNT_GROUP_KEY && accountChangePending
-          ? html`
-              <ion-item id="account-save-required" lines="none" color="light">
-                <ion-icon
-                  aria-hidden="true"
-                  name="information-circle"
-                  slot="start"
-                ></ion-icon>
-                <ion-label class="ion-text-wrap">
-                  <h3>Save this account change</h3>
-                  <p>
-                    Player and RadioDial options will refresh after saving. Your
-                    current player stays active until then.
-                  </p>
-                </ion-label>
-              </ion-item>
-            `
-          : ""}
+        ${
+          groupKey === ACCOUNT_GROUP_KEY && accountChangePending
+            ? html`
+                <ion-item id="account-save-required" lines="none" color="light">
+                  <ion-icon
+                    aria-hidden="true"
+                    name="information-circle"
+                    slot="start"
+                  ></ion-icon>
+                  <ion-label class="ion-text-wrap">
+                    <h3>Save this account change</h3>
+                    <p>
+                      Player and RadioDial options will refresh after saving.
+                      Your current player stays active until then.
+                    </p>
+                  </ion-label>
+                </ion-item>
+              `
+            : ""
+        }
       </ion-item-group>
     `;
   }
