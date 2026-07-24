@@ -52,6 +52,9 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    bin/mount
    ```
 
+   The helper uses synchronous I/O and verifies a small write before reporting
+   the filesystem ready.
+
 2. **Customize button behavior:**
    - Edit [`src/main.py`](./src/main.py) to change macropad key behavior.
    - Stations are received as a compact call-sign menu from the connected [player](../player/), which loads a complete registry [RadioDial](../player/README.md#registry-discovery).
@@ -62,7 +65,9 @@ A linux host is assumed, with the macropad plugged into it. It must have python3
    ```
 
    Mounting is explicit because it may require `sudo`; syncing never mounts or
-   prompts. Run `bin/mount` again after reconnecting the device.
+   prompts. Firmware is copied and verified in a staging directory before the
+   installed files are replaced. Run `bin/mount` again after reconnecting the
+   device.
 
    To verify the hardware is ready after syncing, run:
 

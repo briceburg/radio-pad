@@ -38,17 +38,17 @@ elif [ -z "$mounted_source" ]; then
   fail "$target is not mounted; run macropad-control/bin/mount"
 elif [ "$mounted_device" != "$device" ]; then
   fail "$target is mounted from ${mounted_device:-$mounted_source}, but CIRCUITPY is $device; run macropad-control/bin/mount"
-elif [[ "$mount_options" != *,rw,* ]]; then
-  fail "$target is mounted read-only; run macropad-control/bin/mount"
+elif [[ "$mount_options" != *,rw,* ]] || [[ "$mount_options" != *,sync,* ]]; then
+  fail "$target is not mounted read/write synchronously; run macropad-control/bin/mount"
 else
-  ok "$device mounted read/write at $target"
+  ok "$device mounted read/write synchronously at $target"
   storage_ready=1
 fi
 
 if [ -z "$repo_root" ]; then
   fail "not running from a git checkout"
 elif [ "$storage_ready" -ne 1 ]; then
-  warn "skipping firmware diff until CIRCUITPY is mounted read/write"
+  warn "skipping firmware diff until CIRCUITPY is mounted read/write synchronously"
 elif [ ! -e "$target/boot.py" ] || [ ! -d "$target/lib" ] || [ ! -e "$target/main.py" ]; then
   fail "firmware files are missing from $target; run bin/sync"
 elif diff -q "$source_dir/boot.py" "$target/boot.py" >/dev/null &&
