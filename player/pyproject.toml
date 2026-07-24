@@ -1,7 +1,7 @@
 [project]
 name = "radio-pad-player"
 version = "2025.01.0"
-description = "Radio-Pad player client"
+description = "RadioPad player client"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "httpx2==2.5.0",
@@ -23,8 +23,10 @@ cache-dir = "tmp/.uv_cache"
 package = false
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "tests"]
 cache_dir = "tmp/.pytest_cache"
+faulthandler_timeout = 30
+faulthandler_exit_on_timeout = true
+pythonpath = ["src", "tests"]
 
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"

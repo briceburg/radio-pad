@@ -1,7 +1,7 @@
 [project]
 name = "radio-pad-integration-tests"
 version = "2025.01.0"
-description = "Integration tests for radio-pad compose topologies"
+description = "Integration tests for RadioPad Compose topologies"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "httpx2",
@@ -22,6 +22,8 @@ package = false
 
 [tool.pytest.ini_options]
 addopts = "--tb=short -p no:cacheprovider"
+faulthandler_timeout = 30
+faulthandler_exit_on_timeout = true
 
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"

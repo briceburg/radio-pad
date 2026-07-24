@@ -1,22 +1,19 @@
-# radio-pad remote-control
+# RadioPad remote control
 
-A web and mobile remote for [radio-pad](https://github.com/briceburg/radio-pad).
+A web and native mobile controller for [RadioPad](https://github.com/briceburg/radio-pad).
 
 ## Overview
 
-- connects to the [registry switchboard](../registry/) for real-time syncing with [players](../player/)
-  - remote controls publish playback commands and render requested, confirmed, and failed playback state
-  - players arbitrate playback commands and publish authoritative playback and status state
-- discovers players and RadioDials from the [registry](../registry/)
-  - RadioDial choices include the selected account and discoverable community dials
-  - the saved selection is a qualified RadioDial identity, not a registry URL
-  - sign in to control players when registry auth is enabled
+- Discover players and RadioDials from the [registry](../registry/).
+- Send playback commands through the registry switchboard and render requested, confirmed, and failed playback plus player status in real time.
+- Run as a web app or a Capacitor app for Android and iOS.
+- Sign in only when the registry requires authentication for player control.
 
 ## Usage
 
 ### Local configuration
 
-```bash
+```sh
 npm ci
 cp .env.example .env
 ```
@@ -35,15 +32,15 @@ For local switchboard testing, set `VITE_SWITCHBOARD_URL=ws://localhost:1980/swi
 
 ### Web development
 
-After completing the root [Google sign-in setup](../README.md#google-sign-in), run:
+After completing [local configuration](#local-configuration), run:
 
-```bash
+```sh
 npm start
 ```
 
 Open `http://localhost:5173`. When registry auth is enabled, sign in from `Settings` to control players or test registry writes.
 
-For compose-based development, the root `.env` pins the remote-control port to `5173` so the same Google OAuth web client works with `docker compose up`. If you change that port, update the Google web client origin and redirect URI to match.
+For [Compose-based development](../README.md#development), the root `.env` pins the remote-control port to `5173` so the same Google OAuth web client works with `docker compose up`. If you change that port, update the Google web client origin and redirect URI to match.
 
 For registry write testing on web, copy the API test token from `Settings` and use it with the [registry](../registry/) API.
 
@@ -53,17 +50,19 @@ Cloudflare Pages uses `remote-control` as the Git root and `npm run build` as th
 
 The `remote-control` component uses Vitest + jsdom for headless domain and UI-structure tests.
 
-Run formatting and the full client test suite with:
+Run the full client test suite with:
 
-```bash
+```sh
 ./bin/ci
 ```
 
 Use `npm test` for tests only, or run tests in watch mode during development:
 
-```bash
+```sh
 npm run test:watch
 ```
+
+Formatting is repo-wide; run `npm run format` from the repository root to write changes. Root `bin/ci` verifies formatting and every component; for dependency changes, follow the root [toolchain policy](../README.md#toolchain-and-dependency-policy).
 
 ### Android development
 
@@ -73,7 +72,7 @@ Android OAuth clients authorize a package and signing-certificate pair. Their cl
 
 Print the debug signing certificate with:
 
-```bash
+```sh
 cd android
 ./gradlew signingReport
 cd ..
@@ -92,7 +91,7 @@ Create one debug Android client for each distinct debug signing certificate used
 
 Build, sync Android, and open Android Studio:
 
-```bash
+```sh
 ./bin/android
 ```
 
@@ -104,7 +103,7 @@ The application ID is `dev.radiopad.remote`. Confirm it before creating the Play
 
 Keep the dedicated upload keystore outside the repository, back it up, and do not use the debug key. Build a signed bundle with:
 
-```bash
+```sh
 ./bin/android-bundle
 ```
 
@@ -144,15 +143,11 @@ Manual Play uploads work well for internal testing. Automated publishing should 
 
 The iOS project is checked in under `ios/`; do not run `cap add` again.
 
-Create a Google `iOS` OAuth client:
-
-- bundle identifier: `dev.radiopad.remote`
-- save the iOS client ID
-- save the reversed URL scheme
+Create a Google `iOS` OAuth client with bundle identifier `dev.radiopad.remote`, then save its client ID and reversed URL scheme.
 
 Then create a local iOS config file:
 
-```bash
+```sh
 cp ios/App/App/GoogleSignIn.local.xcconfig.example \
   ios/App/App/GoogleSignIn.local.xcconfig
 ```
@@ -164,16 +159,12 @@ Set these values in `ios/App/App/GoogleSignIn.local.xcconfig`:
 
 Then run:
 
-```bash
+```sh
 npm run build
 npx cap sync ios
 ```
 
 Open the iOS project in Xcode and run it there.
-
-## Development
-
-For compose-based development with all services, see the [root README](../README.md#development); for dependency changes, see the root [toolchain policy](../README.md#toolchain-and-dependency-policy).
 
 ## License
 
