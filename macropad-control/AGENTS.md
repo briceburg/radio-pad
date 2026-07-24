@@ -11,12 +11,14 @@ Guidance for coding agents working in `radio-pad/macropad-control`.
 - Use `bin/doctor` for a read-only hardware readiness check before physical
   iteration.
 - Only `bin/mount` is privileged. Ask the user to run it when `sudo` prompts.
+- Treat its write probe—not a running display backed by RAM—as the
+  storage-readiness check.
 - `bin/sync` is non-interactive and fails rather than mounting implicitly.
 - Sync firmware before creating or recreating the compose player. CircuitPython
   may reboot and expose a different host device number during the sync.
-- Resets, safe mode, and unplug/replug cycles can also re-enumerate both the
-  storage device and tty names. Re-run `bin/mount` and `bin/doctor` after those
-  operations rather than trusting an old `/mnt/CIRCUITPY` mount.
+- Unmount CIRCUITPY before reset, unplug, or `fsck.vfat -n`. A dirty bit alone
+  is not structural corruption; if no damage is reported, reset while
+  unmounted, then rediscover devices and rerun `bin/mount` and `bin/doctor`.
 - Verify physical connectivity from both sides: the player must log a connection
   to `/dev/macropad`, and the CircuitPython console must receive player events.
 - Keep LED animations low-brightness and bounded. If LED hardware behavior is
