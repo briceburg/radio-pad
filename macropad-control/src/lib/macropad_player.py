@@ -19,9 +19,9 @@ class MacropadPlayer:
         if not self.player:
             raise RuntimeError("No USB CDC data port found.")
         self._serial_buffer = ""
-        self._last_station_menu_request_time = 0
-        self._last_player_message_time = 0
-        self._connected_since = 0
+        self._last_station_menu_request_time = None  # type: int | None
+        self._last_player_message_time = None  # type: int | None
+        self._connected_since = None  # type: int | None
 
     @property
     def connected(self):
@@ -32,7 +32,7 @@ class MacropadPlayer:
             self.reset_session()
             return False
 
-        if connected and not self._connected_since:
+        if connected and self._connected_since is None:
             self._connected_since = ticks_ms()
         elif not connected:
             self.reset_session()
@@ -43,8 +43,10 @@ class MacropadPlayer:
     def session_stale(self):
         if not self.connected:
             return False
-        last_activity = self._last_player_message_time or self._connected_since
-        if not last_activity:
+        last_activity = (
+            self._last_player_message_time if self._last_player_message_time is not None else self._connected_since
+        )
+        if last_activity is None:
             return False
         return ticks_diff(ticks_ms(), last_activity) > PLAYER_SESSION_TIMEOUT_MS
 
@@ -103,16 +105,27 @@ class MacropadPlayer:
 
     def request_station_menu(self):
         current_time = ticks_ms()
-        if ticks_diff(current_time, self._last_station_menu_request_time) >= STATION_MENU_REQUEST_INTERVAL_MS:
+        if (
+            self._last_station_menu_request_time is None
+            or ticks_diff(current_time, self._last_station_menu_request_time) >= STATION_MENU_REQUEST_INTERVAL_MS
+        ):
             self._last_station_menu_request_time = current_time
             self.send_command("station_menu_request")
 
     def flush_buffer(self):
-        while self.read_event():
-            pass
+        self._serial_buffer = ""
+        try:
+            in_waiting = self.player.in_waiting
+            while in_waiting:
+                if not self.player.read(in_waiting):
+                    break
+                in_waiting = self.player.in_waiting
+        except Exception as e:
+            print(f"PLAYER: error flushing serial buffer: {e}")
+            self.reset_session()
 
     def reset_session(self):
         self._serial_buffer = ""
-        self._last_station_menu_request_time = 0
-        self._last_player_message_time = 0
-        self._connected_since = 0
+        self._last_station_menu_request_time = None
+        self._last_player_message_time = None
+        self._connected_since = None
