@@ -21,10 +21,14 @@ function attribute(tag, name) {
   return match?.[1] ?? match?.[2];
 }
 
-function findTag(element, attributeName, attributeValue) {
+function findTag(element, attributeName, attributeValue, size) {
   return [...indexHtml.matchAll(new RegExp(`<${element}\\b[^>]*>`, "gi"))]
     .map(([tag]) => tag)
-    .find((tag) => attribute(tag, attributeName) === attributeValue);
+    .find(
+      (tag) =>
+        attribute(tag, attributeName) === attributeValue &&
+        (!size || attribute(tag, "sizes") === `${size}x${size}`),
+    );
 }
 
 function distPathFromUrl(url) {
@@ -114,11 +118,16 @@ assert(
 );
 
 for (const [rel, expectedSize] of [
+  ["icon", 16],
+  ["icon", 32],
   ["icon", 256],
   ["apple-touch-icon", 180],
 ]) {
-  const link = findTag("link", "rel", rel);
-  assert(link, `The production HTML is missing rel=${rel}.`);
+  const link = findTag("link", "rel", rel, expectedSize);
+  assert(
+    link,
+    `The production HTML is missing rel=${rel} ${expectedSize}x${expectedSize}.`,
+  );
   await assertPng(
     attribute(link, "href"),
     expectedSize,

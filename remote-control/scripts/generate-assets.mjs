@@ -34,8 +34,6 @@ const sources = {
 
 const conventionalIconPadding = 0.1;
 const adaptiveForegroundPadding = 0.14;
-// Slight overscan keeps the mark legible when browsers shrink it to tab size.
-const faviconForegroundPadding = -0.1;
 // Use a density-scaled base with modest low-density optical sizing.
 const androidSplashLogoWidthDp = 96;
 const androidLowDensitySplashOpticalScale = 1.125;
@@ -130,6 +128,42 @@ async function renderIcon(
   );
 }
 
+async function renderFavicons() {
+  // Isolate the blue-plus keycap from the canonical 256px render without duplicating its artwork.
+  const croppedKeycap = await sharp(
+    await renderSource(sources.foreground, 256),
+  )
+    .extract({ left: 80, top: 108, width: 100, height: 100 })
+    .png()
+    .toBuffer();
+  const keycap = await sharp(croppedKeycap)
+    .trim()
+    .resize({
+      width: 192,
+      height: 192,
+      fit: "contain",
+      background: "transparent",
+    })
+    .png()
+    .toBuffer();
+  // The solid green badge and thin edge stay visible on light and dark browser chrome.
+  const badge = Buffer.from(
+    '<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="green" cx="50%" cy="62%" r="74%"><stop offset="0" stop-color="#86ff80"/><stop offset="64%" stop-color="#41db47"/><stop offset="100%" stop-color="#22a832"/></radialGradient></defs><rect x="8" y="8" width="240" height="240" rx="52" fill="url(#green)" stroke="#111111" stroke-width="8"/></svg>',
+  );
+  const favicon = await sharp(badge)
+    .composite([{ input: keycap, gravity: "centre" }])
+    .png()
+    .toBuffer();
+  await Promise.all(
+    [16, 32, 256].map((outputSize) =>
+      writePng(
+        sharp(favicon).resize(outputSize, outputSize),
+        path.join(webAssets, `favicon-${outputSize}.png`),
+      ),
+    ),
+  );
+}
+
 async function validateGlow() {
   const alpha = (
     await sharp(await renderSource(sources.background, 160)).stats()
@@ -172,10 +206,7 @@ async function renderSplash(
 
 async function generateWebAssets() {
   await Promise.all([
-    renderIcon(path.join(webAssets, "favicon-256.png"), 256, {
-      glow: true,
-      padding: faviconForegroundPadding,
-    }),
+    renderFavicons(),
     renderIcon(path.join(webAssets, "apple-touch-icon-180.png"), 180, {
       background: "#ffffff",
       glow: true,
