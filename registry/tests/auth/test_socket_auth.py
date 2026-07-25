@@ -9,8 +9,9 @@ from fastapi import FastAPI, HTTPException, Request, WebSocketException
 from starlette.types import Scope
 
 from api.auth import AuthServices
-from auth import AccountOwners, AuthzStore, RegistryIDToken
+from auth import RegistryIDToken
 from auth.socket_auth import validate_local, validate_remote
+from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
 from tests.api._app import build_store
 

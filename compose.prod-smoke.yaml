@@ -15,8 +15,9 @@ services:
       context: ./registry
       target: prod
     environment:
-      REGISTRY_BACKEND: "git"
-      REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY: "dummy"
+      REGISTRY_AUTHZ_BACKEND_GIT_SSH_PRIVATE_KEY: "dummy-authz"
+      REGISTRY_DATA_BACKEND: "git"
+      REGISTRY_DATA_BACKEND_GIT_SSH_PRIVATE_KEY: "dummy"
     volumes:
       - ./tests/smoke_registry_git.py:/tmp/smoke_registry_git.py:ro
     command:

@@ -118,7 +118,7 @@ class TestObjectStoreContract:
             model=Account,
             path_template="accounts/{id}",
         )
-        seed_from_path(seed_root, [seedable(accounts)], label="content")
+        seed_from_path(seed_root, [seedable(accounts)], label="data")
 
         model = accounts.get("seeded")
         assert model is not None

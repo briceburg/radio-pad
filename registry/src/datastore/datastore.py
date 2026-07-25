@@ -3,7 +3,7 @@ from pathlib import Path
 
 from lib.constants import BASE_DIR
 
-from .configuration import DATA_BACKEND_DEFAULTS, build_backend_from_env
+from .configuration import DATA_NAMESPACE, data_backend_from_env
 from .core import ObjectStore, SeedableStore, seed_from_path, seedable
 from .stores import Accounts, Players, RadioDials, Stations
 
@@ -18,13 +18,9 @@ class DataStore:
     ) -> None:
         # Provide sensible defaults so tests can construct without args
         seed_root = Path(os.environ.get("REGISTRY_SEED_DATA_PATH", str(BASE_DIR / "seed-data")))
-        self.seed_path = Path(seed_path) if seed_path else seed_root / "store"
+        self.seed_path = Path(seed_path) if seed_path else seed_root / DATA_NAMESPACE
 
-        if backend:
-            self.backend = backend
-            self.prefix = getattr(backend, "prefix", "")
-        else:
-            self.backend, self.prefix = build_backend_from_env("REGISTRY_BACKEND", DATA_BACKEND_DEFAULTS)
+        self.backend = backend if backend is not None else data_backend_from_env()
 
         self.accounts = Accounts(self.backend)
         self.players = Players(self.backend)
@@ -36,7 +32,7 @@ class DataStore:
         Seeds the datastore with initial data from the data-seed directory.
         Only seeds data if it doesn't already exist in the backend.
         """
-        seed_from_path(self.seed_path, self._seedable_stores(), label="content")
+        seed_from_path(self.seed_path, self._seedable_stores(), label=DATA_NAMESPACE)
 
     def _seedable_stores(self) -> list[SeedableStore]:
         return [
