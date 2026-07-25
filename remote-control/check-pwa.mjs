@@ -7,6 +7,10 @@ import sharp from "sharp";
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const dist = path.join(projectRoot, "dist");
 const indexHtml = await readFile(path.join(dist, "index.html"), "utf8");
+const privacyHtml = await readFile(
+  path.join(dist, "privacy", "index.html"),
+  "utf8",
+);
 
 function assert(condition, message) {
   if (!condition) {
@@ -21,8 +25,14 @@ function attribute(tag, name) {
   return match?.[1] ?? match?.[2];
 }
 
-function findTag(element, attributeName, attributeValue, size) {
-  return [...indexHtml.matchAll(new RegExp(`<${element}\\b[^>]*>`, "gi"))]
+function findTag(
+  element,
+  attributeName,
+  attributeValue,
+  size,
+  html = indexHtml,
+) {
+  return [...html.matchAll(new RegExp(`<${element}\\b[^>]*>`, "gi"))]
     .map(([tag]) => tag)
     .find(
       (tag) =>
@@ -53,6 +63,12 @@ async function assertPng(url, size, description) {
       metadata.height === size,
     `${description} must be a ${size}x${size} PNG.`,
   );
+}
+
+async function assertHtmlIcon(html, page, rel, size) {
+  const link = findTag("link", "rel", rel, size, html);
+  assert(link, `The ${page} HTML is missing rel=${rel} ${size}x${size}.`);
+  await assertPng(attribute(link, "href"), size, `The rel=${rel} asset`);
 }
 
 const manifestLink = findTag("link", "rel", "manifest");
@@ -117,29 +133,20 @@ assert(
   "The production HTML must define the iOS Home Screen title.",
 );
 
-for (const [rel, expectedSize] of [
-  ["icon", 16],
-  ["icon", 32],
-  ["icon", 256],
-  ["apple-touch-icon", 180],
+for (const [page, html] of [
+  ["application", indexHtml],
+  ["privacy", privacyHtml],
 ]) {
-  const link = findTag("link", "rel", rel, expectedSize);
-  assert(
-    link,
-    `The production HTML is missing rel=${rel} ${expectedSize}x${expectedSize}.`,
-  );
-  await assertPng(
-    attribute(link, "href"),
-    expectedSize,
-    `The rel=${rel} asset`,
-  );
+  for (const size of [16, 32, 256]) {
+    await assertHtmlIcon(html, page, "icon", size);
+  }
 }
+await assertHtmlIcon(indexHtml, "application", "apple-touch-icon", 180);
 
 const themeColor = findTag("meta", "name", "theme-color");
 assert(
   attribute(themeColor, "content") === manifest.theme_color,
   "HTML and manifest theme colors must match.",
 );
-await access(path.join(dist, "privacy", "index.html"));
 
 console.log("Validated production PWA metadata and assets.");

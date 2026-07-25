@@ -130,10 +130,9 @@ async function renderIcon(
 
 async function renderFavicons() {
   // Isolate the blue-plus keycap from the canonical 256px render without duplicating its artwork.
-  const croppedKeycap = await sharp(
-    await renderSource(sources.foreground, 256),
-  )
-    .extract({ left: 80, top: 108, width: 100, height: 100 })
+  const keycapBounds = { left: 80, top: 108, width: 100, height: 100 };
+  const croppedKeycap = await sharp(await renderSource(sources.foreground, 256))
+    .extract(keycapBounds)
     .png()
     .toBuffer();
   const keycap = await sharp(croppedKeycap)
