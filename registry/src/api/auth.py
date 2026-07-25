@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from auth import AuthenticatedIdentity, AuthzStore, OIDCConfig, RegistryIDToken
+from auth import AuthenticatedIdentity, OIDCConfig, RegistryIDToken
+from authz import AuthzStore
 from lib.logging import logger
 
 from .helpers import get_or_404
@@ -30,7 +31,7 @@ class AuthServices:
         logger.info("Registry auth enabled: issuer=%s, client_id_count=%s", config.issuer, len(config.client_ids))
         authz_store = AuthzStore()
         authz_store.seed()
-        authz_store.validate_access()
+        authz_store.check_backend_access()
         return cls(authenticate_user=config.build_auth_dependency(), authz_store=authz_store)
 
     @property

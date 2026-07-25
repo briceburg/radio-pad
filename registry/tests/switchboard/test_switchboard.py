@@ -18,7 +18,8 @@ from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from api.auth import AuthServices
-from auth import AccountOwners, AuthzStore, RegistryIDToken
+from auth import RegistryIDToken
+from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
 from registry import create_app
 from switchboard.broadcast import Broadcast

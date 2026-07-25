@@ -25,17 +25,19 @@ def git(*args: str, cwd: pathlib.Path | None = None, env: dict[str, str] | None 
 
 def main() -> None:
     # -- entrypoint plumbing --
-    key = pathlib.Path(os.environ["REGISTRY_BACKEND_GIT_SSH_KEY_PATH"])
-    assert key.exists(), f"SSH key not written: {key}"
-    cmd = os.environ.get("GIT_SSH_COMMAND", "")
-    assert str(key) in cmd, f"GIT_SSH_COMMAND missing key: {cmd}"
-    assert "UserKnownHostsFile=" in cmd, f"GIT_SSH_COMMAND missing known-hosts path: {cmd}"
-    assert "StrictHostKeyChecking" in cmd, f"GIT_SSH_COMMAND missing host check: {cmd}"
-    known_hosts = pathlib.Path(
-        next(arg.split("=", 1)[1] for arg in cmd.split() if arg.startswith("UserKnownHostsFile="))
-    )
-    assert known_hosts.exists(), f"SSH known-hosts file not created: {known_hosts}"
-    print(f"entrypoint: ok  (GIT_SSH_COMMAND={cmd})")
+    key_count = 0
+    for role in ("DATA", "AUTHZ"):
+        if not os.environ.get(f"REGISTRY_{role}_BACKEND_GIT_SSH_PRIVATE_KEY"):
+            continue
+        variable = f"REGISTRY_{role}_BACKEND_GIT_SSH_KEY_PATH"
+        key_path = os.environ.get(variable)
+        assert key_path, f"{variable} not exported"
+        key = pathlib.Path(key_path)
+        assert key.is_file(), f"SSH key not written: {key}"
+        key_count += 1
+    assert key_count, "No Git SSH private key configured"
+    assert (pathlib.Path.home() / ".ssh").is_dir(), "SSH home not created"
+    print("entrypoint: ok")
 
     print(f"system git: {git('--version')}")
 

@@ -8,7 +8,7 @@ An internet radio player with physical, web, and mobile controllers that stay in
 
 - The [player](./player/) streams internet radio through a host's audio output and owns playback and volume.
 - A USB [Macropad](./macropad-control/) or the web/mobile [remote control](./remote-control/) tells the player what to play.
-- The [registry](./registry/) assigns players curated, shareable [RadioDials](./registry/seed-data/store/accounts/community/radio-dials/) of account-owned Stations and relays remote commands over WebSockets.
+- The [registry](./registry/) assigns players curated, shareable [RadioDials](./registry/seed-data/data/accounts/community/radio-dials/) of account-owned Stations and relays remote commands over WebSockets.
 
 ![RadioPad Macropad](./shared/assets/radio-macropad-ai-image.webp)
 
@@ -91,7 +91,7 @@ Set the public client ID in the root `.env`:
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
-The client ID becomes the registry token audience and is embedded in the Compose remote-control build; the downloaded OAuth JSON and client secret are not used. Recreate `registry` and `remote-control` after changing it. See the [remote-control README](./remote-control/README.md#local-configuration) for standalone and native setup, and the [registry README](./registry/README.md#authentication-and-account-owner-seeding) for server authorization.
+The client ID becomes the registry token audience and is embedded in the Compose remote-control build; the downloaded OAuth JSON and client secret are not used. Recreate `registry` and `remote-control` after changing it. See the [remote-control README](./remote-control/README.md#local-configuration) for standalone and native setup, and the [registry README](./registry/README.md#authentication-and-authz) for server authz.
 
 ### Validation
 

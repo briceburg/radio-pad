@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
-from dataclasses import dataclass
 
 from lib.constants import BASE_DIR
 from lib.logging import logger
@@ -10,87 +8,66 @@ from lib.logging import logger
 from .backends import GitBackend, LocalBackend, S3Backend
 from .core import ObjectStore
 
-
-@dataclass(frozen=True)
-class BackendDefaults:
-    path: str
-    prefixes: Mapping[str, str]
-    prefix_env: str | None
-    git_remote_url: str | None
+_BACKENDS = {"git", "local", "s3"}
+DATA_NAMESPACE = "data"
+AUTHZ_NAMESPACE = "authz"
+_DATA_GIT_REMOTE = "git@github.com:briceburg/radio-pad-registry-data.git"
 
 
-DATA_BACKEND_DEFAULTS = BackendDefaults(
-    path=str(BASE_DIR / "tmp" / "data"),
-    prefixes={"local": "registry-v1", "s3": "registry-v1", "git": ""},
-    prefix_env="REGISTRY_BACKEND_PREFIX",
-    git_remote_url="git@github.com:briceburg/radio-pad-registry-data.git",
-)
-
-AUTHZ_BACKEND_DEFAULTS = BackendDefaults(
-    path=str(BASE_DIR / "tmp" / "authz"),
-    prefixes={"local": "registry-authz-v1", "s3": "registry-authz-v1", "git": "registry-authz-v1"},
-    prefix_env=None,
-    git_remote_url=None,
-)
+def data_backend_from_env() -> ObjectStore:
+    return _backend_from_env(DATA_NAMESPACE)
 
 
-def build_backend_from_env(
-    env_prefix: str,
-    defaults: BackendDefaults,
-    *,
-    inherit_from: tuple[str, BackendDefaults] | None = None,
-) -> tuple[ObjectStore, str]:
-    inherited_env_prefix, inherited_defaults = inherit_from or ("", defaults)
-    inherited_backend_choice = os.environ.get(inherited_env_prefix, "local").lower() if inherit_from else "local"
-    backend_choice = os.environ.get(env_prefix, inherited_backend_choice).lower()
-    if backend_choice not in defaults.prefixes:
-        raise ValueError(f"Unsupported {env_prefix} value: {backend_choice}")
+def authz_backend_from_env() -> ObjectStore:
+    return _backend_from_env(AUTHZ_NAMESPACE)
 
-    inherits_backend_settings = inherit_from is not None and backend_choice == inherited_backend_choice
+
+def _backend_from_env(namespace: str) -> ObjectStore:
+    variable = f"REGISTRY_{namespace.upper()}_BACKEND"
+    data_backend = _selected_backend("REGISTRY_DATA_BACKEND", "local")
+    backend = data_backend if namespace == DATA_NAMESPACE else _selected_backend(variable, data_backend)
+    inherit_data = namespace == AUTHZ_NAMESPACE and backend == data_backend
 
     def setting(suffix: str, default: str | None) -> str | None:
-        key = f"{env_prefix}_{suffix}"
-        if key in os.environ:
-            return os.environ[key]
-        if inherits_backend_settings:
-            return os.environ.get(f"{inherited_env_prefix}_{suffix}", default)
+        value = os.environ.get(f"{variable}_{suffix}")
+        if value is not None:
+            return value
+        if inherit_data:
+            return os.environ.get(f"REGISTRY_DATA_BACKEND_{suffix}", default)
         return default
 
-    def common_git_setting(suffix: str, default: str) -> str:
-        common_prefix = inherited_env_prefix if inherit_from else env_prefix
-        return os.environ.get(f"{common_prefix}_{suffix}", default)
-
-    prefix = defaults.prefixes[backend_choice]
-    if defaults.prefix_env:
-        prefix = os.environ.get(defaults.prefix_env, prefix)
-    path_default = inherited_defaults.path if inherits_backend_settings else defaults.path
-    path = setting("PATH", path_default)
+    default_path = BASE_DIR / "tmp" / (DATA_NAMESPACE if inherit_data else namespace)
+    default_git_remote = _DATA_GIT_REMOTE if namespace == DATA_NAMESPACE or inherit_data else None
+    path = setting("PATH", str(default_path))
     assert path is not None
-    logger.info("%s: %s prefix=%s", env_prefix, backend_choice, prefix)
+    logger.info("%s backend: %s prefix=%s", namespace.title(), backend, namespace)
 
-    if backend_choice == "s3":
-        bucket_key = f"{env_prefix}_S3_BUCKET"
-        bucket = (setting("S3_BUCKET", "") or "").lower()
+    if backend == "local":
+        return LocalBackend(base_path=path, prefix=namespace)
+
+    if backend == "s3":
+        bucket = setting("S3_BUCKET", None)
         if not bucket:
-            raise ValueError(f"S3 backend selected but {bucket_key} is not set")
-        return S3Backend(bucket=bucket, prefix=prefix), prefix
+            raise ValueError("S3 backend selected but no bucket is configured")
+        return S3Backend(bucket=bucket.lower(), prefix=namespace)
 
-    if backend_choice == "git":
-        remote_default = inherited_defaults.git_remote_url if inherits_backend_settings else defaults.git_remote_url
-        remote_url = setting("GIT_REMOTE_URL", remote_default)
-        backend = GitBackend(
-            repo_path=path,
-            prefix=prefix,
-            branch=common_git_setting("GIT_BRANCH", "main"),
-            remote_url=remote_url,
-            fetch_ttl_seconds=int(common_git_setting("GIT_FETCH_TTL_SECONDS", "30")),
-            author_name=common_git_setting("GIT_AUTHOR_NAME", "briceburg"),
-            author_email=common_git_setting(
-                "GIT_AUTHOR_EMAIL",
-                "briceburg@users.noreply.github.com",
-            ),
-            ssh_key_path=setting("GIT_SSH_KEY_PATH", None),
-        )
-        return backend, prefix
+    return GitBackend(
+        repo_path=path,
+        prefix=namespace,
+        branch=os.environ.get("REGISTRY_GIT_BRANCH", "main"),
+        remote_url=setting("GIT_REMOTE_URL", default_git_remote),
+        fetch_ttl_seconds=int(os.environ.get("REGISTRY_GIT_FETCH_TTL_SECONDS", "30")),
+        author_name=os.environ.get("REGISTRY_GIT_AUTHOR_NAME", "briceburg"),
+        author_email=os.environ.get(
+            "REGISTRY_GIT_AUTHOR_EMAIL",
+            "briceburg@users.noreply.github.com",
+        ),
+        ssh_key_path=setting("GIT_SSH_KEY_PATH", None),
+    )
 
-    return LocalBackend(base_path=path, prefix=prefix), prefix
+
+def _selected_backend(variable: str, default: str) -> str:
+    backend = os.environ.get(variable, default).lower()
+    if backend not in _BACKENDS:
+        raise ValueError(f"Unsupported {variable} value: {backend}")
+    return backend

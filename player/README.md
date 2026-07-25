@@ -68,7 +68,7 @@ The registry player resource contains a qualified `radio_dial` identity such as 
 
 #### Editing Stations
 
-Stations are account-owned registry resources. RadioDials contain ordered Station keys, so changing a Station's stream URL updates every RadioDial that references it. Use the registry API or edit the [community seed data](../registry/seed-data/store/accounts/community/) during development.
+Stations are account-owned registry resources. RadioDials contain ordered Station keys, so changing a Station's stream URL updates every RadioDial that references it. Use the registry API or edit the [community seed data](../registry/seed-data/data/accounts/community/) during development.
 
 To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a complete RadioDial resource:
 

@@ -71,7 +71,7 @@ class GitBackend:
                 "LC_ALL": "C",
             }
         )
-        if self.ssh_key_path:
+        if self.ssh_key_path and "GIT_SSH_COMMAND" not in self._git_env:
             self._git_env["GIT_SSH_COMMAND"] = (
                 f"ssh -i {shlex.quote(self.ssh_key_path)} -o StrictHostKeyChecking=accept-new"
             )

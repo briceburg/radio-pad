@@ -12,8 +12,8 @@ from tests.datastore._git_helpers import init_repo
 
 def test_datastore_creates_local_backend_by_default(monkeypatch: MonkeyPatch) -> None:
     """By default, with no env vars, a LocalBackend should be created."""
-    monkeypatch.delenv("REGISTRY_BACKEND", raising=False)
-    monkeypatch.delenv("REGISTRY_BACKEND_PATH", raising=False)
+    monkeypatch.delenv("REGISTRY_DATA_BACKEND", raising=False)
+    monkeypatch.delenv("REGISTRY_DATA_BACKEND_PATH", raising=False)
 
     store = DataStore()
     assert isinstance(store.backend, LocalBackend)
@@ -22,8 +22,8 @@ def test_datastore_creates_local_backend_by_default(monkeypatch: MonkeyPatch) ->
 def test_datastore_uses_backend_path_for_local(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """A custom path for the LocalBackend can be set via envar."""
     data_dir = tmp_path / "custom_data"
-    monkeypatch.setenv("REGISTRY_BACKEND", "local")
-    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(data_dir))
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "local")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_PATH", str(data_dir))
 
     store = DataStore()
     assert isinstance(store.backend, LocalBackend)
@@ -31,9 +31,9 @@ def test_datastore_uses_backend_path_for_local(monkeypatch: MonkeyPatch, tmp_pat
 
 
 def test_datastore_creates_s3_backend_from_env_var(monkeypatch: MonkeyPatch) -> None:
-    """S3Backend is created when REGISTRY_BACKEND is 's3'."""
-    monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", "test-bucket")
+    """S3Backend is created when REGISTRY_DATA_BACKEND is 's3'."""
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "s3")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_S3_BUCKET", "test-bucket")
     monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
@@ -49,12 +49,12 @@ def test_datastore_creates_git_backend_from_env_var(
     tmp_path: Path,
     caplog: LogCaptureFixture,
 ) -> None:
-    """GitBackend is created when REGISTRY_BACKEND is 'git'."""
+    """GitBackend is created when REGISTRY_DATA_BACKEND is 'git'."""
     repo_path = tmp_path / "git-data"
     init_repo(repo_path)
-    monkeypatch.setenv("REGISTRY_BACKEND", "git")
-    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(repo_path))
-    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "git")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_PATH", str(repo_path))
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_GIT_REMOTE_URL", "")
     caplog.set_level(logging.INFO, logger="uvicorn")
 
     store = DataStore()
@@ -63,7 +63,7 @@ def test_datastore_creates_git_backend_from_env_var(
     assert store.backend.remote_url == ""
     assert store.backend.author_name == "briceburg"
     assert store.backend.author_email == "briceburg@users.noreply.github.com"
-    assert store.prefix == ""
+    assert store.backend.prefix == "data"
     assert f"Git backend ready: repo={repo_path}" in caplog.text
 
 
@@ -71,9 +71,9 @@ def test_datastore_rejects_disabled_git_remote_without_existing_checkout(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("REGISTRY_BACKEND", "git")
-    monkeypatch.setenv("REGISTRY_BACKEND_PATH", str(tmp_path / "missing-git-data"))
-    monkeypatch.setenv("REGISTRY_BACKEND_GIT_REMOTE_URL", "")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "git")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_PATH", str(tmp_path / "missing-git-data"))
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND_GIT_REMOTE_URL", "")
 
     with pytest.raises(ValueError, match="remote disabled but checkout does not exist"):
         DataStore()
@@ -81,15 +81,15 @@ def test_datastore_rejects_disabled_git_remote_without_existing_checkout(
 
 def test_datastore_raises_error_if_s3_bucket_is_missing(monkeypatch: MonkeyPatch) -> None:
     """ValueError is raised if S3 is selected but the bucket is not specified."""
-    monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    monkeypatch.delenv("REGISTRY_BACKEND_S3_BUCKET", raising=False)
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "s3")
+    monkeypatch.delenv("REGISTRY_DATA_BACKEND_S3_BUCKET", raising=False)
 
-    with pytest.raises(ValueError, match="S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set"):
+    with pytest.raises(ValueError, match="S3 backend selected but no bucket is configured"):
         DataStore()
 
 
 def test_datastore_rejects_unknown_backend(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REGISTRY_BACKEND", "unknown")
+    monkeypatch.setenv("REGISTRY_DATA_BACKEND", "unknown")
 
-    with pytest.raises(ValueError, match="Unsupported REGISTRY_BACKEND"):
+    with pytest.raises(ValueError, match="Unsupported REGISTRY_DATA_BACKEND"):
         DataStore()

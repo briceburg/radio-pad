@@ -1,31 +1,35 @@
 #!/bin/sh
 set -e
 
-if [ "${REGISTRY_BACKEND:-}" = "git" ] && [ -n "${REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY:-}" ]; then
-    KEY_PATH="${REGISTRY_BACKEND_GIT_SSH_KEY_PATH:-/tmp/.ssh_deploy_key}"
-    KNOWN_HOSTS_PATH="/tmp/.ssh/known_hosts"
+configure_git_key() {
+    private_key=$1
+    key_path=$2
+    key_path_variable=$3
+    ssh_dir=${HOME:-/tmp}/.ssh
+
+    [ -n "$private_key" ] || return
+
     umask 077
-    mkdir -p "$(dirname "$KEY_PATH")"
-    mkdir -p "$(dirname "$KNOWN_HOSTS_PATH")"
-    printf '%s\n' "$REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" > "$KEY_PATH"
-    touch "$KNOWN_HOSTS_PATH"
-    chmod 600 "$KEY_PATH"
-    chmod 600 "$KNOWN_HOSTS_PATH"
-    export REGISTRY_BACKEND_GIT_SSH_KEY_PATH="$KEY_PATH"
-    export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o UserKnownHostsFile=$KNOWN_HOSTS_PATH -o StrictHostKeyChecking=accept-new"
+    mkdir -p "$(dirname "$key_path")" "$ssh_dir"
+    chmod 700 "$ssh_dir"
+    printf '%s\n' "$private_key" > "$key_path"
+    chmod 600 "$key_path"
+    export "$key_path_variable=$key_path"
+}
+
+if [ "${REGISTRY_DATA_BACKEND:-}" = "git" ]; then
+    configure_git_key \
+        "$REGISTRY_DATA_BACKEND_GIT_SSH_PRIVATE_KEY" \
+        "${REGISTRY_DATA_BACKEND_GIT_SSH_KEY_PATH:-/tmp/.ssh_deploy_key}" \
+        REGISTRY_DATA_BACKEND_GIT_SSH_KEY_PATH
 fi
 
-AUTHZ_BACKEND="${REGISTRY_BACKEND_AUTH:-${REGISTRY_BACKEND:-local}}"
-if [ "$AUTHZ_BACKEND" = "git" ] && [ -n "${REGISTRY_BACKEND_AUTH_GIT_SSH_PRIVATE_KEY:-}" ]; then
-    AUTHZ_KEY_PATH="${REGISTRY_BACKEND_AUTH_GIT_SSH_KEY_PATH:-/tmp/.ssh_authz_deploy_key}"
-    AUTHZ_KNOWN_HOSTS_PATH=/tmp/.ssh/known_hosts
-    umask 077
-    mkdir -p "$(dirname "$AUTHZ_KEY_PATH")" "$(dirname "$AUTHZ_KNOWN_HOSTS_PATH")"
-    touch "$AUTHZ_KNOWN_HOSTS_PATH"
-    chmod 600 "$AUTHZ_KNOWN_HOSTS_PATH"
-    printf '%s\n' "$REGISTRY_BACKEND_AUTH_GIT_SSH_PRIVATE_KEY" > "$AUTHZ_KEY_PATH"
-    chmod 600 "$AUTHZ_KEY_PATH"
-    export REGISTRY_BACKEND_AUTH_GIT_SSH_KEY_PATH="$AUTHZ_KEY_PATH"
+AUTHZ_BACKEND="${REGISTRY_AUTHZ_BACKEND:-${REGISTRY_DATA_BACKEND:-local}}"
+if [ "$AUTHZ_BACKEND" = "git" ]; then
+    configure_git_key \
+        "$REGISTRY_AUTHZ_BACKEND_GIT_SSH_PRIVATE_KEY" \
+        "${REGISTRY_AUTHZ_BACKEND_GIT_SSH_KEY_PATH:-/tmp/.ssh_authz_deploy_key}" \
+        REGISTRY_AUTHZ_BACKEND_GIT_SSH_KEY_PATH
 fi
 
 CPU_COUNT=$(bin/docker/get_cpus.sh)

@@ -8,7 +8,8 @@ from httpx2 import Response
 from starlette.testclient import TestClient
 
 from api.auth import AuthServices
-from auth import AccountOwners, AuthzStore, RegistryIDToken
+from auth import RegistryIDToken
+from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
 from tests.api._app import build_client, build_store
 

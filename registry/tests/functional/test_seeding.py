@@ -46,7 +46,7 @@ def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None
         assert any(a["id"] == "acct-seeded" for a in accounts["items"])
 
         # Tamper with the data to ensure it is not overwritten on next startup
-        tampered_path = functional_test_bed.data_dir / "registry-v1" / "accounts" / "acct-seeded.json"
+        tampered_path = functional_test_bed.data_dir / "data" / "accounts" / "acct-seeded.json"
         tampered_path.write_text(json.dumps({"name": "TAMPERED"}))
 
     # Re-create the app and client to trigger lifespan startup again
@@ -60,8 +60,8 @@ def test_custom_seed_idempotency(functional_test_bed: FunctionalTestBed) -> None
 @pytest.mark.s3
 def test_s3_seeding(s3_test_bucket: str, functional_test_bed: FunctionalTestBed) -> None:
     """Verify seeding works with the S3 backend."""
-    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
+    functional_test_bed.monkeypatch.setenv("REGISTRY_DATA_BACKEND", "s3")
+    functional_test_bed.monkeypatch.setenv("REGISTRY_DATA_BACKEND_S3_BUCKET", s3_test_bucket)
     functional_test_bed.create_seed_account("s3-acct", "S3 Account")
     functional_test_bed.configure_env()
 
@@ -70,7 +70,7 @@ def test_s3_seeding(s3_test_bucket: str, functional_test_bed: FunctionalTestBed)
     with TestClient(app):
         # Verify the object was created in S3
         s3 = boto3.client("s3")
-        obj = s3.get_object(Bucket=s3_test_bucket, Key="registry-v1/accounts/s3-acct.json")
+        obj = s3.get_object(Bucket=s3_test_bucket, Key="data/accounts/s3-acct.json")
         data = json.loads(obj["Body"].read())
         assert data["name"] == "S3 Account"
 
@@ -79,13 +79,13 @@ def test_s3_seeding(s3_test_bucket: str, functional_test_bed: FunctionalTestBed)
 @pytest.mark.s3
 def test_s3_seed_idempotency(s3_test_bucket: str, functional_test_bed: FunctionalTestBed) -> None:
     """Verify S3 seeding does not overwrite existing data."""
-    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND", "s3")
-    functional_test_bed.monkeypatch.setenv("REGISTRY_BACKEND_S3_BUCKET", s3_test_bucket)
+    functional_test_bed.monkeypatch.setenv("REGISTRY_DATA_BACKEND", "s3")
+    functional_test_bed.monkeypatch.setenv("REGISTRY_DATA_BACKEND_S3_BUCKET", s3_test_bucket)
     functional_test_bed.create_seed_account("s3-acct-idem", "S3 Idempotent")
     functional_test_bed.configure_env()
 
     s3 = boto3.client("s3")
-    key = "registry-v1/accounts/s3-acct-idem.json"
+    key = "data/accounts/s3-acct-idem.json"
 
     # 1. Run seeding once to create the object
     app = create_app()
