@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Canonical transparent green glow for RadioPad application icons. -->
+
+<svg
+   width="160"
+   height="160"
+   viewBox="0 0 160 160"
+   version="1.1"
+   xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 93% diameter, centered at (80, 92) toward the keycap; the lower fade intentionally clips. -->
+    <radialGradient
+       id="glow"
+       cx="80"
+       cy="92"
+       r="74.4"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         style="stop-color:#7cff7c;stop-opacity:1"
+         offset="0.31835344" />
+      <stop
+         style="stop-color:#537553;stop-opacity:0"
+         offset="1" />
+    </radialGradient>
+  </defs>
+  <circle
+     cx="80"
+     cy="92"
+     r="74.4"
+     style="fill:url(#glow)" />
+</svg>
