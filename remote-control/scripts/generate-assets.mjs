@@ -145,9 +145,9 @@ async function renderFavicons() {
     })
     .png()
     .toBuffer();
-  // The solid green badge and thin edge stay visible on light and dark browser chrome.
+  // The darker green edge keeps the borderless badge visible on light and dark browser chrome.
   const badge = Buffer.from(
-    '<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="green" cx="50%" cy="62%" r="74%"><stop offset="0" stop-color="#86ff80"/><stop offset="64%" stop-color="#41db47"/><stop offset="100%" stop-color="#22a832"/></radialGradient></defs><rect x="6" y="6" width="244" height="244" rx="52" fill="url(#green)" stroke="#111111" stroke-width="8"/></svg>',
+    '<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="green" cx="50%" cy="62%" r="74%"><stop offset="0" stop-color="#86ff80"/><stop offset="64%" stop-color="#41db47"/><stop offset="100%" stop-color="#22a832"/></radialGradient></defs><rect x="2" y="2" width="252" height="252" rx="56" fill="url(#green)"/></svg>',
   );
   const favicon = await sharp(badge)
     .composite([{ input: keycap, gravity: "centre" }])
