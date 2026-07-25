@@ -20,7 +20,7 @@ cp .env.example .env
 
 The registry URL defaults to `https://registry.radiopad.dev/api/`. Override it only if you are targeting a different registry or local registry instance. An explicit player `switchboard_url` takes precedence; otherwise the remote infers a same-origin `/switchboard/{account}/{player}` URL before applying the web-only `VITE_SWITCHBOARD_URL` override.
 
-Follow the root [Google sign-in setup](../README.md#google-sign-in). Standalone builds use its Web client ID as `VITE_GOOGLE_CLIENT_ID`; Vite embeds the value at build time, so set it before `npm run build` or `npx cap sync`.
+Standalone builds read the Web client ID from `VITE_GOOGLE_CLIENT_ID` in `remote-control/.env`; Vite embeds it at build time, so set it before `npm run build` or `npx cap sync`. Compose instead reads `GOOGLE_CLIENT_ID` from the root `.env`; see the root [Google sign-in setup](../README.md#google-sign-in). Register `http://localhost:5173` and `https://remote.radiopad.dev` as authorized JavaScript origins on the Web client, with their trailing-slash forms as authorized redirect URIs.
 
 The remote reads the registry's auth status at runtime. When registry auth is disabled, public player discovery and tokenless switchboard control remain available for local development. Controllers authenticate in their first WebSocket message so OIDC tokens never appear in switchboard URLs or access logs. Authentication and authorization failures stop reconnecting and remain visible in the Control title.
 
