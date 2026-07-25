@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "vite",
-    "build": "vite build",
+    "assets": "node scripts/generate-assets.mjs",
+    "build": "vite build && node check-pwa.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
     "jsdom": "^29.1.1",
+    "sharp": "^0.35.3",
     "vite": "^8.1.0",
     "vitest": "^4.1.9"
   },

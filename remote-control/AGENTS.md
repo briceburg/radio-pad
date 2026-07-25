@@ -13,6 +13,8 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 
 - Run local web dev with `npm start`.
 - Validate production bundling with `npm run build`.
+- Regenerate web and native application assets with `npm run assets` after changing their canonical SVGs in `../shared/assets`; do not hand-edit the generated PNGs.
+- `src/manifest.webmanifest` owns PWA identity and behavior. Keep its root-relative icon URLs aligned with `vite.config.mjs` and the production-build assertions.
 - Repository formatting is owned by the root tooling package. Run `npm run format` from the repository root to write changes; root `bin/ci` verifies them.
 - Run headless logic tests via `npm test` or `npm run test:watch`.
 
