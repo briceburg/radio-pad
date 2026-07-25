@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -129,13 +129,16 @@ async function renderIcon(
 }
 
 async function renderFavicons() {
-  // Isolate the blue-plus keycap from the canonical 256px render without duplicating its artwork.
-  const keycapBounds = { left: 80, top: 108, width: 100, height: 100 };
-  const croppedKeycap = await sharp(await renderSource(sources.foreground, 256))
-    .extract(keycapBounds)
-    .png()
-    .toBuffer();
-  const keycap = await sharp(croppedKeycap)
+  // Hide the canonical full mark to render its blue keycap and white plus without the black frame.
+  const foregroundSvg = await readFile(sources.foreground, "utf8");
+  const keycapSvg = foregroundSvg.replace(
+    'id="full-mark"',
+    'id="full-mark" display="none"',
+  );
+  if (keycapSvg === foregroundSvg) {
+    throw new Error("The favicon keycap path is missing.");
+  }
+  const keycap = await sharp(await renderSource(Buffer.from(keycapSvg), 256))
     .trim()
     .resize({
       width: 192,
