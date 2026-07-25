@@ -15,6 +15,19 @@ if [ "${REGISTRY_BACKEND:-}" = "git" ] && [ -n "${REGISTRY_BACKEND_GIT_SSH_PRIVA
     export GIT_SSH_COMMAND="ssh -i $KEY_PATH -o UserKnownHostsFile=$KNOWN_HOSTS_PATH -o StrictHostKeyChecking=accept-new"
 fi
 
+AUTHZ_BACKEND="${REGISTRY_BACKEND_AUTH:-${REGISTRY_BACKEND:-local}}"
+if [ "$AUTHZ_BACKEND" = "git" ] && [ -n "${REGISTRY_BACKEND_AUTH_GIT_SSH_PRIVATE_KEY:-}" ]; then
+    AUTHZ_KEY_PATH="${REGISTRY_BACKEND_AUTH_GIT_SSH_KEY_PATH:-/tmp/.ssh_authz_deploy_key}"
+    AUTHZ_KNOWN_HOSTS_PATH=/tmp/.ssh/known_hosts
+    umask 077
+    mkdir -p "$(dirname "$AUTHZ_KEY_PATH")" "$(dirname "$AUTHZ_KNOWN_HOSTS_PATH")"
+    touch "$AUTHZ_KNOWN_HOSTS_PATH"
+    chmod 600 "$AUTHZ_KNOWN_HOSTS_PATH"
+    printf '%s\n' "$REGISTRY_BACKEND_AUTH_GIT_SSH_PRIVATE_KEY" > "$AUTHZ_KEY_PATH"
+    chmod 600 "$AUTHZ_KEY_PATH"
+    export REGISTRY_BACKEND_AUTH_GIT_SSH_KEY_PATH="$AUTHZ_KEY_PATH"
+fi
+
 CPU_COUNT=$(bin/docker/get_cpus.sh)
 UVICORN_WORKERS=${UVICORN_WORKERS:-$CPU_COUNT}
 

@@ -131,7 +131,7 @@ def test_git_backend_clone_error_explains_deploy_key_setup(tmp_path: Path, monke
         )
 
     message = str(excinfo.value)
-    assert "REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" in message
+    assert "Git SSH private-key secret" in message
     assert "deploy key with write access" in message
 
 
@@ -181,7 +181,24 @@ def test_git_backend_origin_ssh_remote_uses_ssh_guidance(tmp_path: Path, monkeyp
     with pytest.raises(RuntimeError) as excinfo:
         _backend(backend_path)
 
-    assert "REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY" in str(excinfo.value)
+    assert "Git SSH private-key secret" in str(excinfo.value)
+
+
+def test_git_backend_explicit_ssh_key_overrides_global_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_path = tmp_path / "repo"
+    init_repo(repo_path)
+    monkeypatch.setenv("GIT_SSH_COMMAND", "ssh -i /tmp/content-key")
+
+    backend = GitBackend(
+        repo_path=str(repo_path),
+        remote_url="",
+        ssh_key_path="/tmp/authz key",
+    )
+
+    assert backend._git_env["GIT_SSH_COMMAND"] == "ssh -i '/tmp/authz key' -o StrictHostKeyChecking=accept-new"
 
 
 def test_git_backend_clone_oserror_reports_underlying_local_problem(

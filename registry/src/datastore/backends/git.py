@@ -71,7 +71,7 @@ class GitBackend:
                 "LC_ALL": "C",
             }
         )
-        if self.ssh_key_path and "GIT_SSH_COMMAND" not in self._git_env:
+        if self.ssh_key_path:
             self._git_env["GIT_SSH_COMMAND"] = (
                 f"ssh -i {shlex.quote(self.ssh_key_path)} -o StrictHostKeyChecking=accept-new"
             )
@@ -416,9 +416,9 @@ class GitBackend:
             f"Git backend failed to {action} remote {remote.label!r} for branch {self.branch!r}.",
         ]
         if self._is_ssh_remote(remote.url):
-            message.append("Check SSH auth: ensure REGISTRY_BACKEND_GIT_SSH_KEY_PATH points to a readable private key.")
+            message.append("Check SSH auth: ensure the configured Git SSH key path points to a readable private key.")
             message.append(
-                "On Fly, set REGISTRY_BACKEND_GIT_SSH_PRIVATE_KEY and add the matching public key "
+                "On Fly, set the matching backend's Git SSH private-key secret and add the public key "
                 "to the data repository as a deploy key with write access."
             )
         else:
