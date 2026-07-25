@@ -150,7 +150,7 @@ Resource reads remain public. Writes and player control become protected when bo
 
 The registry verifies OIDC bearer tokens against an allowed client-id list and then applies account-owner ACL checks from a separate private local authz store.
 
-For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The canonical client creation, `.env`, and Fly configuration steps live in the root [Google sign-in setup](../README.md#google-sign-in).
+For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#local-configuration).
 
 The checked-in seed documents live under a dedicated `seed-data/` root:
 
