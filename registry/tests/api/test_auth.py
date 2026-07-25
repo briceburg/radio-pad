@@ -17,7 +17,7 @@ def _token(
     *,
     subject: str,
     email: str | None = None,
-    email_verified: bool = False,
+    email_verified: bool | None = False,
     exp: int = 4_102_444_800,
 ) -> RegistryIDToken:
     return RegistryIDToken(
@@ -207,6 +207,30 @@ def test_account_owner_cannot_write_other_account(tmp_path: Path) -> None:
 
     with client:
         response = _put_station(client, "testuser2", _bearer("owner"))
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account owner access required"
+
+
+@pytest.mark.parametrize("email_verified", [False, None])
+def test_account_owner_email_must_be_explicitly_verified(
+    tmp_path: Path,
+    email_verified: bool | None,
+) -> None:
+    client = _auth_client(
+        tmp_path,
+        {
+            "owner": _token(
+                subject="owner",
+                email="owner@example.com",
+                email_verified=email_verified,
+            )
+        },
+        _with_account_owners("testuser1", "owner@example.com"),
+    )
+
+    with client:
+        response = _put_station(client, "testuser1", _bearer("owner"))
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Account owner access required"

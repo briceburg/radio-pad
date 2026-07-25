@@ -2,9 +2,8 @@ import os
 from pathlib import Path
 
 from lib.constants import BASE_DIR
-from lib.logging import logger
 
-from .backends import GitBackend, LocalBackend, S3Backend
+from .configuration import DATA_BACKEND_DEFAULTS, build_backend_from_env
 from .core import ObjectStore, SeedableStore, seed_from_path, seedable
 from .stores import Accounts, Players, RadioDials, Stations
 
@@ -25,20 +24,7 @@ class DataStore:
             self.backend = backend
             self.prefix = getattr(backend, "prefix", "")
         else:
-            backend_choice = os.environ.get("REGISTRY_BACKEND", "local").lower()
-            logger.info("DataStore backend: %s", backend_choice)
-            default_prefix = "" if backend_choice == "git" else "registry-v1"
-            self.prefix = os.environ.get("REGISTRY_BACKEND_PREFIX", default_prefix)
-            data_path = os.environ.get("REGISTRY_BACKEND_PATH", str(BASE_DIR / "tmp" / "data"))
-            if backend_choice == "s3":
-                bucket = os.environ.get("REGISTRY_BACKEND_S3_BUCKET", "").lower()
-                if not bucket:
-                    raise ValueError("S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set")
-                self.backend = S3Backend(bucket=bucket, prefix=self.prefix)
-            elif backend_choice == "git":
-                self.backend = self._build_git_backend(data_path)
-            else:
-                self.backend = LocalBackend(base_path=data_path, prefix=self.prefix)
+            self.backend, self.prefix = build_backend_from_env("REGISTRY_BACKEND", DATA_BACKEND_DEFAULTS)
 
         self.accounts = Accounts(self.backend)
         self.players = Players(self.backend)
@@ -51,25 +37,6 @@ class DataStore:
         Only seeds data if it doesn't already exist in the backend.
         """
         seed_from_path(self.seed_path, self._seedable_stores(), label="content")
-
-    def _build_git_backend(self, repo_path: str) -> GitBackend:
-        remote_url = os.environ.get(
-            "REGISTRY_BACKEND_GIT_REMOTE_URL",
-            "git@github.com:briceburg/radio-pad-registry-data.git",
-        )
-        return GitBackend(
-            repo_path=repo_path,
-            prefix=self.prefix,
-            branch=os.environ.get("REGISTRY_BACKEND_GIT_BRANCH", "main"),
-            remote_url=remote_url,
-            fetch_ttl_seconds=int(os.environ.get("REGISTRY_BACKEND_GIT_FETCH_TTL_SECONDS", "30")),
-            author_name=os.environ.get("REGISTRY_BACKEND_GIT_AUTHOR_NAME", "briceburg"),
-            author_email=os.environ.get(
-                "REGISTRY_BACKEND_GIT_AUTHOR_EMAIL",
-                "briceburg@users.noreply.github.com",
-            ),
-            ssh_key_path=os.environ.get("REGISTRY_BACKEND_GIT_SSH_KEY_PATH"),
-        )
 
     def _seedable_stores(self) -> list[SeedableStore]:
         return [

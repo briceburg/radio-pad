@@ -86,3 +86,10 @@ def test_datastore_raises_error_if_s3_bucket_is_missing(monkeypatch: MonkeyPatch
 
     with pytest.raises(ValueError, match="S3 backend selected but REGISTRY_BACKEND_S3_BUCKET is not set"):
         DataStore()
+
+
+def test_datastore_rejects_unknown_backend(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("REGISTRY_BACKEND", "unknown")
+
+    with pytest.raises(ValueError, match="Unsupported REGISTRY_BACKEND"):
+        DataStore()

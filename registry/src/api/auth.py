@@ -30,6 +30,7 @@ class AuthServices:
         logger.info("Registry auth enabled: issuer=%s, client_id_count=%s", config.issuer, len(config.client_ids))
         authz_store = AuthzStore()
         authz_store.seed()
+        authz_store.validate_access()
         return cls(authenticate_user=config.build_auth_dependency(), authz_store=authz_store)
 
     @property
@@ -72,10 +73,7 @@ def current_identity(
         subject=token.sub,
         expires_at=token.exp,
         email=token.email,
-        # Treat missing email_verified as True, particularly for Google id_tokens which
-        # may omit it when implicit (like via mobile Capacitor SDKs).
-        # Only explicitly False means unverified.
-        email_verified=token.email_verified is not False,
+        email_verified=token.email_verified is True,
     )
 
 

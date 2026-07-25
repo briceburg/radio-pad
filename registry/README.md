@@ -46,12 +46,15 @@ Registry resources are account-scoped:
 | `REGISTRY_BACKEND_GIT_AUTHOR_NAME` | Author name for registry-managed commits. | `briceburg` |
 | `REGISTRY_BACKEND_GIT_AUTHOR_EMAIL` | Author email for registry-managed commits; use a GitHub-linked address for attribution. | `briceburg@users.noreply.github.com` |
 | `REGISTRY_BACKEND_GIT_SSH_KEY_PATH` | Optional SSH private-key path for deploy-key authentication. | unset |
+| `REGISTRY_BACKEND_AUTH` | Private authorization backend: `local`, `s3`, or `git`. | same as `REGISTRY_BACKEND` |
+| `REGISTRY_BACKEND_AUTH_PATH` | Private local path or Git checkout when authorization storage is split. | content path for the same backend type; otherwise `tmp/authz` |
+| `REGISTRY_BACKEND_AUTH_S3_BUCKET` | Private S3 bucket when authorization does not use the content bucket. | content bucket when both use S3 |
+| `REGISTRY_BACKEND_AUTH_GIT_REMOTE_URL` | Private remote for a separate authorization Git repository. | content remote when both use Git |
+| `REGISTRY_BACKEND_AUTH_GIT_SSH_KEY_PATH` | Optional private key for a separate authorization Git repository. | content key when both use Git |
 | `REGISTRY_AUTH_OIDC_CLIENT_IDS` | Comma-separated OIDC client IDs allowed for writes and player control. | unset |
 | `REGISTRY_AUTH_OIDC_ISSUER` | OIDC issuer used to verify bearer tokens. | unset |
 | `REGISTRY_AUTH_OIDC_BASE_URI` | Optional OIDC discovery base URI. | same as issuer |
 | `REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL` | JWKS/discovery cache lifetime in seconds. | `3600` |
-| `REGISTRY_AUTHZ_PATH` | Private local account-authorization store; it may share a volume with public data but must use a separate directory. | `tmp/authz` |
-| `REGISTRY_AUTHZ_PREFIX` | Prefix for private authorization files. | `registry-authz-v1` |
 | `REGISTRY_PROFILES` | Enabled roles: `api`, `switchboard`, or both. | `api,switchboard` |
 | `REGISTRY_API_PREFIX` | API routing prefix. | `/api` |
 | `REGISTRY_SWITCHBOARD_PREFIX` | WebSocket routing prefix. | `/switchboard` |
@@ -148,22 +151,22 @@ The switchboard accepts state events from players and command events from contro
 
 Resource reads remain public. Writes and player control become protected when both `REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured. Clients discover this mode through `GET /api/auth/status`; split switchboards validate a controller through `GET /api/auth/players/{account_id}/{player_id}/control`. Both auth responses use `Cache-Control: no-store`.
 
-The registry verifies OIDC bearer tokens against an allowed client-id list and then applies account-owner ACL checks from a separate private local authz store.
+The registry verifies OIDC bearer tokens against an allowed client-id list and then applies account-owner ACL checks from a separate private authz store. Account emails authorize only when the OIDC token explicitly reports the email as verified.
 
 For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#local-configuration).
 
-The checked-in seed documents live under a dedicated `seed-data/` root:
+The checked-in seed directories live under a dedicated `seed-data/` root:
 
 - `seed-data/store/...` for public datastore seed content
-- `seed-data/auth/...` for private authz seed content
+- `seed-data/auth/...` for account-owner authz seeds
 
-The initial authz documents follow the same seed-file pattern as the public datastore, but live under `seed-data/auth/accounts/<account>.json`.
+Account-owner seeds initialize local authz data. Documents live at `registry-authz-v1/accounts/<account>.json` and can contain verified emails or issuer-qualified OIDC subjects.
 
-These files are intended to stay human-friendly and easy to review. The checked-in defaults make `briceburg@gmail.com` an owner of both the `briceburg` and `community` accounts. An account can have multiple owners by listing multiple verified emails or OIDC subjects in its document. Provision that account-owner document before the account's first authenticated write.
+Authorization storage is always private and supports local, S3, and Git. By default it shares the content backend under the fixed `registry-authz-v1` prefix. Set `REGISTRY_BACKEND_AUTH` and the needed location override only when the stores are split. Registry content may be public only when authorization uses separate private storage.
 
-If you later want less public identity exposure, you can replace email entries with OIDC `subject` entries after first login.
+Shared Git storage uses the same checkout lock and reconciliation behavior. For a separate private Git repository, set its auth path, remote, and optional deploy key. On Fly, store the key in `REGISTRY_BACKEND_AUTH_GIT_SSH_PRIVATE_KEY`.
 
-In production, the private authz store should use a separate local path such as `REGISTRY_AUTHZ_PATH=/data/authz`, even if the public datastore also uses local storage on the same Fly volume.
+Authorization reads are not cached, so a successful S3 update affects the next HTTP authorization check or new WebSocket connection without restarting the registry. An already-authenticated WebSocket remains authorized until it disconnects or its token expires.
 
 ## Development
 

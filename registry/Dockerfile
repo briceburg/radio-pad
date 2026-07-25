@@ -11,8 +11,7 @@ ENV \
   REGISTRY_BIND_HOST=0.0.0.0 \
   REGISTRY_BIND_PORT=8000 \
   REGISTRY_LOG_LEVEL=info \
-  REGISTRY_BACKEND_PATH=/tmp/registry-data \
-  REGISTRY_AUTHZ_PATH=/tmp/registry-authz
+  REGISTRY_BACKEND_PATH=/tmp/registry-data
 
 WORKDIR /app
 
