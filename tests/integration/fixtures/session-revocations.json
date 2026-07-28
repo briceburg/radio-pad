@@ -1,0 +1,7 @@
+{
+  "emails": {},
+  "revoked_before": null,
+  "subjects": {
+    "oidc:http://oidc:8080:revoked-user": "2100-01-01T00:00:00Z"
+  }
+}

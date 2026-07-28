@@ -8,6 +8,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Docker Compose provides the local development and integration test environment.
 - `compose.yaml` runs unified mode (registry serves API + switchboard in one process).
 - `compose.split.yaml` runs split mode (registry and switchboard as separate services).
+- `compose.auth.yaml` adds local OIDC and revocation fixtures to a registry/switchboard topology.
 - `compose.prod-smoke.yaml` builds all services with `target: prod` and verifies healthchecks.
 - `bin/dev` wraps local Compose usage and auto-adds `compose.macropad.yaml` only when a Macropad CDC2 data port is available, unless `RADIOPAD_MACROPAD=off` or `RADIOPAD_MACROPAD=required` is set.
 - `bin/dev` also adds `compose.audio.yaml` for host Pulse-compatible or native PipeWire audio unless `RADIOPAD_AUDIO=off` is set.
@@ -19,7 +20,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Root `npm run format` writes repository Markdown plus supported source, configuration, workflow, and data files; `bin/ci` verifies them without writing.
 - GitHub Actions CI (`.github/workflows/ci.yml`) calls the same root entry point in two job groups:
   - `components`: runs `bin/ci` after installing uv and both npm packages.
-  - `integration`: matrix over the three Compose files — runs `bin/ci integration <compose-file>`.
+  - `integration`: matrix over four Compose configurations — runs `bin/ci integration <compose-file>`.
 - Use component `bin/ci` scripts for targeted work, root `bin/ci` for routine repository validation, and `bin/ci integration` when changes warrant cross-service validation.
 
 ## Agent workflow

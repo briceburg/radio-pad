@@ -21,6 +21,7 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 ## Auth conventions
 
 - Google sign-in uses `@capawesome/capacitor-google-sign-in` across web, Android, and iOS.
+- Exchange the Google token once; keep registry access tokens in memory and use the registry's HttpOnly rolling session through standard `fetch`.
 - `VITE_GOOGLE_CLIENT_ID` should be the Google web client ID.
 - Android OAuth clients register package/signing-certificate pairs in Google Auth Platform; their IDs are not application configuration.
 - `VITE_GOOGLE_REDIRECT_URL` is optional on web. By default, the app uses the current page URL.

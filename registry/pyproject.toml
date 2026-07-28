@@ -5,10 +5,13 @@ description = "FastAPI registry and switchboard service for RadioPad"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "boto3",
+  "cachetools",
   "fastapi",
   "fastapi-oidc",
   "httpx2",
+  "itsdangerous",
   "pydantic",
+  "pyjwt",
   "uvicorn[standard]",
 ]
 

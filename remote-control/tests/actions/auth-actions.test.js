@@ -34,6 +34,7 @@ describe("auth-actions", () => {
     createAuthActions({ auth, refreshAccountsForCurrentRegistry });
     const nextState = {
       signedIn: true,
+      subject: "user-1",
       name: "Test User",
       registryBearerToken: "token",
     };
@@ -46,6 +47,13 @@ describe("auth-actions", () => {
       ),
     );
     expect(authStore.get()).toMatchObject(nextState);
+
+    auth.dispatchEvent(
+      new CustomEvent("statechange", {
+        detail: { ...nextState, registryBearerToken: "refreshed-token" },
+      }),
+    );
+    expect(refreshAccountsForCurrentRegistry).toHaveBeenCalledOnce();
   });
 
   it("copies available tokens and explains when none is available", async () => {

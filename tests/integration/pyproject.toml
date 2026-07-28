@@ -5,6 +5,7 @@ description = "Integration tests for RadioPad Compose topologies"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "httpx2",
+  "pyjwt",
   "pytest",
   "pytest-asyncio",
   "websockets",

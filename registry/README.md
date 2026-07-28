@@ -43,9 +43,10 @@ Registry resources are account-scoped:
 | `REGISTRY_AUTHZ_BACKEND_PATH` | Authz local root or Git checkout. | data path when backends match; otherwise `tmp/authz` |
 | `REGISTRY_AUTHZ_BACKEND_S3_BUCKET` | Authz S3 bucket. | data bucket when both use S3; otherwise unset |
 | `REGISTRY_AUTH_OIDC_BASE_URI` | OIDC discovery base URI. | issuer |
-| `REGISTRY_AUTH_OIDC_CLIENT_IDS` | Allowed OIDC client IDs for writes and player control. | unset |
-| `REGISTRY_AUTH_OIDC_ISSUER` | OIDC bearer-token issuer. | unset |
+| `REGISTRY_AUTH_OIDC_CLIENT_IDS` | Accepted OIDC ID-token audiences (client IDs). | unset |
+| `REGISTRY_AUTH_OIDC_ISSUER` | Accepted OIDC ID-token issuer. | unset |
 | `REGISTRY_AUTH_OIDC_SIGNATURE_CACHE_TTL` | OIDC discovery and key cache lifetime in seconds. | `3600` |
+| `REGISTRY_AUTH_SESSION_SECRET` | Signing key for sessions and access tokens; at least 32 bytes and required when auth is enabled. | unset |
 | `REGISTRY_BIND_HOST` | Server bind host. | `localhost` |
 | `REGISTRY_BIND_PORT` | Server bind port. | `8000` |
 | `REGISTRY_CORS_ORIGINS` | Comma-separated allowed CORS origins. | `capacitor://localhost,http://localhost:5173,http://localhost:5174,http://localhost,https://localhost` |
@@ -105,6 +106,7 @@ Generate a keypair, add its public key to GitHub as a write-enabled deploy key, 
 ```sh
 ssh-keygen -t ed25519 -f ~/.ssh/radio-pad-registry-data-fly -C "radio-pad-registry fly deploy"
 fly secrets set REGISTRY_DATA_BACKEND_GIT_SSH_PRIVATE_KEY="$(cat ~/.ssh/radio-pad-registry-data-fly)"
+fly secrets set REGISTRY_AUTH_SESSION_SECRET="$(openssl rand -hex 32)"
 fly deploy
 curl -i https://radio-pad-registry.fly.dev/healthz
 ```
@@ -134,15 +136,15 @@ The switchboard accepts state events from players and command events from contro
 
 ## Authentication and authz
 
-Registry API reads are currently unauthenticated. Writes and player control become protected when both `REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured. Clients discover this mode through `GET /api/auth/status`; split switchboards validate a controller through `GET /api/auth/players/{account_id}/{player_id}/control`. Both auth responses use `Cache-Control: no-store`.
+Registry API reads are currently unauthenticated. Writes and player control become protected when `REGISTRY_AUTH_OIDC_CLIENT_IDS` and `REGISTRY_AUTH_OIDC_ISSUER` are configured; `REGISTRY_AUTH_SESSION_SECRET` is required in that mode. Clients discover this mode through `GET /api/auth/status`; split switchboards validate a controller through `GET /api/auth/players/{account_id}/{player_id}/control`. Auth responses use `Cache-Control: no-store`.
 
-The registry verifies OIDC bearer tokens against an allowed client-id list, then checks the private account-owner store. Email ownership requires an explicitly verified OIDC email claim.
+The registry exchanges a verified OIDC ID token for a rolling 30-day signed cookie and one-hour bearer token. Its issuer and audience must match `REGISTRY_AUTH_OIDC_ISSUER` and `REGISTRY_AUTH_OIDC_CLIENT_IDS`; email ownership also requires an explicitly verified email claim. The cookie is refreshed while the remote is active and on its next visit, and is never sent to the switchboard.
 
 For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#local-configuration).
 
 Registry and account-owner seeds live under `seed-data/data/` and `seed-data/authz/`. Owner documents live at `authz/accounts/<account>.json` and contain email addresses or issuer-qualified OIDC subjects.
 
-An S3 update applies to the next HTTP check or WebSocket connection without a restart. Existing WebSockets remain authorized until disconnect or token expiry.
+Session invalidation lives at `authz/policies/session-revocations.json`. Set `revoked_before` to invalidate all earlier sign-ins, or add a cutoff under `emails` or `subjects` for one user; the registry caches this document for five minutes. Existing WebSockets remain authorized until disconnect or their one-hour bearer expires.
 
 ## Development
 

@@ -50,6 +50,7 @@ RADIOPAD_AUDIO=off RADIOPAD_AUDIO_OUTPUT=null RADIOPAD_MACROPAD=off bin/dev up -
 | --- | --- |
 | `compose.yaml` | Default development stack; one registry process serves both the API and switchboard. |
 | `compose.split.yaml` | Development stack with separate API and switchboard services for scaling and load tests. |
+| `compose.auth.yaml` | Registry auth overlay for `compose.yaml`, with local OIDC and revocation fixtures. |
 | `compose.prod-smoke.yaml` | Production-image build and healthcheck integration test. |
 
 `bin/dev` loads `compose.yaml` plus detected host overlays. Add the split configuration when working across the API/switchboard boundary:
@@ -146,7 +147,8 @@ flowchart TD
 
     Remote -- "Read auth status + registered players" --> Registry
     Registry -- "Auth mode + public player data" --> Remote
-    User -. "Google OIDC when auth enabled" .-> Remote
+    User -. "Google sign-in when auth enabled" .-> Remote
+    Remote -- "Exchange + refresh registry session" --> Registry
     Remote -- "Connect + authenticate event" --> Switchboard
     Switchboard -- "Validate account-owner control access" --> Registry
     Player -- "Connect as Player" --> Switchboard
@@ -157,7 +159,7 @@ Player control follows the registry's advertised auth mode:
 
 - Player registry reads remain public.
 - Every controller connection starts with an `authenticate` event; its token is null when registry authentication is disabled.
-- When authentication is enabled, the remote supplies its OIDC token only in that first WebSocket message, never in the URL.
+- When authentication is enabled, the remote exchanges Google sign-in once and supplies a short-lived registry token only in the first WebSocket message, never in the URL.
 - The switchboard validates account-owner control access locally in unified mode or through the registry API in split mode.
 - The switchboard sends `authenticated` before replaying state or accepting commands. Unauthorized or expired sessions close with policy code `1008`.
 

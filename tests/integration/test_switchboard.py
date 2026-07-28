@@ -27,11 +27,13 @@ async def test_player_connect(switchboard_url):
 
 
 @pytest.mark.asyncio
-async def test_controller_connects_without_token_when_auth_is_disabled(switchboard_url):
-    """Local Compose permits tokenless controllers while OIDC is disabled."""
+async def test_controller_authenticates_for_registry_mode(switchboard_url, registry_session):
+    """Controllers use a registry token exactly when OIDC is enabled."""
+    token = registry_session.json()["access_token"] if registry_session else None
+    expires_at = registry_session.json()["expires_at"] if registry_session else None
     async with websockets.connect(f"{switchboard_url}/{REGISTERED_PLAYER_ROOM}") as ws:
-        await ws.send(json.dumps({"event": "authenticate", "data": {"token": None}}))
-        assert json.loads(await ws.recv()) == {"event": "authenticated", "data": {"expires_at": None}}
+        await ws.send(json.dumps({"event": "authenticate", "data": {"token": token}}))
+        assert json.loads(await ws.recv()) == {"event": "authenticated", "data": {"expires_at": expires_at}}
         await ws.send(json.dumps({"event": "ping"}))
         async with asyncio.timeout(3):
             while True:

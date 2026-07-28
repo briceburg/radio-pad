@@ -1,0 +1,32 @@
+services:
+  oidc:
+    image: busybox:1
+    command: ["httpd", "-f", "-p", "8080", "-h", "/www"]
+    volumes:
+      - ./tests/integration/fixtures/oidc:/www:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://localhost:8080/.well-known/openid-configuration",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  registry:
+    depends_on:
+      oidc:
+        condition: service_healthy
+    environment:
+      REGISTRY_AUTH_OIDC_BASE_URI: "http://oidc:8080"
+      REGISTRY_AUTH_OIDC_CLIENT_IDS: "radiopad-integration"
+      REGISTRY_AUTH_OIDC_ISSUER: "http://oidc:8080"
+      REGISTRY_AUTH_SESSION_SECRET: "radio-pad-integration-session-secret"
+      REGISTRY_AUTHZ_BACKEND_PATH: "/tmp/radiopad-authz"
+    volumes:
+      - ./tests/integration/fixtures/session-revocations.json:/app/seed-data/authz/policies/session-revocations.json:ro

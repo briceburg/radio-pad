@@ -15,7 +15,7 @@ uv run --locked ruff check .
 uv run --locked pytest --collect-only -q
 
 if [ "$#" -eq 0 ]; then
-  set -- compose.yaml compose.split.yaml compose.prod-smoke.yaml
+  set -- compose.yaml compose.split.yaml "compose.yaml:compose.auth.yaml" compose.prod-smoke.yaml
 fi
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-radiopad-ci}"

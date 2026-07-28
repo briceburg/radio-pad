@@ -1,11 +1,16 @@
+import os
+import secrets
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 
+from auth import SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS
 from datastore import DataStore
+from lib.constants import API_PREFIX
 from lib.logging import silence_access_logs
 from switchboard.broadcast import Broadcast
 
@@ -129,3 +134,13 @@ class RegistryAPI(FastAPI):
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        if "api" in self.state.profiles:
+            self.add_middleware(
+                SessionMiddleware,
+                secret_key=os.environ.get("REGISTRY_AUTH_SESSION_SECRET") or secrets.token_urlsafe(32),
+                session_cookie=SESSION_COOKIE_NAME,
+                max_age=SESSION_MAX_AGE_SECONDS,
+                path=f"{API_PREFIX.rstrip('/')}/auth/session",
+                same_site="none",
+                https_only=True,
+            )

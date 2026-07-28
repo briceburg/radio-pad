@@ -1,3 +1,3 @@
 # Authz seeds
 
-Account-owner documents in `accounts/` initialize authz data without overwriting existing owners.
+Documents in `accounts/` and `policies/` initialize missing authz data without overwriting persisted values.

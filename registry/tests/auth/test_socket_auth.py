@@ -9,11 +9,13 @@ from fastapi import FastAPI, HTTPException, Request, WebSocketException
 from starlette.types import Scope
 
 from api.auth import AuthServices
-from auth import RegistryIDToken
+from auth import AccessTokens, RegistryIDToken
 from auth.socket_auth import validate_local, validate_remote
 from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
 from tests.api._app import build_store
+
+_ACCESS_TOKENS = AccessTokens("test-session-secret-value-32-bytes", clock=lambda: 1_700_000_100)
 
 
 def _token() -> RegistryIDToken:
@@ -28,6 +30,11 @@ def _token() -> RegistryIDToken:
     )
 
 
+def _access_token() -> str:
+    identity = _ACCESS_TOKENS.identity_from_oidc(_token())
+    return _ACCESS_TOKENS.issue(identity).token
+
+
 def _local_request(tmp_path: Path, owner_account: str) -> Request:
     store = build_store(tmp_path / "data", seed=True)
     authz = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
@@ -37,7 +44,11 @@ def _local_request(tmp_path: Path, owner_account: str) -> Request:
         return _token()
 
     app = FastAPI()
-    app.state.auth = AuthServices(authenticate_user=authenticate, authz_store=authz)
+    app.state.auth = AuthServices(
+        authenticate_oidc=authenticate,
+        authz_store=authz,
+        access_tokens=_ACCESS_TOKENS,
+    )
     app.state.store = store
     scope: Scope = {"type": "http", "app": app}
     return Request(scope)
@@ -51,12 +62,12 @@ def mock_request() -> AsyncMock:
 
 
 async def test_validate_local_allows_account_owner(tmp_path: Path) -> None:
-    await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", "valid-token")
+    await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", _access_token())
 
 
 async def test_validate_local_rejects_other_account_owner(tmp_path: Path) -> None:
     with pytest.raises(WebSocketException) as exc:
-        await validate_local(_local_request(tmp_path, "testuser2"), "testuser1", "player1", "valid-token")
+        await validate_local(_local_request(tmp_path, "testuser2"), "testuser1", "player1", _access_token())
 
     assert exc.value.code == 1008
 
@@ -70,7 +81,7 @@ async def test_validate_local_rejects_missing_token(tmp_path: Path) -> None:
 
 async def test_validate_local_rejects_missing_player(tmp_path: Path) -> None:
     with pytest.raises(WebSocketException) as exc:
-        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "missing", "valid-token")
+        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "missing", _access_token())
 
     assert exc.value.code == 1008
 
@@ -84,7 +95,7 @@ async def test_validate_local_preserves_internal_errors(
     monkeypatch.setattr("auth.socket_auth.current_identity", Mock(side_effect=error))
 
     with pytest.raises(type(error)) as exc:
-        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", "valid-token")
+        await validate_local(_local_request(tmp_path, "testuser1"), "testuser1", "player1", _access_token())
 
     assert exc.value is error
 

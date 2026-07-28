@@ -11,14 +11,14 @@ import asyncio
 import time
 from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from api.auth import AuthServices
-from auth import RegistryIDToken
+from auth import AccessTokens, AuthenticatedIdentity
 from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
 from registry import create_app
@@ -131,22 +131,23 @@ def test_authenticated_controller_receives_retained_player_state(tmp_path: Path)
     authz = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
     authz.save_account_owners(AccountOwners(id="testuser1", emails=["owner@example.com"]))
 
-    def authenticate(token: str) -> RegistryIDToken:
-        if token != "valid-token":
-            raise ValueError("Invalid bearer token")
-        return RegistryIDToken(
-            iss="https://issuer.example",
-            sub="owner",
-            aud="radio-pad-remote-control",
-            exp=4_102_444_800,
-            iat=1_700_000_000,
-            email="owner@example.com",
-            email_verified=True,
-        )
+    identity = AuthenticatedIdentity(
+        issuer="https://issuer.example",
+        subject="owner",
+        authenticated_at=1_700_000_000,
+        email="owner@example.com",
+        email_verified=True,
+    )
+    access_tokens = AccessTokens("test-session-secret-value-32-bytes")
+    access = access_tokens.issue(identity)
 
     app = create_app(profiles=["api", "switchboard"])
     app.state.store = store
-    app.state.auth = AuthServices(authenticate_user=authenticate, authz_store=authz)
+    app.state.auth = AuthServices(
+        authenticate_oidc=Mock(),
+        authz_store=authz,
+        access_tokens=access_tokens,
+    )
 
     with TestClient(app) as client:
         with client.websocket_connect("/switchboard/testuser1/player1", headers=PLAYER_HEADERS) as player:
@@ -156,10 +157,10 @@ def test_authenticated_controller_receives_retained_player_state(tmp_path: Path)
                 pass
 
             with client.websocket_connect("/switchboard/testuser1/player1") as controller:
-                controller.send_json({"event": "authenticate", "data": {"token": "valid-token"}})
+                controller.send_json({"event": "authenticate", "data": {"token": access.token}})
                 assert controller.receive_json() == {
                     "event": "authenticated",
-                    "data": {"expires_at": 4_102_444_800},
+                    "data": {"expires_at": access.expires_at},
                 }
                 while (message := controller.receive_json()).get("event") != "playback_state":
                     pass

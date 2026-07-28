@@ -1,3 +1,4 @@
+from .cache import ExpiringCache
 from .helpers import (
     atomic_write_json_file,
     compute_etag,
@@ -13,6 +14,7 @@ from .model_store import ModelStore
 from .seeding import seed_from_path, seedable
 
 __all__ = [
+    "ExpiringCache",
     "ModelStore",
     "ModelWithId",
     "ObjectStore",

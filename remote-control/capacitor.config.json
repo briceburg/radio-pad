@@ -2,6 +2,9 @@
   "appId": "dev.radiopad.remote",
   "appName": "RadioPad",
   "webDir": "dist",
+  "ios": {
+    "limitsNavigationsToAppBoundDomains": true
+  },
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
