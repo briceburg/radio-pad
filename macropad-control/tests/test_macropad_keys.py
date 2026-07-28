@@ -1,5 +1,15 @@
+import json
+from pathlib import Path
+
+import pytest
+
 from lib import macropad_keys
 from lib.macropad_keys import SKELETON_ANIMATION_TIMEOUT_MS, MacropadKeys
+from lib.macropad_state import MacropadState
+
+CONTROLLER_TITLE_CASES = json.loads(
+    (Path(__file__).resolve().parents[2] / "shared" / "controller-title-cases.json").read_text()
+)
 
 
 class FakePixels:
@@ -40,6 +50,37 @@ class FakeDisplay:
 
     def refresh(self):
         pass
+
+
+@pytest.mark.parametrize(
+    "title_case",
+    CONTROLLER_TITLE_CASES,
+    ids=[title_case["name"] for title_case in CONTROLLER_TITLE_CASES],
+)
+def test_shared_controller_title_contract(title_case):
+    state = MacropadState()
+    keys = MacropadKeys(FakeMacropad(), FakeDisplay())
+
+    if title_case["player_available"]:
+        state.mark_player_available()
+    state.apply(keys, force=True)
+
+    if title_case["player_available"]:
+        station_menu = title_case["station_menu"]
+        if station_menu is not None:
+            state.handle_event({"event": "station_menu", "data": station_menu}, keys)
+
+        state.handle_event(
+            {
+                "event": "playback_state",
+                "data": title_case["playback_state"],
+            },
+            keys,
+        )
+        for status in title_case["player_statuses"]:
+            state.handle_event({"event": "player_status", "data": status}, keys)
+
+    assert keys.display.title == title_case["expected_title"]
 
 
 def test_skeleton_animation_settles_static_after_timeout(monkeypatch):

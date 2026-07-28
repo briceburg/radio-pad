@@ -6,8 +6,37 @@ import {
   RadioPlayerTab,
 } from "../../src/js/ui/radio-player-tab.js";
 import { controlStore } from "../../src/js/store.js";
+import controllerTitleCases from "../../../shared/controller-title-cases.json";
 
 afterEach(() => document.body.replaceChildren());
+
+function controlTitleState(titleCase) {
+  const playbackState = titleCase.playback_state;
+  const playerStatuses = Object.fromEntries(
+    titleCase.player_statuses.map(({ scope, ...status }) => [scope, status]),
+  );
+
+  return {
+    connectionState: "connected",
+    playerConnected: titleCase.player_available,
+    player: { id: "living-room", name: "Living Room" },
+    radioDial:
+      titleCase.station_menu === null
+        ? null
+        : {
+            name: "iCEBURG Radio",
+            stations: titleCase.station_menu.map((callSign) => ({
+              call_sign: callSign,
+            })),
+          },
+    currentStation: playbackState.call_sign,
+    requestedStation: playbackState.requested_call_sign,
+    failedStation: playbackState.failed_call_sign,
+    loading: titleCase.station_menu === null,
+    playerStatuses,
+    resourceStatuses: {},
+  };
+}
 
 describe("radio-player-tab", () => {
   it("treats disconnected, unauthorized, and offline control states as degraded", () => {
@@ -79,30 +108,14 @@ describe("radio-player-tab", () => {
     ).toBe("WWOZ");
   });
 
-  it("matches Macropad playback and loading title transitions", () => {
-    const ready = {
-      connectionState: "connected",
-      playerConnected: true,
-      player: { name: "Living Room" },
-      radioDial: { name: "iCEBURG Radio" },
-    };
-
-    expect(getControlTitle({ ...ready, requestedStation: "WWOZ" })).toBe(
-      "Starting WWOZ",
-    );
-    expect(getControlTitle({ ...ready, currentStation: "WWOZ" })).toBe("WWOZ");
-    expect(getControlTitle({ ...ready, failedStation: "WWOZ" })).toBe(
-      "Failed WWOZ",
-    );
-    expect(getControlTitle(ready)).toBe("Living Room");
-    expect(
-      getControlTitle({
-        ...ready,
-        radioDial: null,
-        loading: true,
-      }),
-    ).toBe("Loading RadioDial");
-  });
+  it.each(controllerTitleCases)(
+    "aligns the $name title with the shared controller contract",
+    (titleCase) => {
+      expect(getControlTitle(controlTitleState(titleCase))).toBe(
+        titleCase.expected_title,
+      );
+    },
+  );
 
   it("derives station visual states", () => {
     expect(
