@@ -2,7 +2,7 @@
 
 A web and native mobile controller for [RadioPad](https://github.com/briceburg/radio-pad). It discovers players and RadioDials through the registry, sends playback commands through its switchboard, renders player state in real time, and signs in only when the registry requires authentication.
 
-The Control tab uses a compact, state-driven title that mirrors the [Macropad title row](../macropad-control/README.md#visual-states): `Starting <call sign>`, the confirmed call sign, and `Failed <call sign>`. The selected player name is the idle fallback instead of a prefix on every state.
+The Control tab uses a compact, state-driven title whose shared playback states align with the [Macropad title row](../macropad-control/README.md#visual-states): `Starting <call sign>`, the confirmed call sign, and `Failed <call sign>`. The selected player name is the idle fallback instead of a prefix on every state.
 
 ## Development
 

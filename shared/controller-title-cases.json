@@ -1,0 +1,161 @@
+[
+  {
+    "name": "waiting for player",
+    "player_available": false,
+    "station_menu": null,
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [],
+    "expected_title": "Waiting for Player"
+  },
+  {
+    "name": "loading RadioDial",
+    "player_available": true,
+    "station_menu": null,
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [],
+    "expected_title": "Loading RadioDial"
+  },
+  {
+    "name": "loading RadioDial status precedes switchboard status",
+    "player_available": true,
+    "station_menu": null,
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [
+      {
+        "scope": "radio_dial",
+        "level": "warning",
+        "summary": "RadioDial unavailable"
+      },
+      {
+        "scope": "switchboard",
+        "level": "warning",
+        "summary": "Switchboard down"
+      }
+    ],
+    "expected_title": "RadioDial unavailable"
+  },
+  {
+    "name": "playback status precedes other loading statuses",
+    "player_available": true,
+    "station_menu": null,
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [
+      {
+        "scope": "radio_dial",
+        "level": "warning",
+        "summary": "RadioDial unavailable"
+      },
+      {
+        "scope": "switchboard",
+        "level": "warning",
+        "summary": "Switchboard down"
+      },
+      {
+        "scope": "playback",
+        "level": "error",
+        "summary": "Playback unavailable"
+      }
+    ],
+    "expected_title": "Playback unavailable"
+  },
+  {
+    "name": "starting station precedes playback status",
+    "player_available": true,
+    "station_menu": ["WWOZ"],
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": "WWOZ",
+      "failed_call_sign": null
+    },
+    "player_statuses": [
+      {
+        "scope": "playback",
+        "level": "error",
+        "summary": "Playback failed"
+      }
+    ],
+    "expected_title": "Starting WWOZ"
+  },
+  {
+    "name": "playing station",
+    "player_available": true,
+    "station_menu": ["WWOZ"],
+    "playback_state": {
+      "call_sign": "WWOZ",
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [],
+    "expected_title": "WWOZ"
+  },
+  {
+    "name": "failed station precedes playback status",
+    "player_available": true,
+    "station_menu": ["WWOZ"],
+    "playback_state": {
+      "call_sign": null,
+      "requested_call_sign": null,
+      "failed_call_sign": "WWOZ"
+    },
+    "player_statuses": [
+      {
+        "scope": "playback",
+        "level": "error",
+        "summary": "Playback failed"
+      }
+    ],
+    "expected_title": "Failed WWOZ"
+  },
+  {
+    "name": "playback status precedes playing station",
+    "player_available": true,
+    "station_menu": ["WWOZ"],
+    "playback_state": {
+      "call_sign": "WWOZ",
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [
+      {
+        "scope": "playback",
+        "level": "error",
+        "summary": "Playback interrupted"
+      }
+    ],
+    "expected_title": "Playback interrupted"
+  },
+  {
+    "name": "ready RadioDial warning preserves playing station",
+    "player_available": true,
+    "station_menu": ["WWOZ"],
+    "playback_state": {
+      "call_sign": "WWOZ",
+      "requested_call_sign": null,
+      "failed_call_sign": null
+    },
+    "player_statuses": [
+      {
+        "scope": "radio_dial",
+        "level": "warning",
+        "summary": "RadioDial unavailable"
+      }
+    ],
+    "expected_title": "WWOZ"
+  }
+]
