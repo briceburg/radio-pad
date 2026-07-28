@@ -6,9 +6,14 @@ import {
   RadioPlayerTab,
 } from "../../src/js/ui/radio-player-tab.js";
 import { controlStore } from "../../src/js/store.js";
-import controllerTitleCases from "../../../shared/controller-title-cases.json";
+import controllerTitleContract from "../../../shared/controller-title-cases.json";
 
 afterEach(() => document.body.replaceChildren());
+
+const controllerTitleCases = controllerTitleContract.cases.map((titleCase) => ({
+  ...controllerTitleContract.defaults,
+  ...titleCase,
+}));
 
 function controlTitleState(titleCase) {
   const playbackState = titleCase.playback_state;
@@ -29,9 +34,9 @@ function controlTitleState(titleCase) {
               call_sign: callSign,
             })),
           },
-    currentStation: playbackState.call_sign,
-    requestedStation: playbackState.requested_call_sign,
-    failedStation: playbackState.failed_call_sign,
+    currentStation: playbackState.call_sign ?? null,
+    requestedStation: playbackState.requested_call_sign ?? null,
+    failedStation: playbackState.failed_call_sign ?? null,
     loading: titleCase.station_menu === null,
     playerStatuses,
     resourceStatuses: {},
