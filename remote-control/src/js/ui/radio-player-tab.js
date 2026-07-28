@@ -8,8 +8,8 @@ import { controlStore, isDegradedStatus, listenStore } from "../store.js";
 
 const PLAYER_DEGRADED_SCOPES = ["radio_dial", "switchboard"];
 const RESOURCE_DEGRADED_SCOPES = ["registry", "radio_dial"];
-const STATUS_SUMMARY_ORDER = [
-  ["playerStatuses", "playback"],
+const PLAYBACK_STATUS_SUMMARY_ORDER = [["playerStatuses", "playback"]];
+const LOADING_STATUS_SUMMARY_ORDER = [
   ["playerStatuses", "radio_dial"],
   ["resourceStatuses", "radio_dial"],
   ["resourceStatuses", "registry"],
@@ -20,14 +20,10 @@ function hasDegradedStatus(statuses = {}, scopes = []) {
   return scopes.some((scope) => isDegradedStatus(statuses[scope]));
 }
 
-function retainedStatusSummary(state) {
-  for (const [statusMap, scope] of STATUS_SUMMARY_ORDER) {
+function retainedStatusSummary(state, order) {
+  for (const [statusMap, scope] of order) {
     const status = state[statusMap]?.[scope];
-    if (
-      isDegradedStatus(status) &&
-      typeof status.summary === "string" &&
-      status.summary
-    ) {
+    if (typeof status?.summary === "string" && status.summary) {
       return status.summary;
     }
   }
@@ -45,22 +41,35 @@ export function isControlDegraded(state) {
   );
 }
 
-export function getControlTitleStatus(state) {
+export function getControlTitle(state) {
   if (state.connectionState === "unauthorized") {
     return state.connectionMessage || "Sign-in required.";
   }
-  if (state.playerConnected === false) return "Offline";
   if (state.connectionState === "disconnected") {
     return state.player?.id ? "Reconnecting..." : "Disconnected";
   }
-  if (state.requestedStation) return `Starting ${state.requestedStation}...`;
+  if (state.connectionState === "connecting") return "Connecting...";
+  if (state.playerConnected === false) return "Waiting for Player";
+  if (state.requestedStation) return `Starting ${state.requestedStation}`;
   if (state.failedStation) return `Failed ${state.failedStation}`;
 
-  const summary = retainedStatusSummary(state);
-  if (summary) return summary;
+  const playbackSummary = retainedStatusSummary(
+    state,
+    PLAYBACK_STATUS_SUMMARY_ORDER,
+  );
+  if (playbackSummary) return playbackSummary;
   if (state.currentStation) return state.currentStation;
-  if (state.loading) return "Loading...";
-  return null;
+
+  if (!state.radioDial) {
+    const loadingSummary = retainedStatusSummary(
+      state,
+      LOADING_STATUS_SUMMARY_ORDER,
+    );
+    if (loadingSummary) return loadingSummary;
+    if (state.player || state.loading) return "Loading RadioDial";
+  }
+
+  return state.player?.name || state.radioDial?.name || "Control";
 }
 
 export function getStationVisualState(tabName, state) {
@@ -230,24 +239,20 @@ export class RadioPlayerTab extends RadioElement {
       );
     }
 
-    const titleName =
-      this.tabName === "control"
-        ? s.player?.name || s.radioDial?.name || ""
-        : s.radioDial?.name || "";
-    const titleStatus =
-      this.tabName === "control"
-        ? getControlTitleStatus(s)
-        : s.currentStation || (s.loading ? "Loading..." : null);
-    const pageTitle = this.tabName === "control" ? "Control" : "Listen";
-    const title = titleName
-      ? [titleName, titleStatus].filter(Boolean).join(": ")
-      : pageTitle;
+    const listenTitle = s.radioDial?.name
+      ? [
+          s.radioDial.name,
+          s.currentStation || (s.loading ? "Loading..." : null),
+        ]
+          .filter(Boolean)
+          .join(": ")
+      : "Listen";
+    const title = this.tabName === "control" ? getControlTitle(s) : listenTitle;
 
     return html`
       <ion-header>
         <ion-toolbar>
           <ion-title
-            size="large"
             role="heading"
             aria-level="1"
             aria-live="polite"
