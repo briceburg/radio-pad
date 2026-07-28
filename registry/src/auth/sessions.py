@@ -80,10 +80,12 @@ class AccessTokens:
 
     @staticmethod
     def identity_from_oidc(token: RegistryIDToken) -> AuthenticatedIdentity:
+        if token.auth_time is not None and token.auth_time > token.iat:
+            raise SessionError("Invalid OIDC authentication time")
         return AuthenticatedIdentity(
             issuer=token.iss,
             subject=token.sub,
-            authenticated_at=token.iat,
+            authenticated_at=token.auth_time if token.auth_time is not None else token.iat,
             expires_at=token.exp,
             email=token.email,
             email_verified=token.email_verified is True,

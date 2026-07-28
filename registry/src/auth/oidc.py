@@ -11,6 +11,7 @@ from fastapi_oidc.types import IDToken
 
 
 class RegistryIDToken(IDToken):
+    auth_time: int | None = None
     email: str | None = None
     email_verified: bool | None = None
     name: str | None = None
