@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  getControlTitleStatus,
+  getControlTitle,
   getStationVisualState,
   isControlDegraded,
   RadioPlayerTab,
@@ -35,17 +35,17 @@ describe("radio-player-tab", () => {
     ).toBe(true);
   });
 
-  it("derives control title status from connection and retained statuses", () => {
+  it("derives a complete control title from controller state", () => {
     expect(
-      getControlTitleStatus({
+      getControlTitle({
         playerConnected: false,
         resourceStatuses: {
           registry: { level: "warning", summary: "Registry unavailable." },
         },
       }),
-    ).toBe("Offline");
+    ).toBe("Waiting for Player");
     expect(
-      getControlTitleStatus({
+      getControlTitle({
         connectionState: "connected",
         player: { name: "Living Room" },
         resourceStatuses: {
@@ -57,11 +57,51 @@ describe("radio-player-tab", () => {
       }),
     ).toBe("RadioDial unavailable.");
     expect(
-      getControlTitleStatus({
+      getControlTitle({
         connectionState: "unauthorized",
         connectionMessage: "Session expired—sign in again.",
       }),
     ).toBe("Session expired—sign in again.");
+    expect(
+      getControlTitle({
+        connectionState: "connected",
+        playerConnected: true,
+        player: { name: "Living Room" },
+        radioDial: { name: "iCEBURG Radio" },
+        currentStation: "WWOZ",
+        resourceStatuses: {
+          registry: {
+            level: "warning",
+            summary: "Registry unavailable.",
+          },
+        },
+      }),
+    ).toBe("WWOZ");
+  });
+
+  it("matches Macropad playback and loading title transitions", () => {
+    const ready = {
+      connectionState: "connected",
+      playerConnected: true,
+      player: { name: "Living Room" },
+      radioDial: { name: "iCEBURG Radio" },
+    };
+
+    expect(getControlTitle({ ...ready, requestedStation: "WWOZ" })).toBe(
+      "Starting WWOZ",
+    );
+    expect(getControlTitle({ ...ready, currentStation: "WWOZ" })).toBe("WWOZ");
+    expect(getControlTitle({ ...ready, failedStation: "WWOZ" })).toBe(
+      "Failed WWOZ",
+    );
+    expect(getControlTitle(ready)).toBe("Living Room");
+    expect(
+      getControlTitle({
+        ...ready,
+        radioDial: null,
+        loading: true,
+      }),
+    ).toBe("Loading RadioDial");
   });
 
   it("derives station visual states", () => {
@@ -120,7 +160,8 @@ describe("radio-player-tab", () => {
 
     const title = element.querySelector("ion-title");
     const station = element.querySelector("ion-button[aria-pressed]");
-    expect(title.textContent.trim()).toBe("Living Room: KEXP");
+    expect(title.textContent.trim()).toBe("KEXP");
+    expect(title.hasAttribute("size")).toBe(false);
     expect(title.getAttribute("aria-level")).toBe("1");
     expect(title.getAttribute("aria-live")).toBe("polite");
     expect(element.querySelector('[role="status"]')).toBeNull();
@@ -139,7 +180,7 @@ describe("radio-player-tab", () => {
     });
     await element.updateComplete;
 
-    expect(title.textContent.trim()).toBe("Living Room: Starting KEXP...");
+    expect(title.textContent.trim()).toBe("Starting KEXP");
     expect(station.getAttribute("color")).toBe("warning");
     expect(station.getAttribute("fill")).toBe("outline");
     expect(station.getAttribute("aria-busy")).toBe("true");
@@ -152,7 +193,7 @@ describe("radio-player-tab", () => {
     });
     await element.updateComplete;
 
-    expect(title.textContent.trim()).toBe("Living Room: Failed KEXP");
+    expect(title.textContent.trim()).toBe("Failed KEXP");
     expect(station.getAttribute("color")).toBe("danger");
     expect(station.getAttribute("aria-invalid")).toBe("true");
 
