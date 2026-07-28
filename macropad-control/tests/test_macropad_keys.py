@@ -7,9 +7,12 @@ from lib import macropad_keys
 from lib.macropad_keys import SKELETON_ANIMATION_TIMEOUT_MS, MacropadKeys
 from lib.macropad_state import MacropadState
 
-CONTROLLER_TITLE_CASES = json.loads(
+CONTROLLER_TITLE_CONTRACT = json.loads(
     (Path(__file__).resolve().parents[2] / "shared" / "controller-title-cases.json").read_text()
 )
+CONTROLLER_TITLE_CASES = [
+    {**CONTROLLER_TITLE_CONTRACT["defaults"], **title_case} for title_case in CONTROLLER_TITLE_CONTRACT["cases"]
+]
 
 
 class FakePixels:
