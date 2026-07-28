@@ -60,9 +60,13 @@ def build_client(store: DataStore, auth_services: AuthServices | None = None) ->
     app = create_app(profiles=["api"])
     app.dependency_overrides[get_store] = lambda: store
     app.state.store = store
-    app.state.auth = auth_services or AuthServices(authenticate_user=None, authz_store=None)
+    app.state.auth = auth_services or AuthServices(
+        authenticate_oidc=None,
+        authz_store=None,
+        access_tokens=None,
+    )
     return TestClient(
         app,
         raise_server_exceptions=False,
-        base_url=f"http://testserver{API_PREFIX}/",
+        base_url=f"https://testserver{API_PREFIX}/",
     )

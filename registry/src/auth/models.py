@@ -6,9 +6,11 @@ from pydantic import BaseModel
 class AuthenticatedIdentity(BaseModel):
     issuer: str
     subject: str
+    authenticated_at: int
     expires_at: int | None = None
     email: str | None = None
     email_verified: bool = False
+    name: str | None = None
 
     @property
     def subject_key(self) -> str:

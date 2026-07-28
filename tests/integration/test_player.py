@@ -25,11 +25,12 @@ async def wait_for_event(ws, event_name, predicate=None, timeout=15):
 
 
 @pytest.mark.asyncio
-async def test_real_player_processes_playback_commands(switchboard_url):
+async def test_real_player_processes_playback_commands(switchboard_url, registry_session):
     controller_url = f"{switchboard_url}/{PLAYER_ROOM}"
+    token = registry_session.json()["access_token"] if registry_session else None
 
     async with websockets.connect(controller_url) as controller:
-        await controller.send(json.dumps({"event": "authenticate", "data": {"token": None}}))
+        await controller.send(json.dumps({"event": "authenticate", "data": {"token": token}}))
         await wait_for_event(controller, "authenticated")
         await controller.send(json.dumps({"event": "playback_start", "data": {"call_sign": "WWOZ"}}))
 

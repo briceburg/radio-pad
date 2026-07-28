@@ -13,6 +13,7 @@ from fastapi_oidc.types import IDToken
 class RegistryIDToken(IDToken):
     email: str | None = None
     email_verified: bool | None = None
+    name: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -10,7 +11,7 @@ from moto import mock_aws
 from pydantic import ValidationError
 
 from auth import AuthenticatedIdentity
-from authz import AccountOwners, AuthzStore
+from authz import AccountOwners, AuthzStore, SessionRevocations
 from datastore import DataStore
 from datastore.backends import GitBackend, LocalBackend, S3Backend
 from datastore.core import ObjectStore, storage_json
@@ -23,6 +24,7 @@ def _identity(subject: str, email: str) -> AuthenticatedIdentity:
     return AuthenticatedIdentity(
         issuer="https://issuer.example",
         subject=subject,
+        authenticated_at=1_700_000_000,
         email=email,
         email_verified=True,
     )
@@ -227,6 +229,40 @@ def test_authz_store_observes_external_s3_change(s3_authz: tuple[AuthzStore, Any
     assert store.is_account_owner("briceburg", _identity("second", "second@example.com"))
 
 
+def test_session_revocations_support_global_and_user_cutoffs() -> None:
+    identity = _identity("user-123", "owner@example.com")
+    before_authentication = datetime.fromtimestamp(identity.authenticated_at - 1, tz=UTC)
+    at_authentication = datetime.fromtimestamp(identity.authenticated_at, tz=UTC)
+
+    assert SessionRevocations(revoked_before=before_authentication).allows(identity)
+    assert not SessionRevocations(revoked_before=at_authentication).allows(identity)
+    assert not SessionRevocations(subjects={identity.subject_key: at_authentication}).allows(identity)
+    assert not SessionRevocations(emails={"OWNER@EXAMPLE.COM": at_authentication}).allows(identity)
+    assert SessionRevocations(subjects={"oidc:https://issuer.example:other": at_authentication}).allows(identity)
+
+
+def test_session_revocations_are_cached_and_saved_values_invalidate_cache(tmp_path: Path) -> None:
+    now = [10.0]
+    backend = LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz")
+    store = AuthzStore(backend=backend, cache_ttl_seconds=5, cache_clock=lambda: now[0])
+    identity = _identity("user-123", "owner@example.com")
+    cutoff = datetime.fromtimestamp(identity.authenticated_at, tz=UTC)
+
+    assert store.is_session_allowed(identity)
+    backend.save(
+        "session-revocations",
+        SessionRevocations(revoked_before=cutoff).model_dump(mode="json", exclude={"id"}),
+        "policies",
+    )
+    assert store.is_session_allowed(identity)
+
+    now[0] = 15.0
+    assert not store.is_session_allowed(identity)
+
+    store.save_session_revocations(SessionRevocations())
+    assert store.is_session_allowed(identity)
+
+
 def test_checked_in_account_owners_are_seeded(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("REGISTRY_SEED_DATA_PATH", str(BASE_DIR / "seed-data"))
     store = AuthzStore(backend=LocalBackend(base_path=str(tmp_path / "authz"), prefix="authz"))
@@ -240,3 +276,4 @@ def test_checked_in_account_owners_are_seeded(monkeypatch: MonkeyPatch, tmp_path
         id="community",
         emails=["briceburg@gmail.com"],
     )
+    assert store.get_session_revocations() == SessionRevocations()

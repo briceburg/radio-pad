@@ -19,7 +19,7 @@ The registry defaults to `https://registry.radiopad.dev/api/`. An explicit playe
 
 Standalone builds read the Google Web client ID from `VITE_GOOGLE_CLIENT_ID`; Vite embeds it at build time, so set it before building or syncing Capacitor. Register `http://localhost:5173` and `https://remote.radiopad.dev` as authorized JavaScript origins, with their trailing-slash forms as redirect URIs. Compose uses `GOOGLE_CLIENT_ID` from the root `.env`; see the root [Google sign-in setup](../README.md#google-sign-in).
 
-Authentication follows the registry's runtime status. Public discovery and tokenless control remain available when authentication is disabled; authorization failures stop reconnecting and remain visible in the Control title. The `.env.example` also documents optional web-only switchboard and OAuth redirect overrides.
+Authentication follows the registry's runtime status. After Google sign-in, the registry keeps a rolling 30-day session and the remote keeps only its short-lived access token in memory; opening or actively using the app refreshes both. Public discovery and tokenless control remain available when authentication is disabled, and authorization failures remain visible in the Control title.
 
 ### Web
 
@@ -118,6 +118,8 @@ Set `GOOGLE_IOS_CLIENT_ID` and `GOOGLE_IOS_REVERSED_CLIENT_ID`, then build, sync
 ```sh
 ./bin/ios
 ```
+
+The native project lists `registry.radiopad.dev` as an app-bound domain so its shared cookie-based registry session can work on iOS. The installed PWA remains the recommended iOS distribution.
 
 ## License
 

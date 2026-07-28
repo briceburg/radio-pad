@@ -200,7 +200,7 @@ export function createSettingsActions({
       await prefs.init();
       preferencesStore.set({ definitions: prefs.getSnapshot() });
 
-      const isOauthCallback = await auth.init();
+      const isOauthCallback = await auth.init(await prefs.get("registryUrl"));
       if (!auth.signedIn) {
         await sync();
       }
@@ -231,6 +231,9 @@ export function createSettingsActions({
         return { status, results };
       }
 
+      if (results.registryUrl?.status === "applied") {
+        await auth.useRegistry(results.registryUrl.value);
+      }
       await syncAfterCurrent("accounts", {
         fromSettingsSave: true,
         invalidDependentSelection:

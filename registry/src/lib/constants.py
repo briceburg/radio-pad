@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # API version (GitHub-style date-based versioning)
-API_VERSION = "2026-06-27"
+API_VERSION = "2026-07-27"
 
 # Active service profiles (comma-separated: "api", "switchboard", or both)
 PROFILES = [

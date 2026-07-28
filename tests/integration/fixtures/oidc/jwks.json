@@ -1,0 +1,11 @@
+{
+  "keys": [
+    {
+      "alg": "HS256",
+      "k": "cmFkaW8tcGFkLWludGVncmF0aW9uLW9pZGMtc2VjcmV0",
+      "kid": "integration",
+      "kty": "oct",
+      "use": "sig"
+    }
+  ]
+}

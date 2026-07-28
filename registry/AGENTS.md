@@ -40,10 +40,11 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 ## Auth and seeding conventions
 
-- Write and player-control auth verifies OIDC bearer tokens against a configured client-id allowlist; registry API reads are currently unauthenticated.
+- Write and player-control auth exchanges a verified OIDC ID token for a rolling session and short-lived registry bearer token; registry API reads are currently unauthenticated.
 - Authz data uses the same local, S3, and Git implementations as registry data. It inherits the data backend's physical configuration when the backend types match; `REGISTRY_AUTHZ_BACKEND_*` values configure only what differs.
 - Authz data may share the registry backend unless that backend is public; authz documents must remain private.
 - Keep OIDC authentication under `src/auth/` and persisted authorization models and stores under `src/authz/`.
+- Keep session invalidation in the authz backend and cache shared policy reads rather than adding per-session storage.
 - Checked-in seed data lives under `seed-data/`, with:
   - `data/...` for registry seeds
   - `authz/...` for authz seeds
