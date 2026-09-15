@@ -14,6 +14,25 @@ def test_radio_dial_resolves_current_station_definitions(radio_dial_api: RadioDi
     assert dial["stations"][0]["stream_url"] == "https://www.wwoz.org/listen/hi"
 
 
+def test_resolved_radio_dial_etag_tracks_linked_station_updates(client: TestClient) -> None:
+    url = "accounts/community/radio-dials/briceburg"
+    initial = client.get(url)
+
+    assert initial.headers["cache-control"] == "public, max-age=0, must-revalidate"
+    etag = initial.headers["etag"]
+    assert client.get(url, headers={"If-None-Match": etag}).status_code == 304
+
+    updated = client.put(
+        "accounts/community/stations/WWOZ",
+        json={"stream_url": "https://new.example/wwoz"},
+    )
+    assert updated.status_code == 200
+
+    refreshed = client.get(url, headers={"If-None-Match": etag})
+    assert refreshed.status_code == 200
+    assert refreshed.headers["etag"] != etag
+
+
 def test_radio_dial_can_mix_account_station_libraries(
     station_api: StationApi,
     radio_dial_api: RadioDialApi,

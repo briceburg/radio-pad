@@ -7,10 +7,14 @@ import boto3
 import pytest
 from _pytest.fixtures import SubRequest
 
-from datastore.core import ModelStore, seed_from_path, seedable
+from api.radio_dials import materialize_radio_dial, resolve_station_refs
+from datastore import DataStore
+from datastore.core import ModelStore, compute_etag, seed_from_path, seedable
 from datastore.core.interfaces import ObjectStore
 from datastore.exceptions import ConcurrencyError
 from models.account import Account, AccountSpec
+from models.radio_dial import RadioDialSpec
+from models.station import StationSpec
 
 
 @pytest.fixture(params=["json", "s3", "git"], ids=["json", "s3", "git"])
@@ -124,3 +128,25 @@ class TestObjectStoreContract:
         assert model is not None
         assert model.id == "seeded"
         assert model.name == "Seeded"
+
+    def test_linked_station_update_changes_resolved_radio_dial_revision(self, object_store: ObjectStore) -> None:
+        datastore = DataStore(backend=object_store)
+        datastore.stations.upsert(
+            "community",
+            "WWOZ",
+            StationSpec.model_validate({"stream_url": "https://example.test/old"}),
+        )
+        spec = RadioDialSpec(name="Community", stations=["community/WWOZ"])
+
+        def revision() -> str:
+            radio_dial = materialize_radio_dial("community/test", spec, resolve_station_refs(datastore, spec))
+            return compute_etag(radio_dial.model_dump(mode="json"))
+
+        initial = revision()
+        datastore.stations.upsert(
+            "community",
+            "WWOZ",
+            StationSpec.model_validate({"stream_url": "https://example.test/new"}),
+        )
+
+        assert revision() != initial

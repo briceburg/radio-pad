@@ -186,8 +186,12 @@ class MacropadClient(RadioPadClient):
             "summary": summary,
         }
         if level == "ok":
+            if scope not in self._status_by_scope:
+                return
             self._status_by_scope.pop(scope, None)
         else:
+            if self._status_by_scope.get(scope) == data:
+                return
             self._status_by_scope[scope] = data
         await self.broadcast("player_status", data=data)
 
@@ -203,6 +207,14 @@ class MacropadClient(RadioPadClient):
             await self._send(json.dumps({"event": "player_status", "data": status}))
 
     async def _handle_station_menu_request(self, event):
+        await self.publish_station_menu()
+        await asyncio.sleep(0.1)  # Handle backpressure
+        await self.broadcast("playback_state", limit_to_self=True)
+        await asyncio.sleep(0.1)
+        await self.resend_status()
+
+    async def publish_station_menu(self):
+        """Push the currently loaded station menu to the Macropad."""
         config = self.player.config
         if config is None:
             await self.resend_status("radio_dial")
@@ -213,10 +225,6 @@ class MacropadClient(RadioPadClient):
             data=[station.call_sign for station in config.stations],
             limit_to_self=True,
         )
-        await asyncio.sleep(0.1)  # Handle backpressure
-        await self.broadcast("playback_state", limit_to_self=True)
-        await asyncio.sleep(0.1)
-        await self.resend_status()
 
     async def close(self):
         self._closed = True

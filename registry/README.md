@@ -61,6 +61,7 @@ Registry resources are account-scoped:
 | `REGISTRY_GIT_FETCH_TTL_SECONDS` | Read fetch interval in seconds; writes always fetch. | `30` |
 | `REGISTRY_LOG_LEVEL` | Uvicorn log level. | `info` |
 | `REGISTRY_PROFILES` | Enabled roles: `api`, `switchboard`, or both. | `api,switchboard` |
+| `REGISTRY_RADIO_DIAL_REFRESH_SECONDS` | Interval for conditionally checking each unique active resolved RadioDial; `0` disables live refresh. | `30` |
 | `REGISTRY_SEED_DATA_PATH` | Root containing `data/` and `authz/` seeds. | `seed-data` |
 | `REGISTRY_SWITCHBOARD_PREFIX` | WebSocket routing prefix. | `/switchboard` |
 | `REGISTRY_URL` | Registry API URL used by a split switchboard. | `http://localhost:8000/api` |
@@ -132,7 +133,7 @@ Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
 Controllers must send `{"event":"authenticate","data":{"token":...}}` as their first message. The token is null when auth is disabled. The switchboard validates access and replies with `authenticated` before subscribing the controller, replaying state, or accepting commands. It closes rejected and expired sessions with WebSocket policy code `1008`. Bearer tokens are never placed in switchboard URLs.
 
-The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_url`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
+The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_state`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. `radio_dial_state` contains the running player's source URL and resolved-resource ETag. The switchboard conditionally checks each unique active Registry RadioDial rather than polling per player; when an ETag changes, it broadcasts the new state to every player room using that dial. Because the ETag covers the fully resolved resource, updating a linked Station changes every referencing active RadioDial across local, S3, and Git data backends. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
 ## Authentication and authz
 

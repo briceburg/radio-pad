@@ -13,6 +13,7 @@ import websockets
 PLAYER_HEADERS = {
     "User-Agent": "RadioPad/1.0 (integration-test)",
     "RadioPad-Radio-Dial-Url": "http://example.com/radio-dial.json",
+    "RadioPad-Radio-Dial-Revision": '"integration-v1"',
 }
 REGISTERED_PLAYER_ROOM = "briceburg/living-room"
 
@@ -22,8 +23,9 @@ async def test_player_connect(switchboard_url):
     """Player can connect, send ping, receive pong."""
     async with websockets.connect(f"{switchboard_url}/test-acct/player1", additional_headers=PLAYER_HEADERS) as ws:
         await ws.send(json.dumps({"event": "ping"}))
-        resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert resp["event"] == "pong"
+        async with asyncio.timeout(5):
+            while json.loads(await ws.recv())["event"] != "pong":
+                pass
 
 
 @pytest.mark.asyncio

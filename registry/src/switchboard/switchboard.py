@@ -7,13 +7,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketExceptio
 
 from auth.socket_auth import validate_socket_client
 from switchboard.broadcast import Broadcast
+from switchboard.radio_dials import RadioDialWatcher
 
 router = APIRouter()
 logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
 AUTHENTICATION_REQUIRED_REASON = "Authentication required"
 CONTROLLER_AUTH_TIMEOUT_SECONDS = 10
-RETAINED_EVENTS = {"radio_dial_url", "player_presence", "playback_state"}
+RETAINED_EVENTS = {"radio_dial_state", "player_presence", "playback_state"}
 PLAYER_STATUS_SCOPES = {"radio_dial", "switchboard", "playback"}
 PLAYER_COMMAND_EVENTS = {
     "playback_start",
@@ -105,7 +106,7 @@ async def _run_loop(
     expires_at: int | None = None,
 ) -> None:
     async def sender() -> None:
-        async with broadcast.subscribe(player_key, replay=not is_player) as subscriber:
+        async with broadcast.subscribe(player_key, replay=True) as subscriber:
             async for event in subscriber:
                 try:
                     await websocket.send_text(event.message)
@@ -161,11 +162,13 @@ async def websocket_endpoint(
     is_player = user_agent.startswith(PLAYER_USER_AGENT_PREFIX)
     player_key = f"{account_id}/{player_id}"
     radio_dial_url: str | None = None
+    radio_dial_revision: str | None = None
 
     if is_player:
         radio_dial_url = websocket.headers.get("RadioPad-Radio-Dial-Url")
-        if not radio_dial_url:
-            await websocket.close(code=4000, reason="RadioPad-Radio-Dial-Url header required")
+        radio_dial_revision = websocket.headers.get("RadioPad-Radio-Dial-Revision")
+        if not radio_dial_url or not radio_dial_revision:
+            await websocket.close(code=4000, reason="RadioDial URL and revision headers required")
             return
 
     await websocket.accept()
@@ -180,6 +183,7 @@ async def websocket_endpoint(
         logger.error("Broadcast not configured on app state")
         await websocket.close()
         return
+    radio_dial_watcher: RadioDialWatcher | None = getattr(websocket.app.state, "radio_dial_watcher", None)
 
     if is_player:
         if player_key in ACTIVE_PLAYER_CONNECTIONS:
@@ -189,6 +193,7 @@ async def websocket_endpoint(
 
     try:
         if is_player:
+            assert radio_dial_url is not None
             await publish_event(
                 broadcast,
                 player_key,
@@ -198,12 +203,16 @@ async def websocket_endpoint(
             await publish_event(
                 broadcast,
                 player_key,
-                "radio_dial_url",
-                radio_dial_url,
+                "radio_dial_state",
+                {"url": radio_dial_url, "revision": radio_dial_revision},
             )
+            if radio_dial_watcher:
+                radio_dial_watcher.register(radio_dial_url, player_key, radio_dial_revision)
         await _run_loop(websocket, broadcast, player_key, is_player=is_player, expires_at=expires_at)
     finally:
         if is_player:
+            if radio_dial_watcher and radio_dial_url:
+                radio_dial_watcher.unregister(radio_dial_url, player_key)
             ACTIVE_PLAYER_CONNECTIONS.discard(player_key)
             broadcast.clear_state(player_key)
             await publish_event(

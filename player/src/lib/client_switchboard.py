@@ -21,21 +21,33 @@ class SwitchboardClient(RadioPadClient):
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[], None] | None = None,
         status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None,
+        radio_dial_reloader: Callable[[str, str], Awaitable[None]] | None = None,
     ):
         super().__init__(player)
         config = player.config
         if config is None:
             raise RuntimeError("SwitchboardClient requires loaded player configuration")
+        if config.radio_dial_revision is None:
+            raise RuntimeError("SwitchboardClient requires a RadioDial revision")
 
         self.url = config.switchboard_url
         self.ws: Any | None = None
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
         self.status_reporter = status_reporter
+        self.radio_dial_reloader = radio_dial_reloader
+        self._radio_dial_task: asyncio.Task[None] | None = None
         self._connected = False
         self._closing = False
 
-        self.http_headers = http_client_headers({"RadioPad-Radio-Dial-Url": config.radio_dial_url})
+        self.http_headers = http_client_headers(
+            {
+                "RadioPad-Radio-Dial-Url": config.radio_dial_url,
+                "RadioPad-Radio-Dial-Revision": config.radio_dial_revision,
+            }
+        )
+        if radio_dial_reloader:
+            self.register_event("radio_dial_state", self._handle_radio_dial_state)
 
     async def run(self):
         if not self.url:
@@ -96,6 +108,32 @@ class SwitchboardClient(RadioPadClient):
         if self.ws:
             await self.ws.send(message)
 
+    async def _handle_radio_dial_state(self, event):
+        data = event.get("data")
+        url = data.get("url") if isinstance(data, dict) else None
+        revision = data.get("revision") if isinstance(data, dict) else None
+        if not isinstance(url, str) or not isinstance(revision, str):
+            logger.warning("ignoring invalid radio_dial_state")
+            return
+        config = self.player.config
+        if config and config.radio_dial_url == url and config.radio_dial_revision == revision:
+            return
+        if self._radio_dial_task:
+            self._radio_dial_task.cancel()
+            await asyncio.gather(self._radio_dial_task, return_exceptions=True)
+        self._radio_dial_task = asyncio.create_task(
+            self._reload_radio_dial(url, revision),
+            name="radio-dial-reload",
+        )
+
+    async def _reload_radio_dial(self, url, revision):
+        if self.radio_dial_reloader:
+            await self.radio_dial_reloader(url, revision)
+            config = self.player.config
+            if config and config.radio_dial_revision:
+                self.http_headers["RadioPad-Radio-Dial-Url"] = config.radio_dial_url
+                self.http_headers["RadioPad-Radio-Dial-Revision"] = config.radio_dial_revision
+
     async def _report_status(self, level, summary):
         if self.status_reporter:
             await self.status_reporter(level, summary)
@@ -109,6 +147,9 @@ class SwitchboardClient(RadioPadClient):
 
     async def close(self):
         self._closing = True
+        if self._radio_dial_task:
+            self._radio_dial_task.cancel()
+            await asyncio.gather(self._radio_dial_task, return_exceptions=True)
         if self.ws:
             self._connected = False
             await self.ws.close()

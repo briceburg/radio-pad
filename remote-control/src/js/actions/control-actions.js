@@ -72,6 +72,7 @@ export function createControlActions({ localPlayback, control }) {
   const updateTab = (tabName, state) => patchStore(getTabStore(tabName), state);
 
   const radioDialLoads = { control: null, listen: null };
+  const radioDialRevisions = { control: null, listen: null };
 
   function abortRadioDialLoad(tabName) {
     const load = radioDialLoads[tabName];
@@ -89,9 +90,10 @@ export function createControlActions({ localPlayback, control }) {
     });
   }
 
-  async function loadRadioDial(url, tabName = "control") {
+  async function loadRadioDial(url, tabName = "control", revision = null) {
     if (!url) {
       abortRadioDialLoad(tabName);
+      radioDialRevisions[tabName] = null;
       updateTab(tabName, {
         radioDial: null,
         currentStation: null,
@@ -102,6 +104,9 @@ export function createControlActions({ localPlayback, control }) {
       return null;
     }
 
+    if (revision && radioDialRevisions[tabName] === revision) {
+      return getTabStore(tabName).get().radioDial;
+    }
     if (radioDialLoads[tabName]?.url === url) return null;
 
     abortRadioDialLoad(tabName);
@@ -111,7 +116,10 @@ export function createControlActions({ localPlayback, control }) {
     updateTab(tabName, { loading: true });
 
     try {
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, {
+        cache: "no-cache",
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
 
       const radioDial = parseRadioDial(await response.json());
@@ -123,6 +131,7 @@ export function createControlActions({ localPlayback, control }) {
       }
 
       updateTab(tabName, { radioDial, loading: false });
+      radioDialRevisions[tabName] = response.headers?.get?.("etag") || revision;
       radioDialLoads[tabName] = null;
       return radioDial;
     } catch (error) {
@@ -185,9 +194,13 @@ export function createControlActions({ localPlayback, control }) {
       failedStation: event.detail.failedCallSign,
     }),
   );
-  control.addEventListener("radiodialurl", (event) => {
+  control.addEventListener("radiodialstate", (event) => {
     const player = controlStore.get().player;
-    loadRadioDial(resolveReportedRadioDialUrl(player, event.detail), "control");
+    loadRadioDial(
+      resolveReportedRadioDialUrl(player, event.detail.url),
+      "control",
+      event.detail.revision,
+    );
   });
   control.addEventListener("playerpresence", (event) => {
     const connected = event.detail?.connected === true;
@@ -243,6 +256,7 @@ export function createControlActions({ localPlayback, control }) {
         control.disconnect();
         return;
       }
+      radioDialRevisions.control = null;
       const token = authStore.get()?.registryBearerToken || null;
       control.connect(player.switchboard_url, token);
       await loadRadioDial(player.configured_radio_dial_url, "control");

@@ -33,7 +33,12 @@ from switchboard.switchboard import (
 
 PLAYER_UA = "RadioPad/1.0 (test)"
 PLAYER_RADIO_DIAL_URL = "http://example.com/radio-dial.json"
-PLAYER_HEADERS = {"User-Agent": PLAYER_UA, "RadioPad-Radio-Dial-Url": PLAYER_RADIO_DIAL_URL}
+PLAYER_RADIO_DIAL_REVISION = '"radio-dial-v1"'
+PLAYER_HEADERS = {
+    "User-Agent": PLAYER_UA,
+    "RadioPad-Radio-Dial-Url": PLAYER_RADIO_DIAL_URL,
+    "RadioPad-Radio-Dial-Revision": PLAYER_RADIO_DIAL_REVISION,
+}
 
 
 def _close_player(ws: WebSocketTestSession, player_key: str = "acct/player1") -> None:
@@ -51,6 +56,7 @@ def switchboard_client() -> Generator[TestClient]:
     ACTIVE_PLAYER_CONNECTIONS.clear()
     app = create_app(profiles=["switchboard"])
     with TestClient(app) as client:
+        app.state.radio_dial_watcher = None
         yield client
     ACTIVE_PLAYER_CONNECTIONS.clear()
 
@@ -63,6 +69,15 @@ def test_player_requires_radio_dial_url_header(switchboard_client: TestClient) -
         with switchboard_client.websocket_connect(
             "switchboard/acct/player1",
             headers={"User-Agent": PLAYER_UA},
+        ):
+            pass
+
+
+def test_player_requires_radio_dial_revision_header(switchboard_client: TestClient) -> None:
+    with pytest.raises(WebSocketDisconnect):
+        with switchboard_client.websocket_connect(
+            "switchboard/acct/player1",
+            headers={"User-Agent": PLAYER_UA, "RadioPad-Radio-Dial-Url": PLAYER_RADIO_DIAL_URL},
         ):
             pass
 
@@ -150,6 +165,7 @@ def test_authenticated_controller_receives_retained_player_state(tmp_path: Path)
     )
 
     with TestClient(app) as client:
+        app.state.radio_dial_watcher = None
         with client.websocket_connect("/switchboard/testuser1/player1", headers=PLAYER_HEADERS) as player:
             player.send_json({"event": "playback_state", "data": {"call_sign": "KEXP"}})
             player.send_json({"event": "ping"})
@@ -162,9 +178,15 @@ def test_authenticated_controller_receives_retained_player_state(tmp_path: Path)
                     "event": "authenticated",
                     "data": {"expires_at": access.expires_at},
                 }
-                while (message := controller.receive_json()).get("event") != "playback_state":
-                    pass
-                assert message["data"] == {"call_sign": "KEXP"}
+                retained: dict[str, object] = {}
+                while not {"playback_state", "radio_dial_state"}.issubset(retained):
+                    message = controller.receive_json()
+                    retained[message["event"]] = message["data"]
+                assert retained["playback_state"] == {"call_sign": "KEXP"}
+                assert retained["radio_dial_state"] == {
+                    "url": PLAYER_RADIO_DIAL_URL,
+                    "revision": PLAYER_RADIO_DIAL_REVISION,
+                }
 
             with client.websocket_connect("/switchboard/testuser1/player1") as signed_out:
                 signed_out.send_json({"event": "authenticate", "data": {"token": None}})
@@ -215,7 +237,8 @@ def test_ignored_messages_keep_connection_open(switchboard_client: TestClient, m
     with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as ws:
         ws.send_text(message)
         ws.send_json({"event": "ping"})
-        resp = ws.receive_json()
+        while (resp := ws.receive_json())["event"] != "pong":
+            pass
         assert resp["event"] == "pong"
         _close_player(ws)
 

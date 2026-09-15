@@ -15,7 +15,7 @@ npm ci
 cp .env.example .env
 ```
 
-The registry defaults to `https://registry.radiopad.dev/api/`. An explicit player `switchboard_url` takes precedence; otherwise the remote infers a same-origin `/switchboard/{account}/{player}` URL before applying the web-only `VITE_SWITCHBOARD_URL` override.
+The registry defaults to `https://registry.radiopad.dev/api/`. An explicit player `switchboard_url` takes precedence; otherwise the remote infers a same-origin `/switchboard/{account}/{player}` URL before applying the web-only `VITE_SWITCHBOARD_URL` override. The Control tab tracks the revision in retained `radio_dial_state`, ignores revisions it already loaded, and revalidates the resource when the switchboard reports a change.
 
 Standalone builds read the Google Web client ID from `VITE_GOOGLE_CLIENT_ID`; Vite embeds it at build time, so set it before building or syncing Capacitor. Register `http://localhost:5173` and `https://remote.radiopad.dev` as authorized JavaScript origins, with their trailing-slash forms as redirect URIs. Compose uses `GOOGLE_CLIENT_ID` from the root `.env`; see the root [Google sign-in setup](../README.md#google-sign-in).
 

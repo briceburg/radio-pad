@@ -57,6 +57,32 @@ async def _load_config_with_retry(player, macropad_client, settings, shutdown_ev
     return None
 
 
+async def _reload_radio_dial(player, macropad_client, radio_dial_url, revision):
+    while True:
+        current_config = player.config
+        if current_config is None or (
+            current_config.radio_dial_url == radio_dial_url and current_config.radio_dial_revision == revision
+        ):
+            return
+        try:
+            refreshed_config = await config.load_radio_dial(radio_dial_url, current_config.switchboard_url)
+        except Exception as e:
+            expected = isinstance(e, ConfigError)
+            logger.warning("RadioDial reload failed: %s", e, exc_info=not expected)
+            summary = e.status_summary if isinstance(e, ConfigError) else "Registry unavailable"
+            await macropad_client.publish_status("radio_dial", "warning", summary)
+            await asyncio.sleep(CONFIG_RETRY_SECONDS)
+            continue
+
+        stations_changed = refreshed_config.stations != current_config.stations
+        player.update_config(refreshed_config)
+        if stations_changed:
+            await macropad_client.publish_station_menu()
+        await macropad_client.publish_status("radio_dial", "ok", None)
+        logger.info("Reloaded RadioDial revision %s from %s", refreshed_config.radio_dial_revision, radio_dial_url)
+        return
+
+
 def _install_sigterm_handler(shutdown_event):
     loop = asyncio.get_running_loop()
 
@@ -93,6 +119,7 @@ async def main(player, macropad_client, settings, health_path):
                     macropad_client.publish_status,
                     "switchboard",
                 ),
+                radio_dial_reloader=partial(_reload_radio_dial, player, macropad_client),
             )
             player.register_client(switchboard_client)
             tasks.append(

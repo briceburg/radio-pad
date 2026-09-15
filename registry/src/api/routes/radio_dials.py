@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response, status
 
+from datastore.core import compute_etag
 from lib.keys import join_key
 from models import RadioDial, RadioDialSpec, RadioDialSummary
 
@@ -37,11 +38,13 @@ async def register_radio_dial(
 
 
 @router.get("/{radio_dial_id}", response_model=RadioDial, response_model_exclude_none=True)
-async def get_radio_dial(
+def get_radio_dial(
     account_id: AccountId,
     radio_dial_id: RadioDialId,
     ds: DS,
-) -> RadioDial:
+    request: Request,
+    response: Response,
+) -> RadioDial | Response:
     stored = get_or_404(
         ds.radio_dials.get(radio_dial_id, path_params={"account_id": account_id}),
         "RadioDial not found",
@@ -49,7 +52,16 @@ async def get_radio_dial(
         radio_dial_id=radio_dial_id,
     )
     stations = resolve_station_refs(ds, stored)
-    return materialize_radio_dial(join_key(account_id, radio_dial_id), stored, stations)
+    radio_dial = materialize_radio_dial(join_key(account_id, radio_dial_id), stored, stations)
+    etag = f'"{compute_etag(radio_dial.model_dump(mode="json"))}"'
+    headers = {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "ETag": etag,
+    }
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    response.headers.update(headers)
+    return radio_dial
 
 
 @router.get("/", response_model=PaginatedList[RadioDialSummary], response_model_exclude_none=True)

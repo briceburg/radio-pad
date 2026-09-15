@@ -67,6 +67,7 @@ describe("control-actions", () => {
     };
     global.fetch.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn(() => '"v1"') },
       json: async () => radioDial,
     });
 
@@ -75,7 +76,10 @@ describe("control-actions", () => {
     expect(control.connect).toHaveBeenCalledWith(PLAYER.switchboard_url, null);
     expect(global.fetch).toHaveBeenCalledWith(
       PLAYER.configured_radio_dial_url,
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      expect.objectContaining({
+        cache: "no-cache",
+        signal: expect.any(AbortSignal),
+      }),
     );
     expect(controlStore.get()).toMatchObject({
       player: PLAYER,
@@ -124,38 +128,72 @@ describe("control-actions", () => {
     const selection = actions.selectPlayer(PLAYER);
     await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledOnce());
     control.dispatchEvent(
-      new CustomEvent("radiodialurl", {
-        detail:
-          "http://registry:1980/api/accounts/community/radio-dials/briceburg",
+      new CustomEvent("radiodialstate", {
+        detail: {
+          url: "http://registry:1980/api/accounts/community/radio-dials/briceburg",
+          revision: '"v1"',
+        },
       }),
     );
 
     expect(global.fetch).toHaveBeenCalledOnce();
     resolveFetch({
       ok: true,
+      headers: { get: vi.fn(() => '"v1"') },
       json: async () => ({ name: "Empty", stations: [] }),
     });
     await selection;
   });
 
-  it("loads a different RadioDial reported by the running player", async () => {
+  it("ignores retained RadioDial state at the loaded revision", async () => {
     const { actions, control } = createActions();
     global.fetch.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn(() => '"v1"') },
       json: async () => ({ name: "Empty", stations: [] }),
     });
-    const reportedUrl =
-      "https://player.test/accounts/briceburg/radio-dials/alternate";
 
     await actions.selectPlayer(PLAYER);
     control.dispatchEvent(
-      new CustomEvent("radiodialurl", { detail: reportedUrl }),
+      new CustomEvent("radiodialstate", {
+        detail: {
+          url: PLAYER.configured_radio_dial_url,
+          revision: '"v1"',
+        },
+      }),
+    );
+
+    expect(global.fetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["new revision of the same", PLAYER.configured_radio_dial_url],
+    [
+      "different",
+      "https://player.test/accounts/briceburg/radio-dials/alternate",
+    ],
+  ])("loads the %s RadioDial state", async (_case, url) => {
+    const { actions, control } = createActions();
+    global.fetch.mockResolvedValue({
+      ok: true,
+      headers: { get: vi.fn(() => '"v1"') },
+      json: async () => ({ name: "Empty", stations: [] }),
+    });
+
+    await actions.selectPlayer(PLAYER);
+    control.dispatchEvent(
+      new CustomEvent("radiodialstate", {
+        detail: { url, revision: '"v2"' },
+      }),
     );
 
     await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     expect(global.fetch).toHaveBeenLastCalledWith(
-      reportedUrl,
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      url,
+      expect.objectContaining({
+        cache: "no-cache",
+        signal: expect.any(AbortSignal),
+      }),
     );
   });
 

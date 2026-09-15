@@ -56,3 +56,44 @@ async def test_real_player_processes_playback_commands(switchboard_url, registry
             predicate=lambda data: data == IDLE,
         )
         assert stopped["data"] == IDLE
+
+
+@pytest.mark.asyncio
+async def test_real_player_broadcasts_live_radio_dial_refresh(
+    http,
+    registry_url,
+    switchboard_url,
+    registry_session,
+):
+    controller_url = f"{switchboard_url}/{PLAYER_ROOM}"
+    token = registry_session.json()["access_token"] if registry_session else None
+    auth_headers = {"Authorization": f"Bearer {token}"} if token else {}
+    station_url = f"{registry_url}/accounts/community/stations/WWOZ"
+    original_stream_url = http.get(station_url).json()["stream_url"]
+    updated_stream_url = f"{original_stream_url}?radio-pad-live-refresh-test=1"
+
+    def update_station(stream_url):
+        response = http.put(station_url, headers=auth_headers, json={"stream_url": stream_url})
+        assert response.status_code == 200
+
+    async with websockets.connect(controller_url) as controller:
+        await controller.send(json.dumps({"event": "authenticate", "data": {"token": token}}))
+        await wait_for_event(controller, "authenticated")
+        initial = await wait_for_event(controller, "radio_dial_state")
+
+        try:
+            update_station(updated_stream_url)
+            refreshed = await wait_for_event(
+                controller,
+                "radio_dial_state",
+                predicate=lambda data: data["revision"] != initial["data"]["revision"],
+            )
+            assert refreshed["data"]["url"].endswith("/accounts/community/radio-dials/briceburg")
+        finally:
+            update_station(original_stream_url)
+
+        await wait_for_event(
+            controller,
+            "radio_dial_state",
+            predicate=lambda data: data["revision"] != refreshed["data"]["revision"],
+        )

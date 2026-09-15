@@ -56,4 +56,5 @@ Guidance for coding agents working in `radio-pad/remote-control`.
 - Keep Settings edits as component-local drafts until explicit Save; account-dependent discovery and active Control changes occur only after Save.
 - Preserve the grouped Settings UI. Standard groups use `ion-item-group` + `ion-item-divider`; Advanced uses Ionic's `ion-accordion` within an item group.
 - Persist qualified RadioDial identities in preferences and derive resource URLs from the current registry URL. Do not persist URLs as RadioDial identity.
-- Treat `radio_dial_url` as the source URL reported by a running player. `configured_radio_dial_url` is the remote's initial URL derived from registry configuration. Retain the configured URL when both URLs identify the same RadioDial resource; a different running-player report may supersede it.
+- Treat `radio_dial_state.url` as the source URL reported by a running player. `configured_radio_dial_url` is the remote's initial URL derived from registry configuration. Retain the configured URL when both URLs identify the same RadioDial resource; a different running-player report may supersede it.
+- Use `radio_dial_state.revision` to ignore retained state already loaded and revalidate only when the resolved RadioDial ETag changes.

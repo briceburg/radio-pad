@@ -38,8 +38,19 @@ def test_unclassified_config_error_defaults_to_registry_unavailable():
     assert ConfigError("unclassified").status_summary == "Registry unavailable"
 
 
+def test_loaded_radio_dial_retains_http_revision():
+    radio_dial = {
+        "name": "Casa Briceburg",
+        "stations": [{"call_sign": "KEXP", "stream_url": "https://example.test/kexp"}],
+    }
+    with patch("lib.config.fetch_json_resource", AsyncMock(return_value=(radio_dial, '"v1"'))):
+        loaded = asyncio.run(config.load_radio_dial("https://registry.example.test/radio-dial"))
+
+    assert loaded.radio_dial_revision == '"v1"'
+
+
 def test_unavailable_radio_dial_reports_unavailable():
-    with patch("lib.config.fetch_json_url", AsyncMock(return_value=None)):
+    with patch("lib.config.fetch_json_resource", AsyncMock(return_value=(None, None))):
         assert_config_error_status(
             config.make(
                 player="briceburg/living-room",
@@ -68,7 +79,7 @@ def test_unavailable_radio_dial_reports_unavailable():
     ],
 )
 def test_malformed_radio_dial_reports_config_error(radio_dial):
-    with patch("lib.config.fetch_json_url", AsyncMock(return_value=radio_dial)):
+    with patch("lib.config.fetch_json_resource", AsyncMock(return_value=(radio_dial, None))):
         assert_config_error_status(
             config.make(
                 player="briceburg/living-room",

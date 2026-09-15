@@ -2,6 +2,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from functools import partial
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,8 +33,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     broadcast: Broadcast | None = None
     http_client = None
+    radio_dial_watcher = None
     if "switchboard" in profiles:
         import httpx2
+
+        from switchboard.radio_dials import RadioDialWatcher
+        from switchboard.switchboard import publish_event
 
         http_client = httpx2.AsyncClient(timeout=5.0)
         app.state.http_client = http_client
@@ -41,9 +46,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         broadcast = Broadcast()
         await broadcast.connect()
         app.state.broadcast = broadcast
+        refresh_seconds = float(os.environ.get("REGISTRY_RADIO_DIAL_REFRESH_SECONDS", "30"))
+        if refresh_seconds > 0:
+            radio_dial_watcher = RadioDialWatcher(
+                http_client,
+                partial(publish_event, broadcast),
+                refresh_seconds=refresh_seconds,
+            )
+            radio_dial_watcher.start()
+        app.state.radio_dial_watcher = radio_dial_watcher
 
     yield
 
+    if radio_dial_watcher:
+        await radio_dial_watcher.close()
     if broadcast:
         await broadcast.disconnect()
     if http_client:
@@ -133,6 +149,7 @@ class RegistryAPI(FastAPI):
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["ETag", "X-RadioPad-Api-Version"],
         )
         if "api" in self.state.profiles:
             self.add_middleware(

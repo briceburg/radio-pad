@@ -6,7 +6,7 @@ import pytest
 
 from switchboard.broadcast import Broadcast, Event
 
-RADIO_DIAL_EVENT = '{"event":"radio_dial_url","data":"http://example.com/dial"}'
+RADIO_DIAL_EVENT = '{"event":"radio_dial_state","data":{"url":"http://example.com/dial","revision":"v1"}}'
 PLAYING_KEXP = (
     '{"event":"playback_state","data":{"call_sign":"KEXP","requested_call_sign":null,"failed_call_sign":null}}'
 )
@@ -84,7 +84,7 @@ async def test_subscriber_iteration(broadcast: Broadcast) -> None:
 
 
 async def test_set_state_replayed_on_subscribe(broadcast: Broadcast) -> None:
-    broadcast.set_state("ch", "radio_dial_url", RADIO_DIAL_EVENT)
+    broadcast.set_state("ch", "radio_dial_state", RADIO_DIAL_EVENT)
     broadcast.set_state("ch", "playback_state", PLAYING_KEXP)
 
     async with broadcast.subscribe("ch", replay=True) as sub:
