@@ -4,6 +4,8 @@ set -eu
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 
+bash -n bin/*
+
 uv run --locked mypy src/ tests/
 uv run --locked ruff format --check src/ tests/
 uv run --locked ruff check src/ tests/

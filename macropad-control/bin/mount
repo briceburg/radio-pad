@@ -1,11 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target="/mnt/CIRCUITPY"
-disk="$(readlink -f /dev/disk/by-label/CIRCUITPY 2>/dev/null || true)"
+usage() {
+  echo "usage: bin/mount [--unmount] [CIRCUITPY|RPI-RP2]" >&2
+  exit 2
+}
 
+unmount=0
+if [ "${1:-}" = "--unmount" ]; then
+  unmount=1
+  shift
+fi
+
+label="${1:-CIRCUITPY}"
+[ "$#" -le 1 ] || usage
+case "$label" in
+  CIRCUITPY | RPI-RP2) ;;
+  *) usage ;;
+esac
+
+target="/mnt/$label"
+if [ "$unmount" -eq 1 ]; then
+  if mountpoint -q "$target"; then
+    sudo umount "$target"
+    echo "[ok] unmounted $target"
+  else
+    echo "[ok] $target is not mounted"
+  fi
+  exit 0
+fi
+
+disk="$(readlink -f "/dev/disk/by-label/$label" 2>/dev/null || true)"
 if [ -z "$disk" ]; then
-  echo "CIRCUITPY device not found; is the macropad attached?" >&2
+  echo "$label device not found; run bin/provision for a factory-new MacroPad" >&2
   exit 1
 fi
 

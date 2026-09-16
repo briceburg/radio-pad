@@ -33,7 +33,7 @@ mounted_device="$(readlink -f "$mounted_source" 2>/dev/null || true)"
 mount_options=",$(findmnt -nro OPTIONS --mountpoint "$target" 2>/dev/null || true),"
 
 if [ -z "$device" ]; then
-  fail "CIRCUITPY storage device not found"
+  fail "CIRCUITPY storage device not found; run bin/provision for a factory-new MacroPad"
 elif [ -z "$mounted_source" ]; then
   fail "$target is not mounted; run macropad-control/bin/mount"
 elif [ "$mounted_device" != "$device" ]; then
@@ -48,15 +48,17 @@ fi
 if [ -z "$repo_root" ]; then
   fail "not running from a git checkout"
 elif [ "$storage_ready" -ne 1 ]; then
-  warn "skipping firmware diff until CIRCUITPY is mounted read/write synchronously"
-elif [ ! -e "$target/boot.py" ] || [ ! -d "$target/lib" ] || [ ! -e "$target/main.py" ]; then
-  fail "firmware files are missing from $target; run bin/sync"
+  warn "skipping RadioPad code diff until CIRCUITPY is mounted read/write synchronously"
+elif [ ! -e "$target/boot.py" ] || [ ! -e "$target/main.py" ] || [ ! -d "$target/lib" ]; then
+  fail "RadioPad code is missing from $target; run bin/sync"
+elif [ -e "$target/code.py" ]; then
+  fail "$target/code.py overrides RadioPad main.py; run bin/sync"
 elif diff -q "$source_dir/boot.py" "$target/boot.py" >/dev/null &&
-  diff -qr "$source_dir/lib" "$target/lib" >/dev/null &&
+  diff -qr --exclude=__pycache__ "$source_dir/lib" "$target/lib" >/dev/null &&
   diff -q "$source_dir/main.py" "$target/main.py" >/dev/null; then
-  ok "firmware matches macropad-control/src"
+  ok "RadioPad code matches macropad-control/src"
 else
-  fail "firmware differs from macropad-control/src; run bin/sync"
+  fail "RadioPad code differs from macropad-control/src; run bin/sync"
 fi
 
 if command -v docker >/dev/null; then
