@@ -23,6 +23,8 @@ An internet radio player with physical, web, and mobile controllers that stay in
 
 This README covers the integrated repository. Each component README owns its standalone requirements, configuration, development workflow, and deployment guidance.
 
+Run the player directly on a development or general-purpose host with the [player guide](./player/). For a dedicated Raspberry Pi appliance, use the [provisioning guide](./player/deploy/raspberry-pi/) to install a systemd service with status, logs, restart, and update commands.
+
 ## Development
 
 Docker Compose is the supported way to run the complete system locally. The stack requires Compose v2; `bin/dev` host audio and USB integration targets Bash on Linux.

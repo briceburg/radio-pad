@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+set -eu
+
+resolver_debug="$(yt-dlp --verbose --simulate test: 2>&1)"
+
+case "$resolver_debug" in
+  *"yt_dlp_ejs-"*) ;;
+  *) echo "yt-dlp EJS challenge scripts are unavailable" >&2; exit 1 ;;
+esac
+
+case "$resolver_debug" in
+  *"JS runtimes: deno-"*) ;;
+  *) echo "yt-dlp did not discover Deno" >&2; exit 1 ;;
+esac
+
+yt-dlp --list-extractors | grep -qx youtube || {
+  echo "yt-dlp YouTube extractor is unavailable" >&2
+  exit 1
+}

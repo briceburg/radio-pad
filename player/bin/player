@@ -1,5 +1,104 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd "$(dirname "$0")/.."
-exec uv run python src/player.py "$@"
+readonly service="radiopad-player.service"
+readonly health_path="/run/radiopad/ready"
+player_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$player_root/.." && pwd)"
+venv="$player_root/tmp/.venv"
+
+usage() {
+  cat <<'EOF'
+Usage: bin/player [run]
+       bin/player status
+       bin/player logs [--follow]
+       bin/player restart
+       bin/player update
+
+Run the player in the foreground or operate its systemd deployment.
+EOF
+}
+
+die() {
+  echo "player: $*" >&2
+  exit 2
+}
+
+require_deployment() {
+  ((EUID == 0)) || die "run service commands with sudo"
+  [[ -d /run/systemd/system ]] || die "systemd is not running"
+  [[ "$(systemctl show "$service" --property=LoadState --value)" == "loaded" ]] ||
+    die "$service is not installed"
+  [[ "$(systemctl show "$service" --property=WorkingDirectory --value)" == "$player_root" ]] ||
+    die "this checkout does not manage $service"
+}
+
+wait_until_ready() {
+  for _ in {1..60}; do
+    [[ -r "$health_path" ]] && {
+      echo "RadioPad is ready."
+      return
+    }
+    sleep 1
+  done
+  systemctl status "$service" --no-pager --full || true
+  die "player did not become ready within 60 seconds"
+}
+
+subcommand="${1:-run}"
+(($# == 0)) || shift
+case "$subcommand" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  run)
+    cd "$player_root"
+    export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
+    exec uv run --locked python src/player.py "$@"
+    ;;
+  status | logs | restart | update)
+    require_deployment
+    ;;
+  *) die "unknown command: $subcommand" ;;
+esac
+
+case "$subcommand" in
+  status)
+    (($# == 0)) || die "status takes no arguments"
+    exec systemctl status "$service" --no-pager --full
+    ;;
+  logs)
+    case "${1:-}" in
+      "") exec journalctl --unit "$service" --boot --lines 100 --no-pager ;;
+      -f | --follow)
+        (($# == 1)) || die "logs --follow takes no other arguments"
+        exec journalctl --unit "$service" --boot --follow
+        ;;
+      *) die "unknown logs option: $1" ;;
+    esac
+    ;;
+  restart)
+    (($# == 0)) || die "restart takes no arguments"
+    systemctl restart "$service"
+    wait_until_ready
+    ;;
+  update)
+    (($# == 0)) || die "update takes no arguments"
+    exec 9>/run/lock/radiopad-update.lock
+    flock --nonblock 9 || die "another update is running"
+    [[ -x "$venv/bin/python" ]] || die "managed environment is missing; update with rpi-provision"
+    [[ -x /usr/local/bin/uv ]] || die "uv is missing; update with rpi-provision"
+    [[ -z "$(git -C "$repo_root" status --porcelain)" ]] || die "checkout has local changes; update refused"
+    branch="$(git -C "$repo_root" branch --show-current)"
+    [[ -n "$branch" ]] || die "checkout is not on a branch; update with rpi-provision"
+    GIT_TERMINAL_PROMPT=0 git -C "$repo_root" fetch origin "$branch"
+    git -C "$repo_root" merge-base --is-ancestor HEAD FETCH_HEAD ||
+      die "remote branch cannot fast-forward this checkout; update with rpi-provision"
+    git -C "$repo_root" merge --ff-only FETCH_HEAD
+    cd "$player_root"
+    VIRTUAL_ENV="$venv" /usr/local/bin/uv sync --active --locked --no-dev --no-python-downloads
+    systemctl restart "$service"
+    wait_until_ready
+    ;;
+esac

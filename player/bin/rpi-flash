@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly IMAGE_URL="https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz"
+readonly IMAGE_SHA256="49fafba626ec00e0f9800349b9edae6caf8cfc223f673b875b72ac2797ed9576"
+readonly ADMIN_USER="radiopad"
+readonly MIN_DEVICE_SIZE_BYTES=4000000000
+
+usage() {
+  cat <<'EOF'
+Usage: player/bin/rpi-flash [OPTIONS] HOSTNAME
+
+Detect or validate a removable device, then erase it and write the pinned
+Raspberry Pi OS Lite 64-bit image.
+
+Options:
+  --country CC             Wi-Fi regulatory country (default: host locale)
+  --device DEVICE          Whole-disk target when auto-detection is ambiguous
+  --keyboard-layout NAME   Console keyboard layout (default: host keymap)
+  --locale LOCALE          System locale (default: host locale)
+  --ssh-key FILE           Public key file instead of a standard file or agent key
+  --timezone ZONE          System time zone (default: host time zone)
+  --wifi                   Prompt for Wi-Fi credentials; Ethernet remains enabled
+  -h, --help               Show this help
+
+Example:
+  player/bin/rpi-flash radio-kitchen
+  player/bin/rpi-flash --wifi --device /dev/sdX radio-kitchen
+EOF
+}
+
+die() {
+  echo "rpi-flash: $*" >&2
+  exit 2
+}
+
+wifi=false
+device=""
+key_file=""
+country=""
+keyboard_layout=""
+locale_name=""
+timezone=""
+
+while (($#)); do
+  case "$1" in
+    --country | --device | --keyboard-layout | --locale | --ssh-key | --timezone)
+      (($# >= 2)) || die "$1 requires a value"
+      case "$1" in
+        --country) country="$2" ;;
+        --device) device="$2" ;;
+        --keyboard-layout) keyboard_layout="$2" ;;
+        --locale) locale_name="$2" ;;
+        --ssh-key) key_file="$2" ;;
+        --timezone) timezone="$2" ;;
+      esac
+      shift 2
+      ;;
+    --wifi)
+      wifi=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*) die "unknown option: $1" ;;
+    *) break ;;
+  esac
+done
+
+(($# == 1)) || die "expected HOSTNAME"
+hostname="$1"
+
+for tool in awk curl head lsblk mktemp readlink rpi-imager sed ssh-keygen tr udevadm; do
+  command -v "$tool" >/dev/null || die "$tool is required"
+done
+
+if [[ -z "$locale_name" && -r /etc/locale.conf ]]; then
+  locale_name="$(sed -n 's/^LANG=//p' /etc/locale.conf | head -n 1 | tr -d '\"')"
+fi
+locale_name="${locale_name:-en_US.UTF-8}"
+if [[ -z "$country" && "$locale_name" =~ _([A-Za-z]{2})([.@]|$) ]]; then
+  country="${BASH_REMATCH[1]}"
+fi
+country="${country:-US}"
+country="${country^^}"
+if [[ -z "$keyboard_layout" && -r /etc/vconsole.conf ]]; then
+  keyboard_layout="$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf | head -n 1 | tr -d '\"')"
+fi
+keyboard_layout="${keyboard_layout:-us}"
+if [[ -z "$timezone" ]]; then
+  timezone_path="$(readlink -f /etc/localtime 2>/dev/null || true)"
+  timezone="${timezone_path#/usr/share/zoneinfo/}"
+  [[ "$timezone" != "$timezone_path" && -n "$timezone" ]] || timezone="UTC"
+fi
+if [[ -r /usr/share/zoneinfo/tzdata.zi ]]; then
+  canonical_timezone="$(awk -v target="$timezone" '$1 == "L" && $3 == target { print $2; exit }' /usr/share/zoneinfo/tzdata.zi)"
+  timezone="${canonical_timezone:-$timezone}"
+fi
+
+[[ "$country" =~ ^[A-Z]{2}$ ]] || die "country must be a two-letter code"
+[[ "$keyboard_layout" =~ ^[A-Za-z0-9_+.-]+$ ]] || die "invalid keyboard layout"
+[[ "$locale_name" =~ ^[A-Za-z0-9_@+.-]+$ ]] || die "invalid locale"
+[[ "$timezone" != /* && "$timezone" != *..* && -e "/usr/share/zoneinfo/$timezone" ]] || die "invalid time zone"
+
+key_type=""
+key_data=""
+if [[ -n "$key_file" ]]; then
+  [[ -r "$key_file" ]] || die "cannot read SSH public key: $key_file"
+  read -r key_type key_data _ <"$key_file"
+elif command -v ssh-add >/dev/null && read -r key_type key_data _ < <(ssh-add -L 2>/dev/null); then
+  :
+else
+  for candidate in "${HOME:-}/.ssh/id_ed25519.pub" "${HOME:-}/.ssh/id_ecdsa.pub" "${HOME:-}/.ssh/id_rsa.pub"; do
+    if [[ -r "$candidate" ]]; then
+      read -r key_type key_data _ <"$candidate"
+      break
+    fi
+  done
+fi
+
+is_removable_disk() {
+  local candidate="$1" transport removable hotplug
+  [[ -b "$candidate" && "$(lsblk -dnro TYPE "$candidate" 2>/dev/null)" == disk ]] || return 1
+  transport="$(lsblk -dnro TRAN "$candidate" | tr -d '[:space:]')"
+  removable="$(lsblk -dnro RM "$candidate" | tr -d '[:space:]')"
+  hotplug="$(lsblk -dnro HOTPLUG "$candidate" | tr -d '[:space:]')"
+  [[ "$transport" == usb || "$transport" == mmc || "$removable" == 1 || "$hotplug" == 1 ]]
+}
+
+udevadm settle --timeout=10 || die "timed out waiting for block devices"
+
+if [[ -z "$device" ]]; then
+  candidates=()
+  while read -r candidate device_type; do
+    [[ "$device_type" == disk ]] || continue
+    size_bytes="$(lsblk -bdnro SIZE "$candidate" | tr -d '[:space:]')"
+    if is_removable_disk "$candidate" && [[ "$size_bytes" =~ ^[0-9]+$ ]] &&
+      ((size_bytes >= MIN_DEVICE_SIZE_BYTES)); then
+      candidates+=("$candidate")
+    fi
+  done < <(lsblk -dpnro NAME,TYPE)
+
+  case "${#candidates[@]}" in
+    1) device="${candidates[0]}" ;;
+    0) die "no removable disk detected; attach the SD card or pass DEVICE explicitly" ;;
+    *)
+      printf 'rpi-flash: multiple removable disks detected:\n' >&2
+      printf '  %s\n' "${candidates[@]}" >&2
+      die "pass the intended DEVICE explicitly"
+      ;;
+  esac
+fi
+
+device="$(readlink -f -- "$device")"
+
+[[ -b "$device" ]] || die "$device is not a block device"
+[[ "$(lsblk -dnro TYPE "$device")" == disk ]] || die "$device is not a whole-disk device"
+is_removable_disk "$device" || die "$device is not reported as removable, hot-pluggable, USB, or MMC"
+[[ "$(lsblk -dnro RO "$device" | tr -d '[:space:]')" == 0 ]] || die "$device is read-only"
+[[ "$hostname" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "invalid hostname"
+[[ -n "$key_type" && -n "$key_data" ]] ||
+  die "no SSH public key found in the SSH agent or standard files; pass --ssh-key or run ssh-keygen"
+case "$key_type" in
+  ssh-ed25519 | ssh-rsa | ecdsa-sha2-* | sk-ssh-ed25519@openssh.com | sk-ecdsa-sha2-*) ;;
+  *) die "unsupported SSH public key type: $key_type" ;;
+esac
+[[ "$key_data" =~ ^[A-Za-z0-9+/]+={0,3}$ ]] || die "invalid SSH public key"
+public_key="$key_type $key_data"
+key_details="$(ssh-keygen -lf - <<<"$public_key")" || die "could not inspect SSH public key"
+
+wifi_ssid=""
+wifi_password=""
+if $wifi; then
+  read -r -p "Wi-Fi SSID: " wifi_ssid
+  read -r -s -p "Wi-Fi passphrase (empty for an open network): " wifi_password
+  echo
+  [[ -n "$wifi_ssid" && ${#wifi_ssid} -le 32 ]] || die "Wi-Fi SSID must contain 1-32 characters"
+  [[ "$wifi_ssid" != *$'\n'* && "$wifi_ssid" != *$'\r'* ]] || die "Wi-Fi SSID must not contain newlines"
+  [[ -z "$wifi_password" || (${#wifi_password} -ge 8 && ${#wifi_password} -le 63) ||
+    (${#wifi_password} -eq 64 && "$wifi_password" =~ ^[A-Fa-f0-9]{64}$) ]] ||
+    die "Wi-Fi passphrase must contain 8-63 characters or a 64-digit hexadecimal PSK"
+  [[ "$wifi_password" != *$'\n'* && "$wifi_password" != *$'\r'* ]] ||
+    die "Wi-Fi passphrase must not contain newlines"
+fi
+
+mounts="$(lsblk -nrpo MOUNTPOINTS "$device" | sed '/^[[:space:]]*$/d')"
+[[ -z "$mounts" ]] || die "$device has mounted filesystems; unmount them first"
+
+size_bytes="$(lsblk -bdnro SIZE "$device" | tr -d '[:space:]')"
+((size_bytes >= MIN_DEVICE_SIZE_BYTES)) || die "$device is smaller than 4 GB"
+
+umask 077
+cloud_init="$(mktemp)"
+network_config="$(mktemp)"
+trap 'rm -f -- "$cloud_init" "$network_config"' EXIT
+
+{
+  printf '%s\n' '#cloud-config'
+  printf 'hostname: %s\n' "$hostname"
+  printf '%s\n' 'manage_etc_hosts: true' "locale: $locale_name" "timezone: $timezone"
+  printf '%s\n' 'keyboard:' '  model: pc105' "  layout: $keyboard_layout"
+  printf '%s\n' 'user:' "  name: $ADMIN_USER" '  shell: /bin/bash' '  lock_passwd: true'
+  printf '%s\n' '  sudo: ALL=(ALL) NOPASSWD:ALL' '  ssh_authorized_keys:' "    - \"$public_key\""
+  printf '%s\n' 'ssh_pwauth: false' 'runcmd:' '  - [ systemctl, enable, --now, ssh ]'
+  printf '%s\n' "  - [ raspi-config, nonint, do_wifi_country, '$country' ]"
+  printf '%s\n' '  - [ raspi-config, nonint, do_boot_behaviour, B1 ]'
+} >"$cloud_init"
+
+if $wifi; then
+  escaped_ssid="${wifi_ssid//\\/\\\\}"
+  escaped_ssid="${escaped_ssid//\"/\\\"}"
+  escaped_password="${wifi_password//\\/\\\\}"
+  escaped_password="${escaped_password//\"/\\\"}"
+  {
+    printf '%s\n' 'network:' '  version: 2' '  ethernets:' '    eth0:'
+    printf '%s\n' '      dhcp4: true' '      dhcp6: true' '      optional: true'
+    printf '%s\n' '  wifis:' '    wlan0:' '      dhcp4: true'
+    printf '      regulatory-domain: "%s"\n' "$country"
+    printf '%s\n' '      access-points:' "        \"$escaped_ssid\":"
+    if [[ -n "$wifi_password" ]]; then
+      printf '          password: "%s"\n' "$escaped_password"
+    else
+      printf '%s\n' '          auth:' '            key-management: none'
+    fi
+    printf '%s\n' '      optional: true'
+  } >"$network_config"
+fi
+
+echo "Checking access to the pinned official Raspberry Pi OS image..."
+curl --fail --silent --show-error --location --head --max-time 20 "$IMAGE_URL" >/dev/null ||
+  die "cannot reach the Raspberry Pi OS image"
+
+lsblk -d -o NAME,SIZE,MODEL,SERIAL,TRAN,RM,HOTPLUG "$device"
+echo
+echo "This will permanently erase $device and install Raspberry Pi OS Lite for $ADMIN_USER@$hostname."
+echo "SSH key: $key_details"
+echo "Region: $locale_name, $timezone, keyboard $keyboard_layout, Wi-Fi country $country."
+read -r -p "Type the full device path to continue: " confirmation
+[[ "$confirmation" == "$device" ]] || die "confirmation did not match $device"
+
+imager_args=(--cli --sha256 "$IMAGE_SHA256" --cloudinit-userdata "$cloud_init")
+$wifi && imager_args+=(--cloudinit-networkconfig "$network_config")
+rpi-imager "${imager_args[@]}" "$IMAGE_URL" "$device"
+
+echo "[ok] flashed and verified $device"
+echo "Boot the Pi, then provision it by hostname or IP (commonly $hostname.local)."

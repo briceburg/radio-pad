@@ -9,11 +9,11 @@ Streams a player's assigned RadioDial through the host audio system and keeps co
 - [uv](https://docs.astral.sh/uv/) for the Python environment
 - [mpv](https://mpv.io/) for audio playback
 
-Python packages are installed from `pyproject.toml` and `uv.lock`; they are not separate host dependencies.
+Python packages are installed from `pyproject.toml` and `uv.lock`; they are not separate host dependencies. The locked environment includes yt-dlp and Deno so mpv can resolve audio from supported site URLs such as YouTube in addition to direct streams and playlists.
 
-### Running the player
+### Run on a host
 
-Start the player through the project script:
+From this directory, start the player in the foreground:
 
 ```sh
 ./bin/player
@@ -22,20 +22,11 @@ Start the player through the project script:
 RADIOPAD_PLAYER="briceburg/living-room" ./bin/player
 ```
 
-On a Raspberry Pi with console auto-login, this `.bashrc` snippet starts the player in tmux. Adjust `RADIOPAD_ROOT` to the checkout path:
+The player runs in the foreground and stops with the process. Use the [root Compose workflow](../README.md#development) when developing the complete RadioPad stack.
 
-```sh
-RADIOPAD_ROOT="$HOME/git/radio-pad"
+### Raspberry Pi deployment
 
-if tmux has-session -t radio-pad 2>/dev/null; then
-  echo "RadioPad is running. To attach:"
-  echo "  tmux attach-session -t radio-pad"
-else
-  tmux new-session -s radio-pad -c "$RADIOPAD_ROOT/player" ./bin/player
-fi
-```
-
-> tmux keeps the player session available when you later attach over SSH.
+Use the [Raspberry Pi provisioning guide](./deploy/raspberry-pi/) to flash Raspberry Pi OS Lite, configure network and audio hardware, and install the player as a managed systemd service. The guide also covers service status, logs, restarts, and on-device updates.
 
 ### Environment variables
 

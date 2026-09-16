@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly ANSIBLE_CORE_VERSION="2.21.4"
+
+deploy_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../deploy/raspberry-pi" && pwd)"
+collection_root="${XDG_CACHE_HOME:-$HOME/.cache}/radiopad/ansible/collections"
+
+usage() {
+  cat <<'EOF'
+Usage: player/bin/rpi-provision [OPTIONS] [USER@]HOST
+
+Configure or update a Raspberry Pi over SSH with the RadioPad Ansible playbook.
+Known hosts use their checked-in inventory. Use --player for an undeclared host.
+
+Options:
+  --audio-device DEVICE    Override the inventory's mpv audio device
+  --ask-become-pass        Prompt for the remote sudo password
+  --player ACCOUNT/PLAYER  Registered identity for an undeclared host
+  --ssh-password           Prompt for and enable an SSH password for radiopad
+  --wifi SSID              Add or update a WPA Wi-Fi profile, prompting for its passphrase
+  --wifi-country CC        Two-letter regulatory country used with --wifi (default: host locale)
+  -h, --help               Show this help
+
+Example:
+  player/bin/rpi-provision radio-canones
+  player/bin/rpi-provision --player example/kitchen radio-kitchen.local
+EOF
+}
+
+die() {
+  echo "rpi-provision: $*" >&2
+  exit 2
+}
+
+become_args=()
+audio_device=""
+player=""
+remote_user=""
+ssh_password_requested=false
+wifi_requested=false
+wifi_ssid=""
+wifi_country=""
+
+while (($#)); do
+  case "$1" in
+    --ask-become-pass)
+      become_args+=(--ask-become-pass)
+      shift
+      ;;
+    --ssh-password)
+      ssh_password_requested=true
+      shift
+      ;;
+    --audio-device | --player | --wifi | --wifi-country)
+      (($# >= 2)) || die "$1 requires a value"
+      case "$1" in
+        --audio-device) audio_device="$2" ;;
+        --player) player="$2" ;;
+        --wifi)
+          wifi_requested=true
+          wifi_ssid="$2"
+          ;;
+        --wifi-country) wifi_country="$2" ;;
+      esac
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*) die "unknown option: $1" ;;
+    *) break ;;
+  esac
+done
+
+(($# == 1)) || die "expected [USER@]HOST"
+$wifi_requested || [[ -z "$wifi_country" ]] || die "--wifi-country requires --wifi"
+target="$1"
+
+if [[ "$target" == *@* ]]; then
+  [[ "$target" =~ ^[^@]+@[^@]+$ ]] || die "target must have the form [USER@]HOST"
+  remote_user="${target%@*}"
+  host="${target#*@}"
+else
+  host="$target"
+fi
+[[ -z "$remote_user" || "$remote_user" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || die "invalid SSH user"
+[[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || die "invalid hostname or IPv4 address"
+if [[ -n "$player" ]]; then
+  [[ "$player" =~ ^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$ ]] ||
+    die "player identity must contain two lowercase slugs, for example briceburg/living-room"
+fi
+[[ "$audio_device" != *[[:space:]]* ]] || die "audio device must not contain whitespace"
+command -v uvx >/dev/null || die "uvx is required; install uv first"
+if $ssh_password_requested; then
+  command -v openssl >/dev/null || die "openssl is required with --ssh-password"
+fi
+
+if $wifi_requested; then
+  [[ -n "$wifi_ssid" && ${#wifi_ssid} -le 32 ]] || die "Wi-Fi SSID must contain 1-32 characters"
+  [[ "$wifi_ssid" != *$'\n'* && "$wifi_ssid" != *$'\r'* ]] || die "Wi-Fi SSID must not contain newlines"
+  if [[ -z "$wifi_country" && -r /etc/locale.conf ]]; then
+    host_locale="$(sed -n 's/^LANG=//p' /etc/locale.conf | head -n 1 | tr -d '\"')"
+    if [[ "$host_locale" =~ _([A-Za-z]{2})([.@]|$) ]]; then wifi_country="${BASH_REMATCH[1]}"; fi
+  fi
+  wifi_country="${wifi_country:-US}"
+  [[ "$wifi_country" =~ ^[A-Za-z]{2}$ ]] || die "Wi-Fi country must be a two-letter code"
+  wifi_country="${wifi_country^^}"
+fi
+
+export ANSIBLE_CONFIG="$deploy_root/ansible.cfg"
+export ANSIBLE_COLLECTIONS_PATH="$collection_root"
+uvx --from "ansible-core==$ANSIBLE_CORE_VERSION" ansible-galaxy collection install \
+  --requirements-file "$deploy_root/requirements.yml" \
+  --collections-path "$collection_root"
+
+extra_vars=()
+[[ -z "$player" ]] || extra_vars+=(--extra-vars "radiopad_player=$player")
+[[ -z "$audio_device" ]] || extra_vars+=(--extra-vars "radiopad_audio_device=$audio_device")
+[[ -z "$remote_user" ]] || extra_vars+=(--extra-vars "ansible_user=$remote_user")
+secret_vars=""
+if $wifi_requested || $ssh_password_requested; then
+  umask 077
+  secret_vars="$(mktemp)"
+  trap 'rm -f -- "$secret_vars"' EXIT
+fi
+
+if $wifi_requested; then
+  IFS= read -r -s -p "Wi-Fi passphrase for $wifi_ssid: " wifi_password
+  echo
+  [[ (${#wifi_password} -ge 8 && ${#wifi_password} -le 63) ||
+    (${#wifi_password} -eq 64 && "$wifi_password" =~ ^[A-Fa-f0-9]{64}$) ]] ||
+    die "Wi-Fi passphrase must contain 8-63 characters or a 64-digit hexadecimal PSK"
+  [[ "$wifi_password" != *$'\n'* && "$wifi_password" != *$'\r'* ]] ||
+    die "Wi-Fi passphrase must not contain newlines"
+
+  wifi_ssid_yaml="${wifi_ssid//\'/\'\'}"
+  wifi_password_yaml="${wifi_password//\'/\'\'}"
+  {
+    printf "radiopad_wifi_ssid: '%s'\n" "$wifi_ssid_yaml"
+    printf "radiopad_wifi_password: '%s'\n" "$wifi_password_yaml"
+    printf "radiopad_wifi_country: '%s'\n" "$wifi_country"
+  } >>"$secret_vars"
+  unset wifi_password wifi_password_yaml
+fi
+
+if $ssh_password_requested; then
+  IFS= read -r -s -p "SSH password for radiopad: " ssh_password
+  echo
+  IFS= read -r -s -p "Confirm SSH password: " ssh_password_confirmation
+  echo
+  [[ -n "$ssh_password" ]] || die "SSH password must not be empty"
+  [[ "$ssh_password" == "$ssh_password_confirmation" ]] || die "SSH passwords do not match"
+  [[ "$ssh_password" != *$'\n'* && "$ssh_password" != *$'\r'* ]] || die "SSH password must not contain newlines"
+  ssh_password_hash="$(printf '%s\n' "$ssh_password" | openssl passwd -6 -stdin)"
+  printf "radiopad_ssh_password_hash: '%s'\n" "$ssh_password_hash" >>"$secret_vars"
+  unset ssh_password ssh_password_confirmation ssh_password_hash
+fi
+
+[[ -z "$secret_vars" ]] || extra_vars+=(--extra-vars "@$secret_vars")
+
+echo "Provisioning $host..."
+uvx --from "ansible-core==$ANSIBLE_CORE_VERSION" ansible-playbook \
+  "${become_args[@]}" \
+  --inventory "$deploy_root/inventory.yml" \
+  --inventory "$host," \
+  --limit "$host" \
+  --ssh-common-args "-o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  "${extra_vars[@]}" \
+  "$deploy_root/playbook.yml"
