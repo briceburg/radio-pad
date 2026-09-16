@@ -69,9 +69,10 @@ Guidance for coding agents working in `radio-pad/registry`.
 - WebSocket relay connecting players and remote controls in per-player channels keyed by `{account_id}/{player_id}`.
 - Player connections provide their RadioDial source and ETag in `RadioPad-Radio-Dial-Url` and `RadioPad-Radio-Dial-Revision` headers. The switchboard retains revisioned `radio_dial_state` and conditionally watches each unique active Registry RadioDial, independent of the configured data backend.
 - Pub-sub uses an in-tree broadcast module (`src/switchboard/broadcast.py`) — no external broker.
-- The in-memory backend works for single-instance and multi-instance with **path-based sticky sessions**.
-- If stateless horizontal scaling is needed later, add a backend (e.g. NATS) behind the `Broadcast` interface.
+- Pub-sub queues, retained state, and active-player membership are process-local, so a switchboard deployment uses one worker and scales across instances with player-path affinity or registry-assigned shard URLs.
+- A shared event bus alone is insufficient for interchangeable processes; distributed retained state and active-player coordination would also be required.
 - The switchboard endpoint uses `asyncio.TaskGroup` with `except*` for concurrent send/receive — tasks auto-cancel when one exits.
+- Standard broadcast traffic currently reaches every subscriber in a room. Preserve protocol behavior when introducing audience-aware player/controller routing.
 
 ## Change preferences
 

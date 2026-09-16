@@ -13,7 +13,7 @@ if [[ $# -gt 0 ]]; then
   exec tests/integration/bin/ci "$@"
 fi
 
-bash -n bin/*
+bash -n bin/* tests/load/bin/*
 npm run lint
 exec node_modules/.bin/concurrently \
   --kill-others-on-fail \
