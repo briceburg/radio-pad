@@ -4,7 +4,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 
 ## Project shape
 
-- Monorepo containing four components (`player`, `registry`, `remote-control`, `macropad-control`) plus the Compose integration suite in `tests/integration`.
+- Monorepo containing four components (`player`, `registry`, `remote-control`, `macropad-control`), the Compose integration suite in `tests/integration`, and opt-in k6 workloads in `tests/load`.
 - Docker Compose provides the local development and integration test environment.
 - `compose.yaml` runs unified mode (registry serves API + switchboard in one process).
 - `compose.split.yaml` runs split mode (registry and switchboard as separate services).
@@ -12,11 +12,12 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - `compose.prod-smoke.yaml` builds all services with `target: prod` and verifies healthchecks.
 - `bin/dev` wraps local Compose usage and auto-adds `compose.macropad.yaml` only when a Macropad CDC2 data port is available, unless `RADIOPAD_MACROPAD=off` or `RADIOPAD_MACROPAD=required` is set.
 - `bin/dev` also adds `compose.audio.yaml` for host Pulse-compatible or native PipeWire audio unless `RADIOPAD_AUDIO=off` is set.
-- Each component and the integration suite has its own `bin/ci`; components also have a `README.md` and (where applicable) `AGENTS.md`.
+- Each component and the integration suite has its own `bin/ci`; components and the load suite also have a `README.md` and (where applicable) `AGENTS.md`.
 
 ## Runtime and tooling
 
 - Root `bin/ci` verifies formatting and runs every component's CI concurrently without starting Compose. Run cross-service validation explicitly with `bin/ci integration`.
+- `tests/load/bin/run` runs manual capacity workloads against discovered Compose ports or configured remote endpoints; load tests never run in CI. Follow `tests/load/AGENTS.md` for remote-test safety and evidence conventions.
 - Root `npm run format` writes repository Markdown plus supported source, configuration, workflow, and data files; `bin/ci` verifies them without writing.
 - GitHub Actions CI (`.github/workflows/ci.yml`) calls the same root entry point in two job groups:
   - `components`: runs `bin/ci` after installing uv and both npm packages.

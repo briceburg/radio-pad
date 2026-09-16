@@ -108,6 +108,10 @@ bin/ci integration compose.split.yaml    # only the split-mode integration test
 
 Pass multiple Compose files to run any other combination.
 
+### Load testing
+
+The opt-in [load-test harness](./tests/load/) exercises switchboard connections and message fan-out against configurable local or remote endpoints. It is intentionally separate from routine and integration CI.
+
 ### Toolchain and dependency policy
 
 Each project owns its manifest, lockfile, and `bin/ci`; the root npm package owns only repository-wide tooling. Keep dependency changes within that boundary and do not introduce workspaces or consolidate lockfiles unless intentionally changing the repository structure. Run `npm run format` from the root for repository-wide formatting.

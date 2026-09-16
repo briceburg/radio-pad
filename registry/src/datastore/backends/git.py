@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import shlex
 import subprocess
 import time
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from threading import RLock
 from typing import Any, TypeVar, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from datastore.core import (
+    InterProcessLock,
     atomic_write_json_file,
     compute_etag,
     construct_storage_path,
@@ -76,8 +74,8 @@ class GitBackend:
                 f"ssh -i {shlex.quote(self.ssh_key_path)} -o StrictHostKeyChecking=accept-new"
             )
 
-        self._lock = RLock()
         self._lock_path = self.repo_path.parent / f".{self.repo_path.name}.lock"
+        self._operation_lock = InterProcessLock(self._lock_path)
         self._last_fetch_at = 0.0
 
         self._validate_branch()
@@ -273,16 +271,6 @@ class GitBackend:
             if result is not _RETRY:
                 return cast(_T, result)
         raise ConcurrencyError("Push rejected")
-
-    @contextmanager
-    def _operation_lock(self) -> Iterator[None]:
-        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._lock, self._lock_path.open("a+b") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _read_existing(self, file_path: Path) -> ValueWithETag[JsonDoc]:
         if not file_path.exists():

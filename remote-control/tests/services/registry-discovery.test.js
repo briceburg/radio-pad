@@ -33,6 +33,25 @@ describe("Registry Discovery", () => {
       { value: "acct1", label: "Account One" },
       { value: "acct2", label: "Account Two" },
     ]);
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      "http://mock-registry/v1/accounts?page=2",
+      {},
+    );
+  });
+
+  it("resolves query-only next links against the collection", async () => {
+    global.fetch
+      .mockResolvedValueOnce(page([], { next: "?page=2&per_page=100" }))
+      .mockResolvedValueOnce(page([]));
+
+    await discoverAccounts("http://mock-registry/api/");
+
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      "http://mock-registry/api/accounts/?page=2&per_page=100",
+      {},
+    );
   });
 
   it("attaches registry bearer tokens to authenticated discovery", async () => {
@@ -42,7 +61,7 @@ describe("Registry Discovery", () => {
     await discoverAccounts("/api/", auth);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/accounts/",
+      "http://localhost:3000/api/accounts/?per_page=100",
       { headers: { Authorization: "Bearer token" } },
     );
   });
@@ -55,7 +74,7 @@ describe("Registry Discovery", () => {
     await discoverAccounts("/api/");
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/accounts/",
+      "http://localhost:3000/api/accounts/?per_page=100",
       {},
     );
   });

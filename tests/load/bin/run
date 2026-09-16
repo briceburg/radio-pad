@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+load_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$load_root/../.." && pwd)"
+k6_image="grafana/k6:2.2.0"
+
+usage() {
+  cat >&2 <<'EOF'
+usage: tests/load/bin/run switchboard [BASE_URL] [k6 run options]
+
+With no BASE_URL or endpoint variables, discover the active local Compose ports.
+For unified remote deployments, derive endpoints from an http(s) BASE_URL.
+REGISTRY_URL and SWITCHBOARD_URL override either endpoint.
+
+See tests/load/README.md for workload options and examples.
+EOF
+}
+
+die() {
+  echo "[error] $*" >&2
+  exit 1
+}
+
+is_local_endpoint() {
+  local endpoint="$1"
+  local authority="${endpoint#*://}"
+  authority="${authority%%/*}"
+
+  case "$authority" in
+    localhost | localhost:* | 127.0.0.1 | 127.0.0.1:* | '[::1]' | '[::1]':* | host.docker.internal | host.docker.internal:*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+websocket_base() {
+  case "$1" in
+    http://*) echo "ws://${1#http://}" ;;
+    https://*) echo "wss://${1#https://}" ;;
+    *) die "base URL must start with http:// or https://" ;;
+  esac
+}
+
+http_base() {
+  case "$1" in
+    ws://*) echo "http://${1#ws://}" ;;
+    wss://*) echo "https://${1#wss://}" ;;
+    *) die "switchboard URL must start with ws:// or wss://" ;;
+  esac
+}
+
+compose_port() {
+  local service="$1"
+  local published
+  local compose=(docker compose --project-directory "$repo_root" -f "$repo_root/compose.yaml" -f "$repo_root/compose.split.yaml")
+
+  published="$("${compose[@]}" port "$service" 1980 2>/dev/null)" || return 1
+  published="${published%%$'\n'*}"
+  [[ -n "$published" ]] || return 1
+  echo "${published##*:}"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+  usage
+  exit 0
+fi
+
+[[ "${1:-}" == "switchboard" ]] || {
+  usage
+  exit 2
+}
+shift
+
+target=""
+if [[ "${1:-}" == http://* || "${1:-}" == https://* ]]; then
+  target="${1%/}"
+  target="${target%/api}"
+  shift
+fi
+
+if [[ -n "$target" ]]; then
+  REGISTRY_URL="${REGISTRY_URL:-$target/api}"
+  SWITCHBOARD_URL="${SWITCHBOARD_URL:-$(websocket_base "$target")/switchboard}"
+elif [[ -n "${REGISTRY_URL:-}" && -z "${SWITCHBOARD_URL:-}" ]]; then
+  target="${REGISTRY_URL%/}"
+  target="${target%/api}"
+  SWITCHBOARD_URL="$(websocket_base "$target")/switchboard"
+elif [[ -z "${REGISTRY_URL:-}" && -n "${SWITCHBOARD_URL:-}" ]]; then
+  target="${SWITCHBOARD_URL%/}"
+  target="${target%/switchboard}"
+  REGISTRY_URL="$(http_base "$target")/api"
+elif [[ -z "${REGISTRY_URL:-}" && -z "${SWITCHBOARD_URL:-}" ]]; then
+  registry_port="$(compose_port registry)" || die "no running local Compose registry found"
+  switchboard_port="$(compose_port switchboard || true)"
+  REGISTRY_URL="http://localhost:$registry_port/api"
+  SWITCHBOARD_URL="ws://localhost:${switchboard_port:-$registry_port}/switchboard"
+fi
+
+export REGISTRY_URL SWITCHBOARD_URL
+
+if { ! is_local_endpoint "$REGISTRY_URL" || ! is_local_endpoint "$SWITCHBOARD_URL"; } && [[ "${RADIOPAD_LOAD_ALLOW_REMOTE:-}" != "1" ]]; then
+  die "refusing to load-test non-local endpoints; set RADIOPAD_LOAD_ALLOW_REMOTE=1 to confirm"
+fi
+
+echo "[info] registry: $REGISTRY_URL" >&2
+echo "[info] switchboard: $SWITCHBOARD_URL" >&2
+
+environment=(REGISTRY_URL SWITCHBOARD_URL)
+while IFS= read -r name; do
+  environment+=("$name")
+done < <(compgen -A variable RADIOPAD_LOAD_)
+
+docker_args=(run --rm --network host --volume "$load_root:/load:ro")
+for name in "${environment[@]}"; do
+  docker_args+=(--env "$name")
+done
+
+exec docker "${docker_args[@]}" "$k6_image" run "$@" /load/switchboard.js
