@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, call
@@ -64,3 +65,23 @@ async def test_watcher_does_not_fetch_non_registry_resource() -> None:
     await watcher.refresh()
 
     get.assert_not_awaited()
+
+
+async def test_zero_interval_refreshes_only_when_a_player_registers() -> None:
+    url = "https://registry.example/api/accounts/community/radio-dials/briceburg"
+    response = httpx2.Response(200, headers={"ETag": '"new"'}, request=httpx2.Request("GET", url))
+    get = AsyncMock(return_value=response)
+    client = cast(httpx2.AsyncClient, SimpleNamespace(get=get))
+    published = asyncio.Event()
+    publish = AsyncMock(side_effect=lambda *_: published.set())
+    watcher = RadioDialWatcher(client, publish, refresh_seconds=0, registry_url="https://registry.example/api")
+
+    watcher.start()
+    try:
+        watcher.register(url, "briceburg/living-room", '"old"')
+        await asyncio.wait_for(published.wait(), timeout=1)
+        await asyncio.sleep(0)
+    finally:
+        await watcher.close()
+
+    get.assert_awaited_once_with(url, headers={"If-None-Match": '"old"'})

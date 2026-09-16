@@ -61,7 +61,7 @@ Registry resources are account-scoped:
 | `REGISTRY_GIT_FETCH_TTL_SECONDS` | Read fetch interval in seconds; writes always fetch. | `30` |
 | `REGISTRY_LOG_LEVEL` | Uvicorn log level. | `info` |
 | `REGISTRY_PROFILES` | Enabled roles: `api`, `switchboard`, or both. | `api,switchboard` |
-| `REGISTRY_RADIO_DIAL_REFRESH_SECONDS` | Interval for conditionally checking each unique active resolved RadioDial; `0` disables live refresh. | `30` |
+| `REGISTRY_RADIO_DIAL_REFRESH_SECONDS` | Interval for conditionally checking each unique active resolved RadioDial; `0` checks only when a player connects. | `30` |
 | `REGISTRY_SEED_DATA_PATH` | Root containing `data/` and `authz/` seeds. | `seed-data` |
 | `REGISTRY_SWITCHBOARD_PREFIX` | WebSocket routing prefix. | `/switchboard` |
 | `REGISTRY_URL` | Registry API URL used by a split switchboard. | `http://localhost:8000/api` |

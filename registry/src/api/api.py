@@ -47,13 +47,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await broadcast.connect()
         app.state.broadcast = broadcast
         refresh_seconds = float(os.environ.get("REGISTRY_RADIO_DIAL_REFRESH_SECONDS", "30"))
-        if refresh_seconds > 0:
-            radio_dial_watcher = RadioDialWatcher(
-                http_client,
-                partial(publish_event, broadcast),
-                refresh_seconds=refresh_seconds,
-            )
-            radio_dial_watcher.start()
+        radio_dial_watcher = RadioDialWatcher(
+            http_client,
+            partial(publish_event, broadcast),
+            refresh_seconds=refresh_seconds,
+        )
+        radio_dial_watcher.start()
         app.state.radio_dial_watcher = radio_dial_watcher
 
     yield

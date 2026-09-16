@@ -33,8 +33,8 @@ class RadioDialWatcher:
         concurrency: int = 16,
         registry_url: str = REGISTRY_URL,
     ) -> None:
-        if refresh_seconds <= 0:
-            raise ValueError("refresh_seconds must be positive")
+        if refresh_seconds < 0:
+            raise ValueError("refresh_seconds must be non-negative")
         if concurrency < 1:
             raise ValueError("concurrency must be positive")
         self._client = client
@@ -131,8 +131,9 @@ class RadioDialWatcher:
         while True:
             self._wake.clear()
             await self.refresh()
+            timeout = self._refresh_seconds if self._watches else None
             try:
-                await asyncio.wait_for(self._wake.wait(), timeout=self._refresh_seconds)
+                await asyncio.wait_for(self._wake.wait(), timeout=timeout or None)
             except TimeoutError:
                 pass
 
