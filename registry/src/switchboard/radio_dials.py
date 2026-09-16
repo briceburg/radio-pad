@@ -22,7 +22,7 @@ class _Watch:
 
 
 class RadioDialWatcher:
-    """Poll each unique active RadioDial and publish revision changes to its player rooms."""
+    """Check each unique active RadioDial and publish revision changes to its player rooms."""
 
     def __init__(
         self,

@@ -166,6 +166,49 @@ describe("control-actions", () => {
     expect(global.fetch).toHaveBeenCalledOnce();
   });
 
+  it("retries a transient failure for a notified revision", async () => {
+    vi.useFakeTimers();
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    try {
+      const { actions, control } = createActions();
+      const initial = { name: "Initial", stations: [] };
+      const refreshed = { name: "Refreshed", stations: [] };
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: { get: vi.fn(() => '"v1"') },
+          json: async () => initial,
+        })
+        .mockRejectedValueOnce(new Error("temporary failure"))
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: { get: vi.fn(() => '"v2"') },
+          json: async () => refreshed,
+        });
+
+      await actions.selectPlayer(PLAYER);
+      control.dispatchEvent(
+        new CustomEvent("radiodialstate", {
+          detail: {
+            url: PLAYER.configured_radio_dial_url,
+            revision: '"v2"',
+          },
+        }),
+      );
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(controlStore.get().radioDial).toBe(initial);
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.waitFor(() =>
+        expect(controlStore.get().radioDial).toBe(refreshed),
+      );
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+    } finally {
+      random.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it.each([
     ["new revision of the same", PLAYER.configured_radio_dial_url],
     [

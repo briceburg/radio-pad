@@ -67,6 +67,21 @@ async def test_watcher_does_not_fetch_non_registry_resource() -> None:
     get.assert_not_awaited()
 
 
+async def test_watcher_keeps_last_revision_when_dial_is_unavailable() -> None:
+    url = "https://registry.example/api/accounts/community/radio-dials/briceburg"
+    response = httpx2.Response(404, request=httpx2.Request("GET", url))
+    get = AsyncMock(return_value=response)
+    client = cast(httpx2.AsyncClient, SimpleNamespace(get=get))
+    publish = AsyncMock()
+    watcher = RadioDialWatcher(client, publish, registry_url="https://registry.example/api")
+    watcher.register(url, "briceburg/living-room", '"last-good"')
+
+    await watcher.refresh()
+
+    get.assert_awaited_once_with(url, headers={"If-None-Match": '"last-good"'})
+    publish.assert_not_awaited()
+
+
 async def test_zero_interval_refreshes_only_when_a_player_registers() -> None:
     url = "https://registry.example/api/accounts/community/radio-dials/briceburg"
     response = httpx2.Response(200, headers={"ETag": '"new"'}, request=httpx2.Request("GET", url))

@@ -19,6 +19,7 @@ const RADIO_DIAL_UNAVAILABLE_STATUS = {
   level: "warning",
   summary: "RadioDial unavailable.",
 };
+const RADIO_DIAL_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 function isPlayableStation(station) {
   return [station?.call_sign, station?.stream_url].every(
@@ -66,6 +67,50 @@ function resolveReportedRadioDialUrl(player, reportedUrl) {
     : reportedUrl;
 }
 
+function waitForRetry(delay, signal) {
+  if (signal.aborted) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const aborted = () => {
+      clearTimeout(timeout);
+      resolve(false);
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", aborted);
+      resolve(true);
+    }, delay);
+    signal.addEventListener("abort", aborted, { once: true });
+  });
+}
+
+async function fetchRadioDial(url, load) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-cache",
+        signal: load.controller.signal,
+      });
+      if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
+      return {
+        radioDial: parseRadioDial(await response.json()),
+        revision: response.headers?.get?.("etag"),
+      };
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      const retryBase = load.revision
+        ? RADIO_DIAL_RETRY_DELAYS_MS[attempt]
+        : undefined;
+      const retryDelay =
+        retryBase === undefined ? undefined : retryBase * (0.5 + Math.random());
+      if (
+        retryDelay === undefined ||
+        !(await waitForRetry(retryDelay, load.controller.signal))
+      ) {
+        throw error;
+      }
+    }
+  }
+}
+
 export function createControlActions({ localPlayback, control }) {
   const getTabStore = (tabName) =>
     tabName === "listen" ? listenStore : controlStore;
@@ -107,22 +152,23 @@ export function createControlActions({ localPlayback, control }) {
     if (revision && radioDialRevisions[tabName] === revision) {
       return getTabStore(tabName).get().radioDial;
     }
-    if (radioDialLoads[tabName]?.url === url) return null;
+    const activeLoad = radioDialLoads[tabName];
+    if (
+      activeLoad?.url === url &&
+      (!revision || !activeLoad.revision || activeLoad.revision === revision)
+    ) {
+      activeLoad.revision ||= revision;
+      return null;
+    }
 
     abortRadioDialLoad(tabName);
     const controller = new AbortController();
-    const load = { url, controller };
+    const load = { url, revision, controller };
     radioDialLoads[tabName] = load;
     updateTab(tabName, { loading: true });
 
     try {
-      const response = await fetch(url, {
-        cache: "no-cache",
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`Fetch failed (${response.status})`);
-
-      const radioDial = parseRadioDial(await response.json());
+      const result = await fetchRadioDial(url, load);
 
       if (radioDialLoads[tabName] !== load) return null;
 
@@ -130,10 +176,10 @@ export function createControlActions({ localPlayback, control }) {
         setStatusMap("resourceStatuses", RADIO_DIAL_OK_STATUS);
       }
 
-      updateTab(tabName, { radioDial, loading: false });
-      radioDialRevisions[tabName] = response.headers?.get?.("etag") || revision;
+      updateTab(tabName, { radioDial: result.radioDial, loading: false });
+      radioDialRevisions[tabName] = result.revision || load.revision;
       radioDialLoads[tabName] = null;
-      return radioDial;
+      return result.radioDial;
     } catch (error) {
       if (error?.name === "AbortError" || radioDialLoads[tabName] !== load) {
         return null;
