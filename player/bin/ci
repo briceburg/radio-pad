@@ -10,7 +10,7 @@ bash -n bin/rpi-provision
 bin/player --help >/dev/null
 bin/rpi-flash --help >/dev/null
 bin/rpi-provision --help >/dev/null
-uv run --locked bin/check-url-resolver
+uv run --locked tests/bin/check-url-resolver
 export ANSIBLE_COLLECTIONS_PATH="$PWD/tmp/ansible/collections"
 uvx --from ansible-core==2.21.4 ansible-galaxy collection install \
   --requirements-file deploy/raspberry-pi/requirements.yml \

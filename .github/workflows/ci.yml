@@ -43,7 +43,7 @@ jobs:
       - name: Build player image
         run: docker build --target prod --tag radiopad-player:ci player
       - name: Verify player image
-        run: docker run --rm --entrypoint sh radiopad-player:ci -c 'set -eu; mpv --version >/dev/null; ./bin/check-url-resolver'
+        run: docker run --rm --interactive --entrypoint sh radiopad-player:ci -c 'set -eu; mpv --version >/dev/null; sh -s' < player/tests/bin/check-url-resolver
 
   integration:
     runs-on: ubuntu-latest
