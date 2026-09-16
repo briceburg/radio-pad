@@ -38,6 +38,20 @@ Program the Macropad, then connect it to a host running the [player](../player/)
 
 A Linux host with the Macropad attached is assumed.
 
+Provision the device:
+
+```sh
+bin/provision
+```
+
+`bin/provision` is the setup and recovery command. It installs the vendored [CircuitPython runtime](https://circuitpython.org/board/adafruit_macropad_rp2040/) on a factory-new board or one already in `RPI-RP2` bootloader mode, then mounts the device, syncs the RadioPad code, and verifies its USB interfaces. It is safe to rerun and does not reinstall CircuitPython on an already provisioned board. If automatic bootloader entry is unavailable, it prints the exact BOOTSEL/reset action to take. Synchronized writes to the MacroPad's flash are intentionally conservative and may take about a minute.
+
+When first-time provisioning finishes, press the small **RESET** button once as instructed so CircuitPython enables the CDC2 data port. The board is then ready to use; use `bin/mount` followed by `bin/sync` for future RadioPad code changes.
+
+#### Updating RadioPad code
+
+After provisioning, use `bin/sync` for routine code changes. It updates the files on `CIRCUITPY`; it does not install CircuitPython or enter the bootloader.
+
 1. Mount CIRCUITPY:
 
    ```sh
@@ -46,21 +60,28 @@ A Linux host with the Macropad attached is assumed.
 
    The helper uses synchronous I/O and verifies a small write before reporting the filesystem ready.
 
-2. Sync the local firmware:
+2. Sync the RadioPad code:
 
    ```sh
    bin/sync
    ```
 
-   Mounting is explicit because it may require `sudo`; syncing never mounts or prompts. Firmware is staged and verified before the installed files are replaced.
+   Mounting is explicit because it may require `sudo`; syncing never mounts or prompts. The code is staged and verified before the installed files are replaced.
 
-3. Verify storage, serial interfaces, firmware, and the optional Compose player:
+3. Unmount CIRCUITPY, then press the reset button so CircuitPython runs the new `boot.py` and enables the CDC2 data interface:
 
    ```sh
+   bin/mount --unmount
+   ```
+
+4. Mount the reconnected CIRCUITPY drive and verify storage, serial interfaces, RadioPad code, and the optional Compose player:
+
+   ```sh
+   bin/mount
    bin/doctor
    ```
 
-Edit [`src/main.py`](./src/main.py) only when changing firmware behavior. Station assignments are not hardcoded there: the connected [player](../player/) sends an ordered call-sign menu from its registry [RadioDial](../player/README.md#registry-discovery).
+Edit [`src/main.py`](./src/main.py) only when changing Macropad behavior. Station assignments are not hardcoded there: the connected [player](../player/) sends an ordered call-sign menu from its registry [RadioDial](../player/README.md#registry-discovery).
 
 ### USB serial console
 

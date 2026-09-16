@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+component_root="$(cd "$script_dir/.." && pwd)"
+source_dir="$component_root/src"
+target="/mnt/CIRCUITPY"
+
+if [ "$#" -ne 0 ]; then
+  echo "usage: bin/provision" >&2
+  exit 2
+fi
+
+uf2_files=("$component_root/vendor/"*.uf2)
+if [ "${#uf2_files[@]}" -ne 1 ] || [ ! -f "${uf2_files[0]}" ]; then
+  echo "expected exactly one vendored CircuitPython UF2" >&2
+  exit 1
+fi
+uf2="${uf2_files[0]}"
+
+wait_for_label() {
+  local label="$1"
+  for _ in {1..100}; do
+    [ -e "/dev/disk/by-label/$label" ] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+if [ ! -e /dev/disk/by-label/CIRCUITPY ] && [ ! -e /dev/disk/by-label/RPI-RP2 ]; then
+  for link in /dev/serial/by-id/usb-Adafruit_MacroPad_RP2040_*-if00; do
+    [ -e "$link" ] || continue
+    factory_port="$(readlink -f "$link")"
+    interface="/sys/class/tty/${factory_port##*/}/device/interface"
+    [ -f "$interface" ] && [ "$(<"$interface")" = "Board CDC" ] || continue
+    if [ -w "$factory_port" ]; then
+      echo "[info] entering the RP2040 bootloader through $factory_port"
+      stty -F "$factory_port" 1200 || true
+      wait_for_label RPI-RP2 || true
+    fi
+    break
+  done
+fi
+
+if [ -e /dev/disk/by-label/RPI-RP2 ]; then
+  "$script_dir/mount" RPI-RP2
+  echo "[info] installing CircuitPython: $(basename "$uf2")"
+  cp "$uf2" "/mnt/RPI-RP2/$(basename "$uf2")"
+  "$script_dir/mount" --unmount RPI-RP2
+  if ! wait_for_label CIRCUITPY; then
+    echo "CircuitPython was copied, but CIRCUITPY did not appear" >&2
+    exit 1
+  fi
+elif [ ! -e /dev/disk/by-label/CIRCUITPY ]; then
+  echo "[action] hold the encoder, tap the small RESET button, and keep holding until RPI-RP2 appears; then rerun bin/provision" >&2
+  exit 1
+fi
+
+"$script_dir/mount"
+
+needs_reset=0
+if [ ! -e "$target/boot.py" ] || ! diff -q "$source_dir/boot.py" "$target/boot.py" >/dev/null; then
+  needs_reset=1
+fi
+
+if [ -e "$target/code.py" ] || [ ! -e "$target/main.py" ] || [ ! -d "$target/lib" ] ||
+  ! diff -q "$source_dir/boot.py" "$target/boot.py" >/dev/null ||
+  ! diff -q "$source_dir/main.py" "$target/main.py" >/dev/null ||
+  ! diff -qr --exclude=__pycache__ "$source_dir/lib" "$target/lib" >/dev/null; then
+  RADIOPAD_PROVISION=1 "$script_dir/sync"
+fi
+
+if [ "$needs_reset" -eq 1 ] || ! "$script_dir/data-port" >/dev/null 2>&1; then
+  "$script_dir/mount" --unmount
+  echo "[ok] CircuitPython and RadioPad code are installed and verified"
+  echo "[action] press the small RESET button once to activate the CDC2 data port"
+  echo "[ok] provisioning is complete; future code updates use bin/mount followed by bin/sync"
+  exit 0
+fi
+
+"$script_dir/doctor"
+echo "[ok] MacroPad is provisioned"

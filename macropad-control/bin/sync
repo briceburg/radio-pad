@@ -28,19 +28,26 @@ if [[ "$mount_options" != *,rw,* ]] || [[ "$mount_options" != *,sync,* ]]; then
   exit 1
 fi
 
+echo "[info] syncing RadioPad code; synchronized flash writes may take about a minute"
 staging="$(mktemp -d "$target/.radio-pad-sync.XXXXXX")"
 trap 'rm -rf -- "$staging" 2>/dev/null || true' EXIT
 
-cp -R "$source_dir"/{boot.py,lib,main.py} "$staging/"
+tar -C "$source_dir" --exclude=__pycache__ -cf - boot.py lib main.py |
+  tar -C "$staging" -xf -
 sync -f "$staging"
-diff -qr "$source_dir" "$staging"
+diff -q "$source_dir/boot.py" "$staging/boot.py"
+diff -qr --exclude=__pycache__ "$source_dir/lib" "$staging/lib"
+diff -q "$source_dir/main.py" "$staging/main.py"
 
-rm -rf "$target"/{boot.py,lib,main.py}
+rm -rf "$target"/{boot.py,code.py,lib,main.py}
 mv "$staging"/{boot.py,lib,main.py} "$target/"
 sync -f "$target"
 
 diff -q "$source_dir/boot.py" "$target/boot.py"
-diff -qr "$source_dir/lib" "$target/lib"
+diff -qr --exclude=__pycache__ "$source_dir/lib" "$target/lib"
 diff -q "$source_dir/main.py" "$target/main.py"
 
-echo "[ok] synced and verified firmware at $target"
+echo "[ok] synced and verified RadioPad code at $target"
+if [ "${RADIOPAD_PROVISION:-0}" != "1" ]; then
+  echo "[next] run bin/mount --unmount, reset the Macropad, then rerun bin/mount and bin/doctor"
+fi
