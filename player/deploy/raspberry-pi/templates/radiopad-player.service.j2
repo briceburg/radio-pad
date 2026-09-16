@@ -1,0 +1,39 @@
+[Unit]
+Description=RadioPad player
+Documentation=https://github.com/briceburg/radio-pad/tree/main/player
+After=network.target sound.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+DynamicUser=yes
+SupplementaryGroups=audio dialout
+WorkingDirectory={{ radiopad_install_root }}/player
+EnvironmentFile=/etc/radiopad/player.env
+Environment=HOME=/run/radiopad
+Environment=PATH={{ radiopad_install_root }}/player/tmp/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/test -x {{ radiopad_install_root }}/player/tmp/.venv/bin/python
+ExecStartPre=/usr/bin/test -r {{ radiopad_install_root }}/player/src/player.py
+ExecStart={{ radiopad_install_root }}/player/tmp/.venv/bin/python {{ radiopad_install_root }}/player/src/player.py
+Restart=always
+RestartSec=5s
+TimeoutStopSec=20s
+RuntimeDirectory=radiopad
+RuntimeDirectoryMode=0750
+UMask=0077
+CapabilityBoundingSet=
+LockPersonality=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

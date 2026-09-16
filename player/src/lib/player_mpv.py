@@ -61,6 +61,7 @@ class MpvPlayer(RadioPadPlayer):
                     "--no-cache",
                     "--stream-lavf-o=reconnect_streamed=1",
                     "--profile=low-latency",
+                    "--ytdl-format=bestaudio/best",
                     f"--audio-channels={self.audio_channels}",
                     *([f"--audio-device={self.audio_device}"] if self.audio_device else []),
                     *([f"--ao={self.audio_output}"] if self.audio_output else []),

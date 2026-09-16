@@ -43,6 +43,7 @@ def test_play_confirms_only_after_ipc_reports_audio_ready(tmp_path):
     assert player.station == station
     assert player.mpv_sock is sock
     command = popen.call_args.args[0]
+    assert "--ytdl-format=bestaudio/best" in command
     assert "--audio-device=alsa/default:CARD=Generic" in command
     assert "--ao=alsa" in command
 

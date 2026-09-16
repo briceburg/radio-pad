@@ -1,0 +1,282 @@
+---
+- name: Configure RadioPad players
+  hosts: all
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Wait for SSH after first boot
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Gather target facts
+      ansible.builtin.setup:
+
+    - name: Validate target and player identity
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == "Debian"
+          - ansible_facts.service_mgr == "systemd"
+          - ansible_facts.architecture == "aarch64"
+          - radiopad_player is defined
+          - radiopad_player is match('^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$')
+          - radiopad_player.split('/')[0] | length <= 36
+          - radiopad_player.split('/')[1] | length <= 36
+          - radiopad_wifi_ssid | length <= 32
+          - radiopad_wifi_country == '' or radiopad_wifi_country is match('^[A-Z]{2}$')
+          - radiopad_registry_url is match('^https?://')
+          - >-
+            radiopad_wifi_ssid == '' or (radiopad_wifi_password | length >= 8 and radiopad_wifi_password | length <= 63) or (radiopad_wifi_password | length == 64 and radiopad_wifi_password is match('^[A-Fa-f0-9]{64}$'))
+        fail_msg: >-
+          Target must be 64-bit Debian with systemd. Player, registry, and optional Wi-Fi settings must be valid.
+
+    - name: Validate registered player identity
+      ansible.builtin.uri:
+        url: >-
+          {{ radiopad_registry_url }}/accounts/{{ radiopad_player.split('/')[0] }}/players/{{ radiopad_player.split('/')[1] }}
+        status_code: 200
+        timeout: 15
+      changed_when: false
+
+  tasks:
+    - name: Read default boot target
+      ansible.builtin.command: systemctl get-default
+      check_mode: false
+      changed_when: false
+      register: radiopad_default_target
+
+    - name: Configure headless boot target
+      ansible.builtin.command: systemctl set-default multi-user.target
+      changed_when: true
+      when:
+        - radiopad_headless | bool
+        - radiopad_default_target.stdout != 'multi-user.target'
+
+    - name: Disable legacy console auto-login
+      ansible.builtin.file:
+        path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+        state: absent
+      notify: Reload systemd
+      when: radiopad_headless | bool
+
+    - name: Install system packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - mpv
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        install_recommends: false
+
+    - name: Discover mpv audio devices
+      ansible.builtin.command:
+        argv:
+          - mpv
+          - --no-config
+          - --audio-device=help
+      check_mode: false
+      changed_when: false
+      register: radiopad_mpv_audio_devices
+      when: radiopad_audio_device | length > 0
+
+    - name: Validate configured audio device
+      ansible.builtin.assert:
+        that: radiopad_audio_device in (radiopad_mpv_audio_devices.stdout ~ radiopad_mpv_audio_devices.stderr)
+        fail_msg: >-
+          {{ radiopad_audio_device }} is unavailable. Run `mpv --no-config --audio-device=help` on the Pi and update radiopad_audio_device.
+      when: radiopad_audio_device | length > 0
+
+    - name: Install Wi-Fi management packages
+      ansible.builtin.apt:
+        name:
+          - iw
+          - network-manager
+          - rfkill
+        state: present
+        install_recommends: false
+      when: radiopad_wifi_ssid | length > 0
+
+    - name: Read Wi-Fi regulatory domain
+      ansible.builtin.command:
+        argv:
+          - iw
+          - reg
+          - get
+      check_mode: false
+      changed_when: false
+      register: radiopad_wifi_regulatory_domain
+      when: radiopad_wifi_ssid | length > 0
+
+    - name: Set Wi-Fi regulatory country
+      ansible.builtin.command:
+        argv:
+          - raspi-config
+          - nonint
+          - do_wifi_country
+          - "{{ radiopad_wifi_country }}"
+      when:
+        - radiopad_wifi_ssid | length > 0
+        - radiopad_wifi_regulatory_domain.stdout is not search('country ' ~ radiopad_wifi_country ~ ':')
+
+    - name: Read Wi-Fi radio state
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - radio
+          - wifi
+      check_mode: false
+      changed_when: false
+      register: radiopad_wifi_radio
+      when: radiopad_wifi_ssid | length > 0
+
+    - name: Enable Wi-Fi radio
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - radio
+          - wifi
+          - "on"
+      when:
+        - radiopad_wifi_ssid | length > 0
+        - radiopad_wifi_radio.stdout != 'enabled'
+
+    - name: Configure the managed Wi-Fi connection
+      community.general.nmcli:
+        type: wifi
+        conn_name: radiopad-wifi
+        ifname: wlan0
+        ssid: "{{ radiopad_wifi_ssid }}"
+        wifi_sec:
+          key-mgmt: wpa-psk
+          psk: "{{ radiopad_wifi_password }}"
+        method4: auto
+        method6: auto
+        autoconnect: true
+        state: present
+      no_log: true
+      when: radiopad_wifi_ssid | length > 0
+
+    - name: Activate the managed Wi-Fi connection
+      community.general.nmcli:
+        conn_name: radiopad-wifi
+        state: up
+      when: radiopad_wifi_ssid | length > 0
+
+    - name: Check out RadioPad
+      ansible.builtin.git:
+        repo: "{{ radiopad_repo_url }}"
+        dest: "{{ radiopad_install_root }}"
+        version: "{{ radiopad_repo_version }}"
+        depth: 1
+        force: false
+        update: true
+      notify: Restart RadioPad player
+
+    - name: Read installed uv version
+      ansible.builtin.command: /usr/local/bin/uv --version
+      check_mode: false
+      changed_when: false
+      failed_when: false
+      register: radiopad_uv_installed
+
+    - name: Download pinned uv installer
+      ansible.builtin.get_url:
+        url: "https://astral.sh/uv/{{ radiopad_uv_version }}/install.sh"
+        dest: /tmp/radiopad-uv-install.sh
+        checksum: "sha256:{{ radiopad_uv_installer_sha256 }}"
+        mode: "0500"
+      when: >-
+        radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (radiopad_uv_version | regex_escape) ~ '(?: |$)')
+
+    - name: Install pinned uv
+      ansible.builtin.command: /tmp/radiopad-uv-install.sh
+      environment:
+        UV_UNMANAGED_INSTALL: /usr/local/bin
+      changed_when: true
+      when: >-
+        radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (radiopad_uv_version | regex_escape) ~ '(?: |$)')
+
+    - name: Remove uv installer
+      ansible.builtin.file:
+        path: /tmp/radiopad-uv-install.sh
+        state: absent
+
+    - name: Create managed directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - /etc/radiopad
+        - /usr/local/lib/radiopad/python
+        - /var/cache/radiopad/uv
+
+    - name: Synchronize the locked player environment
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/uv
+          - sync
+          - --project
+          - "{{ radiopad_install_root }}/player"
+          - --locked
+          - --no-dev
+          - --python
+          - "3.13"
+      environment:
+        UV_CACHE_DIR: /var/cache/radiopad/uv
+        UV_PROJECT_ENVIRONMENT: "{{ radiopad_install_root }}/player/tmp/.venv"
+        UV_PYTHON_INSTALL_DIR: /usr/local/lib/radiopad/python
+      register: radiopad_uv_sync
+      changed_when: >-
+        radiopad_uv_sync.stderr is search('Creating virtual environment|Installed |Uninstalled |Updated ')
+      notify: Restart RadioPad player
+
+    - name: Configure player environment
+      ansible.builtin.template:
+        src: templates/player.env.j2
+        dest: /etc/radiopad/player.env
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart RadioPad player
+
+    - name: Install player service
+      ansible.builtin.template:
+        src: templates/radiopad-player.service.j2
+        dest: /etc/systemd/system/radiopad-player.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart RadioPad player
+
+    - name: Apply pending service changes
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start player service
+      ansible.builtin.systemd_service:
+        name: radiopad-player.service
+        enabled: true
+        state: started
+
+    - name: Wait for RadioPad readiness
+      ansible.builtin.wait_for:
+        path: /run/radiopad/ready
+        state: present
+        timeout: 60
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Restart RadioPad player
+      ansible.builtin.systemd_service:
+        name: radiopad-player.service
+        daemon_reload: true
+        enabled: true
+        state: restarted

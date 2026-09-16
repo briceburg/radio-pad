@@ -9,6 +9,7 @@ dependencies = [
   "pyserial-asyncio==0.6",
   "python-mpv-jsonipc==1.2.1",
   "websockets==15.0.1",
+  "yt-dlp[default,deno]==2026.8.19",
 ]
 
 [dependency-groups]
@@ -27,6 +28,7 @@ cache_dir = "tmp/.pytest_cache"
 faulthandler_timeout = 30
 faulthandler_exit_on_timeout = true
 pythonpath = ["src", "tests"]
+testpaths = ["tests"]
 
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"
