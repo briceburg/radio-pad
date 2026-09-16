@@ -13,7 +13,7 @@ Guidance for coding agents working in `radio-pad/player`.
 ## Runtime and tooling
 
 - Python dependencies and tool settings live in `pyproject.toml`.
-- Use `bin/ci` for validation. It runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
+- Use `bin/ci` for validation. It checks the yt-dlp/Deno URL resolver and runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
 - Use `bin/player` or `uv run python src/player.py` for local execution.
 - The Docker image installs dependencies with `uv sync` from `pyproject.toml` and `uv.lock`.
 - Validate provisioning changes with the pinned Ansible Core and collection versions under `deploy/raspberry-pi`; keep the playbook idempotent.
