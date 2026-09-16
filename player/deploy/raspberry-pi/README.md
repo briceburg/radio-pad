@@ -1,6 +1,6 @@
 # Raspberry Pi provisioning
 
-This auxiliary Ansible project turns a Raspberry Pi OS Lite host into a supervised RadioPad player. It installs the runtime under `/opt/radio-pad`, synchronizes the locked player environment, writes the player configuration, and enables `radiopad-player.service`. Re-running it updates or repairs the declared configuration rather than layering another startup mechanism on the device.
+This auxiliary Ansible project turns a Raspberry Pi OS Lite host into a supervised [RadioPad player](../../). It installs the runtime under `/opt/radio-pad`, synchronizes the locked player environment, writes the player configuration, and enables `radiopad-player.service`. Re-running it updates or repairs the declared configuration rather than layering another startup mechanism on the device.
 
 The service uses `DynamicUser=yes`, so it has no persistent login account or password. systemd gives its transient `radiopad-player` identity access to the existing `audio` and `dialout` groups for ALSA and the USB Macropad. A separate `radiopad` administrator exists only for SSH maintenance and provisioning.
 
