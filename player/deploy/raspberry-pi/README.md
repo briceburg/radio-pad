@@ -116,7 +116,7 @@ The playbook accepts these inventory variables:
 | `radiopad_player` | Required `account/player` registry identity. | none |
 | `radiopad_audio_device` | Optional device reported by `mpv --no-config --audio-device=help`; provisioning verifies it exists. | unset |
 | `radiopad_audio_output` | mpv audio driver. | `alsa` |
-| `radiopad_extra_environment` | Additional or overriding player environment mapping. | `{}` |
+| `radiopad_extra_environment` | Additional player environment mapping; managed settings take precedence. | `{}` |
 | `radiopad_headless` | Make `multi-user.target` the default boot target. | `true` |
 | `radiopad_repo_url` | Git repository installed on the Pi. | RadioPad GitHub repository |
 | `radiopad_repo_version` | Branch or tag to deploy. | `main` |

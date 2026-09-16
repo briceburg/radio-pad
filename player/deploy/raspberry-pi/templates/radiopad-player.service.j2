@@ -8,15 +8,15 @@ StartLimitIntervalSec=0
 Type=simple
 DynamicUser=yes
 SupplementaryGroups=audio dialout
-WorkingDirectory={{ radiopad_install_root }}/player
+WorkingDirectory={{ _radiopad_player_root }}
 EnvironmentFile=/etc/radiopad/player.env
 Environment=HOME=/run/radiopad
-Environment=PATH={{ radiopad_install_root }}/player/tmp/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=PATH={{ _radiopad_player_venv }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
-ExecStartPre=/usr/bin/test -x {{ radiopad_install_root }}/player/tmp/.venv/bin/python
-ExecStartPre=/usr/bin/test -r {{ radiopad_install_root }}/player/src/player.py
-ExecStart={{ radiopad_install_root }}/player/tmp/.venv/bin/python {{ radiopad_install_root }}/player/src/player.py
+ExecStartPre=/usr/bin/test -x {{ _radiopad_player_venv }}/bin/python
+ExecStartPre=/usr/bin/test -r {{ _radiopad_player_root }}/src/player.py
+ExecStart={{ _radiopad_player_venv }}/bin/python {{ _radiopad_player_root }}/src/player.py
 Restart=always
 RestartSec=5s
 TimeoutStopSec=20s

@@ -3,6 +3,18 @@
   hosts: all
   become: true
   gather_facts: false
+  vars:
+    _radiopad_player_root: "{{ radiopad_install_root }}/player"
+    _radiopad_player_venv: "{{ _radiopad_player_root }}/tmp/.venv"
+    _radiopad_health_path: /run/radiopad/ready
+    _radiopad_uv_python_dir: /usr/local/lib/radiopad/python
+    _radiopad_managed_environment:
+      RADIOPAD_PLAYER: "{{ radiopad_player }}"
+      RADIOPAD_REGISTRY_URL: "{{ radiopad_registry_url }}"
+      RADIOPAD_AUDIO_OUTPUT: "{{ radiopad_audio_output }}"
+      RADIOPAD_AUDIO_DEVICE: "{{ radiopad_audio_device }}"
+      RADIOPAD_MPV_SOCKET_PATH: /run/radiopad/mpv.sock
+      RADIOPAD_HEALTH_PATH: "{{ _radiopad_health_path }}"
 
   pre_tasks:
     - name: Wait for SSH after first boot
@@ -298,24 +310,19 @@
         mode: "0755"
       loop:
         - /etc/radiopad
-        - /usr/local/lib/radiopad/python
-        - /var/cache/radiopad/uv
+        - "{{ _radiopad_uv_python_dir }}"
 
     - name: Synchronize the locked player environment
       ansible.builtin.command:
         argv:
           - /usr/local/bin/uv
           - sync
-          - --project
-          - "{{ radiopad_install_root }}/player"
           - --locked
           - --no-dev
-          - --python
-          - "3.13"
+        chdir: "{{ _radiopad_player_root }}"
       environment:
-        UV_CACHE_DIR: /var/cache/radiopad/uv
-        UV_PROJECT_ENVIRONMENT: "{{ radiopad_install_root }}/player/tmp/.venv"
-        UV_PYTHON_INSTALL_DIR: /usr/local/lib/radiopad/python
+        UV_PROJECT_ENVIRONMENT: tmp/.venv
+        UV_PYTHON_INSTALL_DIR: "{{ _radiopad_uv_python_dir }}"
       register: radiopad_uv_sync
       changed_when: >-
         radiopad_uv_sync.stderr is search('Creating virtual environment|Installed |Uninstalled |Updated ')
@@ -350,7 +357,7 @@
 
     - name: Wait for RadioPad readiness
       ansible.builtin.wait_for:
-        path: /run/radiopad/ready
+        path: "{{ _radiopad_health_path }}"
         state: present
         timeout: 60
 

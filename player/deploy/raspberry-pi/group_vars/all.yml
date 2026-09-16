@@ -14,10 +14,3 @@ radiopad_wifi_ssid: ""
 radiopad_wifi_password: ""
 radiopad_wifi_country: ""
 radiopad_extra_environment: {}
-radiopad_managed_environment:
-  RADIOPAD_PLAYER: "{{ radiopad_player }}"
-  RADIOPAD_REGISTRY_URL: "{{ radiopad_registry_url }}"
-  RADIOPAD_AUDIO_OUTPUT: "{{ radiopad_audio_output }}"
-  RADIOPAD_AUDIO_DEVICE: "{{ radiopad_audio_device }}"
-  RADIOPAD_MPV_SOCKET_PATH: /run/radiopad/mpv.sock
-  RADIOPAD_HEALTH_PATH: /run/radiopad/ready
