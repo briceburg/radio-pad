@@ -90,6 +90,8 @@ case "$command" in
     branch="$(git -C "$repo_root" branch --show-current)"
     [[ -n "$branch" ]] || die "checkout is not on a branch; update with rpi-provision"
     GIT_TERMINAL_PROMPT=0 git -C "$repo_root" fetch origin "$branch"
+    git -C "$repo_root" merge-base --is-ancestor HEAD FETCH_HEAD ||
+      die "remote branch cannot fast-forward this checkout; update with rpi-provision"
     git -C "$repo_root" merge --ff-only FETCH_HEAD
     UV_CACHE_DIR=/var/cache/radiopad/uv \
       UV_PROJECT_ENVIRONMENT="$player_root/tmp/.venv" \

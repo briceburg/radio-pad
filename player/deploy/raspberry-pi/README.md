@@ -10,9 +10,9 @@ Run both helpers from the repository root. The workstation needs Linux, Raspberr
 
 1. Attach an unmounted SD card and run `player/bin/rpi-flash radio-canones`.
 2. Move the card to the Pi, connect Ethernet, and power it on.
-3. Run `player/bin/rpi-provision --wifi SpringSong radio-canones`.
+3. Run `player/bin/rpi-provision radio-canones`.
 
-The provisioner reads the host, registered player identity, and DAC output from `inventory.yml`; it prompts locally for the Wi-Fi passphrase. It validates the registry identity and audio device, installs and configures the player, starts its systemd service, and waits for the player to report ready. Omit `--wifi SpringSong` when Ethernet is sufficient; Wi-Fi can be added later without reflashing.
+The provisioner reads the registered player and hardware settings from `inventory.yml`. It validates the target and audio device, removes one-time cloud-init state, installs the player as a systemd service, and waits for readiness. Wi-Fi can be added during this step or later without reflashing.
 
 ## Flash Raspberry Pi OS Lite
 
@@ -42,7 +42,7 @@ The generated first-boot configuration creates a key-only `radiopad` administrat
 As a manual alternative, open [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and make these selections:
 
 1. Select the exact Pi model under **Device**.
-2. Under **OS**, choose **Raspberry Pi OS (other)** and then **Raspberry Pi OS Lite (64-bit)**. Use Lite (32-bit) only for a model without 64-bit support. Do not choose the desktop image when boot time and footprint are priorities.
+2. Under **OS**, choose **Raspberry Pi OS (other)** and then **Raspberry Pi OS Lite (64-bit)**. This workflow does not support 32-bit-only models or desktop images.
 3. Select the storage device and open **OS Customisation**.
 4. Set a hostname such as `radio-kitchen`, create the administrative user `radiopad`, and configure the correct locale, time zone, keyboard layout, and Wi-Fi country.
 5. Configure Wi-Fi only when Ethernet will not be used.
@@ -63,11 +63,7 @@ Provisioning consumes an existing registry identity; it does not create shared r
 }
 ```
 
-The display name may contain `ñ`, while the qualified player identity uses lowercase registry slugs. Check that deployed registry data is available before provisioning:
-
-```sh
-curl --fail https://registry.radiopad.dev/api/accounts/briceburg/players/canones
-```
+Display names may contain Unicode characters, while qualified player identities use lowercase registry slugs. Provisioning verifies that the player exists in the deployed registry.
 
 The checked-in inventory completes the Cañones deployment definition without storing credentials:
 
@@ -76,12 +72,13 @@ radio-canones:
   ansible_host: radio-canones.lan
   radiopad_player: briceburg/canones
   radiopad_audio_device: alsa/default:CARD=DAC
+  radiopad_timezone: America/Denver
 ```
 
 Provision it by inventory name:
 
 ```sh
-player/bin/rpi-provision --wifi SpringSong radio-canones
+player/bin/rpi-provision radio-canones
 ```
 
 For a new host that is not yet in inventory, provide its registered identity explicitly, then add its durable non-secret configuration to `inventory.yml`:
@@ -94,7 +91,7 @@ Use `USER@HOST` only for a nonstandard existing installation and `--audio-device
 
 SSH remains key-only by default. To add a persistent password fallback for the `radiopad` administrator, use `player/bin/rpi-provision --ssh-password HOST`; the helper prompts twice without echoing the password, keeps public-key access enabled, and does not impose a password-strength policy. Because `radiopad` has passwordless sudo, treat this password as a root credential.
 
-Wi-Fi can also be added later over Ethernet without reflashing. Each `--wifi SSID` run adds or updates that network's autoconnect profile without removing existing profiles, so repeat the command for every deployment or fallback network. If the requested SSID is visible, provisioning activates it as a connectivity check; otherwise, provisioning stages it for NetworkManager to connect when it becomes available. The helper prompts locally without echoing the passphrase, stores it only in a mode-0600 temporary Ansible variables file, and keeps Ethernet enabled.
+Add Wi-Fi during any provisioning run with `player/bin/rpi-provision --wifi NETWORK_NAME HOST`. Each run adds or updates one autoconnect profile without removing Ethernet or existing networks and disables Wi-Fi power saving for reliable playback. A visible network is activated as a connectivity check; an unavailable network is saved for deployment. The passphrase is prompted without echo and exists only in a mode-0600 temporary file on the workstation.
 
 The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
 
@@ -125,6 +122,7 @@ The playbook accepts these inventory variables:
 | `radiopad_repo_version` | Branch or tag to deploy. | `main` |
 | `radiopad_registry_url` | Registry API used by validation and the player. | RadioPad production registry |
 | `radiopad_ssh_password_hash` | Optional hashed `radiopad` password that also enables SSH password authentication; use Ansible Vault in persistent inventories. | unset |
+| `radiopad_timezone` | Optional canonical tzdb time zone enforced after first boot. | unset |
 | `radiopad_wifi_country` | Two-letter regulatory country when configuring Wi-Fi. | unset |
 | `radiopad_wifi_password` | WPA passphrase; use Ansible Vault in persistent inventories. | unset |
 | `radiopad_wifi_ssid` | One Wi-Fi profile to add or update alongside Ethernet and existing profiles. | unset |
@@ -152,7 +150,3 @@ A single `Player already connected` message immediately after a restart can be t
 On an older manually configured Pi, remove the `.bashrc` block and stop the tmux player before provisioning so two players do not compete for audio or the same switchboard identity. In headless mode the playbook also removes Raspberry Pi OS's standard tty1 auto-login override.
 
 To inspect ALSA card names before choosing an mpv device, run `ssh radiopad@HOST cat /proc/asound/cards`. For example, the Cañones Raspberry Pi DAC Plus HAT registers as card `DAC`, corresponding to `alsa/default:CARD=DAC`.
-
-## Why not a custom image?
-
-Raspberry Pi Imager plus Ansible keeps the standard Raspberry Pi OS image and gives both first-install and ongoing-update workflows. [`rpi-image-gen`](https://github.com/raspberrypi/rpi-image-gen) becomes worthwhile when provisioning must work offline, the base filesystem itself needs customization, or many identical devices should be manufactured from one reproducible image. It is intentionally not required by this auxiliary tool.

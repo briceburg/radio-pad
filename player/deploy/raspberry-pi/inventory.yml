@@ -6,3 +6,4 @@ radiopad_players:
       ansible_host: radio-canones.lan
       radiopad_player: briceburg/canones
       radiopad_audio_device: alsa/default:CARD=DAC
+      radiopad_timezone: America/Denver

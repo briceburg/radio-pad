@@ -30,7 +30,7 @@ EOF
 }
 
 die() {
-  echo "flash: $*" >&2
+  echo "rpi-flash: $*" >&2
   exit 2
 }
 
@@ -76,7 +76,7 @@ done
 (($# == 1)) || die "expected HOSTNAME"
 hostname="$1"
 
-for tool in curl head lsblk mktemp readlink rpi-imager sed ssh-keygen tr udevadm; do
+for tool in awk curl head lsblk mktemp readlink rpi-imager sed ssh-keygen tr udevadm; do
   command -v "$tool" >/dev/null || die "$tool is required"
 done
 
@@ -97,6 +97,10 @@ if [[ -z "$timezone" ]]; then
   timezone_path="$(readlink -f /etc/localtime 2>/dev/null || true)"
   timezone="${timezone_path#/usr/share/zoneinfo/}"
   [[ "$timezone" != "$timezone_path" && -n "$timezone" ]] || timezone="UTC"
+fi
+if [[ -r /usr/share/zoneinfo/tzdata.zi ]]; then
+  canonical_timezone="$(awk -v target="$timezone" '$1 == "L" && $3 == target { print $2; exit }' /usr/share/zoneinfo/tzdata.zi)"
+  timezone="${canonical_timezone:-$timezone}"
 fi
 
 [[ "$country" =~ ^[A-Z]{2}$ ]] || die "country must be a two-letter code"
@@ -146,7 +150,7 @@ if [[ -z "$device" ]]; then
     1) device="${candidates[0]}" ;;
     0) die "no removable disk detected; attach the SD card or pass DEVICE explicitly" ;;
     *)
-      printf 'flash: multiple removable disks detected:\n' >&2
+      printf 'rpi-flash: multiple removable disks detected:\n' >&2
       printf '  %s\n' "${candidates[@]}" >&2
       die "pass the intended DEVICE explicitly"
       ;;
@@ -163,7 +167,7 @@ is_removable_disk "$device" || die "$device is not reported as removable, hot-pl
 [[ -n "$key_type" && -n "$key_data" ]] ||
   die "no SSH public key found in the SSH agent or standard files; pass --ssh-key or run ssh-keygen"
 case "$key_type" in
-  ssh-ed25519 | ssh-rsa | ecdsa-sha2-*) ;;
+  ssh-ed25519 | ssh-rsa | ecdsa-sha2-* | sk-ssh-ed25519@openssh.com | sk-ecdsa-sha2-*) ;;
   *) die "unsupported SSH public key type: $key_type" ;;
 esac
 [[ "$key_data" =~ ^[A-Za-z0-9+/]+={0,3}$ ]] || die "invalid SSH public key"
@@ -206,7 +210,6 @@ trap 'rm -f -- "$cloud_init" "$network_config"' EXIT
   printf '%s\n' 'ssh_pwauth: false' 'runcmd:' '  - [ systemctl, enable, --now, ssh ]'
   printf '%s\n' "  - [ raspi-config, nonint, do_wifi_country, '$country' ]"
   printf '%s\n' '  - [ raspi-config, nonint, do_boot_behaviour, B1 ]'
-  printf '%s\n' '  - [ systemctl, set-default, multi-user.target ]'
 } >"$cloud_init"
 
 if $wifi; then

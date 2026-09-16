@@ -9,6 +9,7 @@ radiopad_headless: true
 radiopad_audio_output: alsa
 radiopad_audio_device: ""
 radiopad_ssh_password_hash: ""
+radiopad_timezone: ""
 radiopad_wifi_ssid: ""
 radiopad_wifi_password: ""
 radiopad_wifi_country: ""
