@@ -4,8 +4,10 @@ set -eu
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 
+bash -n bin/player
 bash -n bin/rpi-flash
 bash -n bin/rpi-provision
+bin/player --help >/dev/null
 bin/rpi-flash --help >/dev/null
 bin/rpi-provision --help >/dev/null
 uv run --locked bin/check-url-resolver
