@@ -59,6 +59,31 @@
       notify: Reload systemd
       when: radiopad_headless | bool
 
+    - name: Configure optional SSH password authentication
+      when: radiopad_ssh_password_hash | length > 0
+      block:
+        - name: Set the radiopad SSH password
+          ansible.builtin.user:
+            name: radiopad
+            password: "{{ radiopad_ssh_password_hash }}"
+            password_lock: false
+          no_log: true
+
+        - name: Enable SSH password authentication
+          ansible.builtin.copy:
+            content: |
+              PasswordAuthentication yes
+              PermitRootLogin no
+            dest: /etc/ssh/sshd_config.d/10-radiopad-password.conf
+            owner: root
+            group: root
+            mode: "0644"
+            validate: /usr/sbin/sshd -t -f %s
+          notify: Reload SSH
+
+        - name: Apply SSH password authentication
+          ansible.builtin.meta: flush_handlers
+
     - name: Install system packages
       ansible.builtin.apt:
         name:
@@ -89,110 +114,100 @@
           {{ radiopad_audio_device }} is unavailable. Run `mpv --no-config --audio-device=help` on the Pi and update radiopad_audio_device.
       when: radiopad_audio_device | length > 0
 
-    - name: Install Wi-Fi management packages
-      ansible.builtin.apt:
-        name:
-          - iw
-          - network-manager
-          - rfkill
-        state: present
-        install_recommends: false
+    - name: Configure optional Wi-Fi
       when: radiopad_wifi_ssid | length > 0
+      block:
+        - name: Install Wi-Fi management packages
+          ansible.builtin.apt:
+            name:
+              - iw
+              - network-manager
+              - rfkill
+            state: present
+            install_recommends: false
 
-    - name: Read Wi-Fi regulatory domain
-      ansible.builtin.command:
-        argv:
-          - iw
-          - reg
-          - get
-      check_mode: false
-      changed_when: false
-      register: radiopad_wifi_regulatory_domain
-      when: radiopad_wifi_ssid | length > 0
+        - name: Read Wi-Fi regulatory domain
+          ansible.builtin.command:
+            argv:
+              - iw
+              - reg
+              - get
+          check_mode: false
+          changed_when: false
+          register: radiopad_wifi_regulatory_domain
 
-    - name: Set Wi-Fi regulatory country
-      ansible.builtin.command:
-        argv:
-          - raspi-config
-          - nonint
-          - do_wifi_country
-          - "{{ radiopad_wifi_country }}"
-      when:
-        - radiopad_wifi_ssid | length > 0
-        - radiopad_wifi_regulatory_domain.stdout is not search('country ' ~ radiopad_wifi_country ~ ':')
+        - name: Set Wi-Fi regulatory country
+          ansible.builtin.command:
+            argv:
+              - raspi-config
+              - nonint
+              - do_wifi_country
+              - "{{ radiopad_wifi_country }}"
+          when: radiopad_wifi_regulatory_domain.stdout is not search('country ' ~ radiopad_wifi_country ~ ':')
 
-    - name: Read Wi-Fi radio state
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - radio
-          - wifi
-      check_mode: false
-      changed_when: false
-      register: radiopad_wifi_radio
-      when: radiopad_wifi_ssid | length > 0
+        - name: Read Wi-Fi radio state
+          ansible.builtin.command:
+            argv:
+              - nmcli
+              - radio
+              - wifi
+          check_mode: false
+          changed_when: false
+          register: radiopad_wifi_radio
 
-    - name: Enable Wi-Fi radio
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - radio
-          - wifi
-          - "on"
-      when:
-        - radiopad_wifi_ssid | length > 0
-        - radiopad_wifi_radio.stdout != 'enabled'
+        - name: Enable Wi-Fi radio
+          ansible.builtin.command:
+            argv:
+              - nmcli
+              - radio
+              - wifi
+              - "on"
+          when: radiopad_wifi_radio.stdout != 'enabled'
 
-    - name: Configure the Wi-Fi profile
-      community.general.nmcli:
-        type: wifi
-        conn_name: "radiopad: {{ radiopad_wifi_ssid }}"
-        ifname: wlan0
-        ssid: "{{ radiopad_wifi_ssid }}"
-        wifi_sec:
-          key-mgmt: wpa-psk
-          psk: "{{ radiopad_wifi_password }}"
-        method4: auto
-        method6: auto
-        autoconnect: true
-        state: present
-      no_log: true
-      when: radiopad_wifi_ssid | length > 0
+        - name: Configure the Wi-Fi profile
+          community.general.nmcli:
+            type: wifi
+            conn_name: "radiopad: {{ radiopad_wifi_ssid }}"
+            ifname: wlan0
+            ssid: "{{ radiopad_wifi_ssid }}"
+            wifi_sec:
+              key-mgmt: wpa-psk
+              psk: "{{ radiopad_wifi_password }}"
+            method4: auto
+            method6: auto
+            autoconnect: true
+            state: present
+          no_log: true
 
-    - name: Discover visible Wi-Fi networks
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - --terse
-          - --escape
-          - "no"
-          - --fields
-          - SSID
-          - device
-          - wifi
-          - list
-          - --rescan
-          - "yes"
-      check_mode: false
-      changed_when: false
-      register: radiopad_visible_wifi
-      when: radiopad_wifi_ssid | length > 0
+        - name: Discover visible Wi-Fi networks
+          ansible.builtin.command:
+            argv:
+              - nmcli
+              - --terse
+              - --escape
+              - "no"
+              - --fields
+              - SSID
+              - device
+              - wifi
+              - list
+              - --rescan
+              - "yes"
+          check_mode: false
+          changed_when: false
+          register: radiopad_visible_wifi
 
-    - name: Activate the Wi-Fi profile when visible
-      community.general.nmcli:
-        conn_name: "radiopad: {{ radiopad_wifi_ssid }}"
-        state: up
-      when:
-        - radiopad_wifi_ssid | length > 0
-        - radiopad_wifi_ssid in radiopad_visible_wifi.stdout_lines
+        - name: Activate the Wi-Fi profile when visible
+          community.general.nmcli:
+            conn_name: "radiopad: {{ radiopad_wifi_ssid }}"
+            state: up
+          when: radiopad_wifi_ssid in radiopad_visible_wifi.stdout_lines
 
-    - name: Report staged Wi-Fi profile
-      ansible.builtin.debug:
-        msg: >-
-          Saved {{ radiopad_wifi_ssid }} for automatic connection; activation is deferred because the network is not currently visible.
-      when:
-        - radiopad_wifi_ssid | length > 0
-        - radiopad_wifi_ssid not in radiopad_visible_wifi.stdout_lines
+        - name: Report staged Wi-Fi profile
+          ansible.builtin.debug:
+            msg: >-
+              Saved {{ radiopad_wifi_ssid }} for automatic connection; activation is deferred because the network is not currently visible.
+          when: radiopad_wifi_ssid not in radiopad_visible_wifi.stdout_lines
 
     - name: Check out RadioPad
       ansible.builtin.git:
@@ -211,22 +226,22 @@
       failed_when: false
       register: radiopad_uv_installed
 
-    - name: Download pinned uv installer
-      ansible.builtin.get_url:
-        url: "https://astral.sh/uv/{{ radiopad_uv_version }}/install.sh"
-        dest: /tmp/radiopad-uv-install.sh
-        checksum: "sha256:{{ radiopad_uv_installer_sha256 }}"
-        mode: "0500"
+    - name: Install the pinned uv version when needed
       when: >-
         radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (radiopad_uv_version | regex_escape) ~ '(?: |$)')
+      block:
+        - name: Download pinned uv installer
+          ansible.builtin.get_url:
+            url: "https://astral.sh/uv/{{ radiopad_uv_version }}/install.sh"
+            dest: /tmp/radiopad-uv-install.sh
+            checksum: "sha256:{{ radiopad_uv_installer_sha256 }}"
+            mode: "0500"
 
-    - name: Install pinned uv
-      ansible.builtin.command: /tmp/radiopad-uv-install.sh
-      environment:
-        UV_UNMANAGED_INSTALL: /usr/local/bin
-      changed_when: true
-      when: >-
-        radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (radiopad_uv_version | regex_escape) ~ '(?: |$)')
+        - name: Install pinned uv
+          ansible.builtin.command: /tmp/radiopad-uv-install.sh
+          environment:
+            UV_UNMANAGED_INSTALL: /usr/local/bin
+          changed_when: true
 
     - name: Remove uv installer
       ansible.builtin.file:
@@ -299,6 +314,11 @@
         timeout: 60
 
   handlers:
+    - name: Reload SSH
+      ansible.builtin.systemd_service:
+        name: ssh.service
+        state: reloaded
+
     - name: Reload systemd
       ansible.builtin.systemd_service:
         daemon_reload: true

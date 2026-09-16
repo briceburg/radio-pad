@@ -8,6 +8,7 @@ radiopad_uv_installer_sha256: b3c113bcb8b5f361805bc2283cb1bcc8f3e07b5f0387a12e4f
 radiopad_headless: true
 radiopad_audio_output: alsa
 radiopad_audio_device: ""
+radiopad_ssh_password_hash: ""
 radiopad_wifi_ssid: ""
 radiopad_wifi_password: ""
 radiopad_wifi_country: ""

@@ -17,6 +17,7 @@ Options:
   --audio-device DEVICE    Override the inventory's mpv audio device
   --ask-become-pass        Prompt for the remote sudo password
   --player ACCOUNT/PLAYER  Registered identity for an undeclared host
+  --ssh-password           Prompt for and enable an SSH password for radiopad
   --wifi SSID              Add or update a WPA Wi-Fi profile, prompting for its passphrase
   --wifi-country CC        Two-letter regulatory country used with --wifi (default: host locale)
   -h, --help               Show this help
@@ -36,6 +37,7 @@ become_args=()
 audio_device=""
 player=""
 remote_user=""
+ssh_password_requested=false
 wifi_requested=false
 wifi_ssid=""
 wifi_country=""
@@ -44,6 +46,10 @@ while (($#)); do
   case "$1" in
     --ask-become-pass)
       become_args+=(--ask-become-pass)
+      shift
+      ;;
+    --ssh-password)
+      ssh_password_requested=true
       shift
       ;;
     --audio-device | --player | --wifi | --wifi-country)
@@ -91,6 +97,9 @@ if [[ -n "$player" ]]; then
 fi
 [[ "$audio_device" != *[[:space:]]* ]] || die "audio device must not contain whitespace"
 command -v uvx >/dev/null || die "uvx is required; install uv first"
+if $ssh_password_requested; then
+  command -v openssl >/dev/null || die "openssl is required with --ssh-password"
+fi
 
 if $wifi_requested; then
   [[ -n "$wifi_ssid" && ${#wifi_ssid} -le 32 ]] || die "Wi-Fi SSID must contain 1-32 characters"
@@ -114,8 +123,15 @@ extra_vars=()
 [[ -z "$player" ]] || extra_vars+=(--extra-vars "radiopad_player=$player")
 [[ -z "$audio_device" ]] || extra_vars+=(--extra-vars "radiopad_audio_device=$audio_device")
 [[ -z "$remote_user" ]] || extra_vars+=(--extra-vars "ansible_user=$remote_user")
+secret_vars=""
+if $wifi_requested || $ssh_password_requested; then
+  umask 077
+  secret_vars="$(mktemp)"
+  trap 'rm -f -- "$secret_vars"' EXIT
+fi
+
 if $wifi_requested; then
-  read -r -s -p "Wi-Fi passphrase for $wifi_ssid: " wifi_password
+  IFS= read -r -s -p "Wi-Fi passphrase for $wifi_ssid: " wifi_password
   echo
   [[ (${#wifi_password} -ge 8 && ${#wifi_password} -le 63) ||
     (${#wifi_password} -eq 64 && "$wifi_password" =~ ^[A-Fa-f0-9]{64}$) ]] ||
@@ -123,19 +139,30 @@ if $wifi_requested; then
   [[ "$wifi_password" != *$'\n'* && "$wifi_password" != *$'\r'* ]] ||
     die "Wi-Fi passphrase must not contain newlines"
 
-  umask 077
-  wifi_vars="$(mktemp)"
-  trap 'rm -f -- "$wifi_vars"' EXIT
   wifi_ssid_yaml="${wifi_ssid//\'/\'\'}"
   wifi_password_yaml="${wifi_password//\'/\'\'}"
   {
     printf "radiopad_wifi_ssid: '%s'\n" "$wifi_ssid_yaml"
     printf "radiopad_wifi_password: '%s'\n" "$wifi_password_yaml"
     printf "radiopad_wifi_country: '%s'\n" "$wifi_country"
-  } >"$wifi_vars"
+  } >>"$secret_vars"
   unset wifi_password wifi_password_yaml
-  extra_vars+=(--extra-vars "@$wifi_vars")
 fi
+
+if $ssh_password_requested; then
+  IFS= read -r -s -p "SSH password for radiopad: " ssh_password
+  echo
+  IFS= read -r -s -p "Confirm SSH password: " ssh_password_confirmation
+  echo
+  [[ -n "$ssh_password" ]] || die "SSH password must not be empty"
+  [[ "$ssh_password" == "$ssh_password_confirmation" ]] || die "SSH passwords do not match"
+  [[ "$ssh_password" != *$'\n'* && "$ssh_password" != *$'\r'* ]] || die "SSH password must not contain newlines"
+  ssh_password_hash="$(printf '%s\n' "$ssh_password" | openssl passwd -6 -stdin)"
+  printf "radiopad_ssh_password_hash: '%s'\n" "$ssh_password_hash" >>"$secret_vars"
+  unset ssh_password ssh_password_confirmation ssh_password_hash
+fi
+
+[[ -z "$secret_vars" ]] || extra_vars+=(--extra-vars "@$secret_vars")
 
 echo "Provisioning $host..."
 uvx --from "ansible-core==$ANSIBLE_CORE_VERSION" ansible-playbook \

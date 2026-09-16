@@ -92,6 +92,8 @@ player/bin/rpi-provision --player ACCOUNT/PLAYER HOSTNAME.local
 
 Use `USER@HOST` only for a nonstandard existing installation and `--audio-device DEVICE` for a one-run audio override. The helper uses `uvx` to run pinned Ansible Core and collection versions, requires SSH public-key authentication, accepts and records only a previously unknown host key, and expects passwordless sudo by default. Add `--ask-become-pass` for an account that requires a sudo password. A changed host key still fails closed and should be removed from `known_hosts` only after confirming that the device was intentionally reflashed.
 
+SSH remains key-only by default. To add a persistent password fallback for the `radiopad` administrator, use `player/bin/rpi-provision --ssh-password HOST`; the helper prompts twice without echoing the password, keeps public-key access enabled, and does not impose a password-strength policy. Because `radiopad` has passwordless sudo, treat this password as a root credential.
+
 Wi-Fi can also be added later over Ethernet without reflashing. Each `--wifi SSID` run adds or updates that network's autoconnect profile without removing existing profiles, so repeat the command for every deployment or fallback network. If the requested SSID is visible, provisioning activates it as a connectivity check; otherwise, provisioning stages it for NetworkManager to connect when it becomes available. The helper prompts locally without echoing the passphrase, stores it only in a mode-0600 temporary Ansible variables file, and keeps Ethernet enabled.
 
 The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
@@ -122,6 +124,7 @@ The playbook accepts these inventory variables:
 | `radiopad_repo_url` | Git repository installed on the Pi. | RadioPad GitHub repository |
 | `radiopad_repo_version` | Branch or tag to deploy. | `main` |
 | `radiopad_registry_url` | Registry API used by validation and the player. | RadioPad production registry |
+| `radiopad_ssh_password_hash` | Optional hashed `radiopad` password that also enables SSH password authentication; use Ansible Vault in persistent inventories. | unset |
 | `radiopad_wifi_country` | Two-letter regulatory country when configuring Wi-Fi. | unset |
 | `radiopad_wifi_password` | WPA passphrase; use Ansible Vault in persistent inventories. | unset |
 | `radiopad_wifi_ssid` | One Wi-Fi profile to add or update alongside Ethernet and existing profiles. | unset |
