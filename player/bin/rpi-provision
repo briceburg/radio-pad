@@ -17,7 +17,7 @@ Options:
   --audio-device DEVICE    Override the inventory's mpv audio device
   --ask-become-pass        Prompt for the remote sudo password
   --player ACCOUNT/PLAYER  Registered identity for an undeclared host
-  --wifi SSID              Configure WPA Wi-Fi, prompting locally for its passphrase
+  --wifi SSID              Add or update a WPA Wi-Fi profile, prompting for its passphrase
   --wifi-country CC        Two-letter regulatory country used with --wifi (default: host locale)
   -h, --help               Show this help
 
