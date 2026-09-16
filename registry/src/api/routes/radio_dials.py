@@ -20,7 +20,7 @@ router = APIRouter(prefix="/accounts/{account_id}/radio-dials")
     response_model_exclude_none=True,
     responses=ERROR_409,
 )
-async def register_radio_dial(
+def register_radio_dial(
     account_id: AccountId,
     radio_dial_id: RadioDialId,
     ds: DS,
@@ -58,14 +58,15 @@ def get_radio_dial(
         "Cache-Control": "public, max-age=0, must-revalidate",
         "ETag": etag,
     }
-    if request.headers.get("if-none-match") == etag:
+    request_etags = request.headers.get("if-none-match", "")
+    if any(candidate.strip().removeprefix("W/") in {"*", etag} for candidate in request_etags.split(",")):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
     response.headers.update(headers)
     return radio_dial
 
 
 @router.get("/", response_model=PaginatedList[RadioDialSummary], response_model_exclude_none=True)
-async def list_radio_dials(
+def list_radio_dials(
     account_id: AccountId,
     ds: DS,
     paging: PageParams,

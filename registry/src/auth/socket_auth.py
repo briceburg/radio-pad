@@ -1,6 +1,7 @@
 import httpx2
 from fastapi import HTTPException, Request, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from starlette.concurrency import run_in_threadpool
 
 from api.auth import AuthServices, current_identity, require_player_control_access
 from api.exceptions import NotFoundError
@@ -26,6 +27,10 @@ async def validate_socket_client(
 async def validate_local(
     request: Request | WebSocket, account_id: str, player_id: str, token: str | None
 ) -> int | None:
+    return await run_in_threadpool(_validate_local, request, account_id, player_id, token)
+
+
+def _validate_local(request: Request | WebSocket, account_id: str, player_id: str, token: str | None) -> int | None:
     services = getattr(request.app.state, "auth", None)
     ds = getattr(request.app.state, "store", None)
     if not isinstance(services, AuthServices) or not isinstance(ds, DataStore):

@@ -11,9 +11,11 @@ import asyncio
 import time
 from collections.abc import Generator
 from pathlib import Path
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient, WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
@@ -212,6 +214,30 @@ async def test_controller_session_closes_at_token_expiry() -> None:
     websocket.close.assert_awaited_once_with(code=1008, reason="Authentication required")
 
 
+async def test_offline_controller_receives_player_presence() -> None:
+    websocket = AsyncMock()
+    websocket.receive_text.side_effect = WebSocketDisconnect()
+
+    await _run_loop(websocket, Broadcast(), "acct/player1", is_player=False)
+
+    websocket.send_json.assert_awaited_once_with({"event": "player_presence", "data": {"connected": False}})
+
+
+async def test_slow_websocket_send_ends_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def wait_forever(*_args: object) -> str:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    websocket = AsyncMock()
+    websocket.send_text.side_effect = wait_forever
+    websocket.receive_text.side_effect = wait_forever
+    broadcast = Broadcast()
+    broadcast.set_state("acct/player1", "playback_state", '{"event":"playback_state","data":{}}')
+    monkeypatch.setattr("switchboard.switchboard.WEBSOCKET_SEND_TIMEOUT_SECONDS", 0.01)
+
+    await asyncio.wait_for(_run_loop(websocket, broadcast, "acct/player1", is_player=True), timeout=1)
+
+
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:
     with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as player:
         with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as duplicate:
@@ -219,6 +245,20 @@ def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient)
                 duplicate.receive_json()
         _close_player(player)
     assert error.value.code == 4002
+
+
+def test_disconnected_player_state_is_not_retained(switchboard_client: TestClient) -> None:
+    player_key = "acct/player1"
+    broadcast = cast(FastAPI, switchboard_client.app).state.broadcast
+
+    with switchboard_client.websocket_connect("switchboard/acct/player1", headers=PLAYER_HEADERS) as player:
+        player.send_json({"event": "ping"})
+        while player.receive_json().get("event") != "pong":
+            pass
+        assert player_key in broadcast._channel_state
+        _close_player(player)
+
+    assert player_key not in broadcast._channel_state
 
 
 # -- protocol behavior --

@@ -53,12 +53,33 @@ async def test_subscriber_cleanup_after_context_exit(broadcast: Broadcast) -> No
 async def test_disconnect_signals_all_subscribers(broadcast: Broadcast) -> None:
     async with broadcast.subscribe("ch") as sub:
         await broadcast.disconnect()
-        event = await asyncio.wait_for(sub._queue.get(), timeout=1)
-    assert event is None
+        with pytest.raises(asyncio.QueueShutDown):
+            await asyncio.wait_for(sub._queue.get(), timeout=1)
 
 
 async def test_publish_with_no_subscribers(broadcast: Broadcast) -> None:
     await broadcast.publish("nobody-listening", "echo")
+
+
+async def test_slow_subscriber_is_removed_when_its_queue_fills() -> None:
+    broadcast = Broadcast(subscriber_queue_size=1)
+
+    async with broadcast.subscribe("ch") as sub:
+        await broadcast.publish("ch", "one")
+        await broadcast.publish("ch", "two")
+
+        assert "ch" not in broadcast._channels
+        with pytest.raises(asyncio.QueueShutDown):
+            await sub._queue.get()
+
+
+async def test_replay_can_exceed_live_queue_limit() -> None:
+    broadcast = Broadcast(subscriber_queue_size=1)
+    broadcast.set_state("ch", "first", "one")
+    broadcast.set_state("ch", "second", "two")
+
+    async with broadcast.subscribe("ch", replay=True) as sub:
+        assert [await anext(sub), await anext(sub)] == [Event("ch", "one"), Event("ch", "two")]
 
 
 async def test_subscriber_iteration(broadcast: Broadcast) -> None:

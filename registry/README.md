@@ -65,6 +65,7 @@ Registry resources are account-scoped:
 | `REGISTRY_SEED_DATA_PATH` | Root containing `data/` and `authz/` seeds. | `seed-data` |
 | `REGISTRY_SWITCHBOARD_PREFIX` | WebSocket routing prefix. | `/switchboard` |
 | `REGISTRY_URL` | Registry API URL used by a split switchboard. | `http://localhost:8000/api` |
+| `WEB_CONCURRENCY` | Uvicorn worker processes; switchboard deployments require `1`. | `1` |
 
 Relative paths resolve from the registry project root.
 
@@ -118,12 +119,16 @@ Use `REGISTRY_AUTHZ_BACKEND_GIT_SSH_PRIVATE_KEY` for a separate authz Git remote
 
 When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry mounts a WebSocket router that facilitates event-driven communication between the [RadioPad player](../player/) and connected [remote controls](../remote-control/).
 
-Pub-sub between connected clients uses an in-memory broadcast module (`src/switchboard/broadcast.py`). Because state is held in-memory, horizontal scaling of the switchboard requires ensuring that all clients connecting to the same player land on the same server instance.
+Pub-sub queues, retained state, and active-player membership are process-local. A player and controller accepted by different processes therefore cannot communicate. Switchboard deployments require `WEB_CONCURRENCY=1`, which is Uvicorn's default and explicit in `fly.toml`; scale across instances with player-path affinity. One async process can host many player rooms, so this is not a one-process-per-player constraint. API-only deployments may use more workers.
+
+The entrypoint also limits incoming WebSocket messages to 64 KiB and Uvicorn's per-connection receive queue to 16 messages. RadioPad protocol messages are intentionally small; these bounds prevent slow or flooding peers from reserving unbounded memory.
 
 Two deployment strategies preserve that affinity:
 
-1. **Path-based sticky sessions:** A load balancer routes a given `/{account_id}/{player_id}` path to the same process.
-2. **Switchboard sharding:** Registry player resources provide opaque `switchboard_url` values, allowing different players to use distinct switchboard domains or clusters.
+1. **Path-based affinity:** A stable switchboard endpoint routes a given `/{account_id}/{player_id}` path to one active process. Dynamically registered players need no static process assignment when the routing layer owns this mapping.
+2. **Registry-assigned shards:** Player resources provide opaque `switchboard_url` values, so registration can assign a stable switchboard domain or cluster without changing the client protocol.
+
+Both approaches preserve one active switchboard process per player room. Running interchangeable processes for the same room requires an external event bus plus distributed retained state and player-presence coordination; multiple in-memory processes cannot provide that topology.
 
 The switchboard partitions connections by request path and expects clients to connect to that opaque URL, which takes the form:
 
@@ -133,7 +138,7 @@ Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
 
 Controllers must send `{"event":"authenticate","data":{"token":...}}` as their first message. The token is null when auth is disabled. The switchboard validates access and replies with `authenticated` before subscribing the controller, replaying state, or accepting commands. It closes rejected and expired sessions with WebSocket policy code `1008`. Bearer tokens are never placed in switchboard URLs.
 
-The switchboard accepts state events from players and command events from controllers. State events such as `player_presence`, `radio_dial_state`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. `radio_dial_state` contains the running player's source URL and resolved-resource ETag. The switchboard conditionally checks each unique active Registry RadioDial rather than polling per player; when an ETag changes, it broadcasts the new state to every player room using that dial. Because the ETag covers the fully resolved resource, updating a linked Station changes every referencing active RadioDial across local, S3, and Git data backends. If the RadioDial or a linked Station becomes unavailable, no replacement state is published and clients retain their last valid configuration; periodic checks retry when enabled. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
+The switchboard accepts state events from players and command events from controllers. While a player is connected, state events such as `player_presence`, `radio_dial_state`, `playback_state`, and scoped non-OK `player_status` values are retained so newly connected controllers receive the current player state. Disconnection state is delivered to current controllers but not retained indefinitely; later controllers receive offline presence from the switchboard's active connection state. `radio_dial_state` contains the running player's source URL and resolved-resource ETag. The switchboard conditionally checks each unique active Registry RadioDial rather than polling per player; when an ETag changes, it broadcasts the new state to every player room using that dial. Because the ETag covers the fully resolved resource, updating a linked Station changes every referencing active RadioDial across local, S3, and Git data backends. If the RadioDial or a linked Station becomes unavailable, no replacement state is published and clients retain their last valid configuration; periodic checks retry when enabled. Player-owned `playback_state` contains confirmed `call_sign`, in-flight `requested_call_sign`, and terminal `failed_call_sign` values; each may be null. A new request or stop clears the prior failure. The latest valid request wins, and duplicate requests do not restart playback. Commands such as `playback_start`, `playback_stop`, `volume_up`, and `volume_down` are transient and are never retained.
 
 ## Authentication and authz
 

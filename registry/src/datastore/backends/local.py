@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from datastore.core import (
+    InterProcessLock,
     atomic_write_json_file,
     compute_etag,
     construct_storage_path,
@@ -15,43 +16,33 @@ from datastore.types import JsonDoc, PagedResult, ValueWithETag
 
 
 class LocalBackend:
-    """Local Filesystem based ObjectStore implementation.
-
-    This backend adapts a local filesystem to the ObjectStore protocol. It manages
-    two path concepts:
-    - The logical "storage path", including the prefix (e.g., "prefix/accounts/acct-123.json").
-      This is created by the `construct_storage_path` helper.
-    - The physical "filesystem path", which is the absolute path on disk
-      (e.g., "/tmp/data/prefix/accounts/acct-123.json").
-    """
+    """Filesystem-backed ObjectStore with atomic, conditionally locked writes."""
 
     def __init__(self, base_path: str, prefix: str = "") -> None:
         self.base_path = Path(base_path)
         self.prefix = prefix.strip("/")
-        # Ensure the full root path for this backend exists.
         (self.base_path / self.prefix).mkdir(parents=True, exist_ok=True)
+        self._write_lock = InterProcessLock(self.base_path / ".write.lock")
 
     def _get_fs_path(self, storage_path: str) -> Path:
-        """Translates a logical storage path into a physical filesystem path."""
+        """Translate a logical storage path to a filesystem path."""
         return self.base_path.joinpath(storage_path)
 
-    def get(self, object_id: str, *path_parts: str) -> ValueWithETag[JsonDoc]:
-        """
-        Retrieves a JSON object by its ID and path and returns (data, etag).
-        """
-        storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
-        file_path = self._get_fs_path(storage_path)
-        if not file_path.exists():
+    def _read(self, file_path: Path) -> ValueWithETag[JsonDoc]:
+        try:
+            with file_path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except FileNotFoundError:
             return None, None
-        with file_path.open("r", encoding="utf-8") as f:
-            raw = json.load(f)
         return raw, compute_etag(raw)
 
+    def get(self, object_id: str, *path_parts: str) -> ValueWithETag[JsonDoc]:
+        """Retrieve a JSON object and its content ETag."""
+        storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
+        return self._read(self._get_fs_path(storage_path))
+
     def list(self, *path_parts: str, page: int = 1, per_page: int = 10) -> PagedResult[JsonDoc]:
-        """
-        Lists JSON objects from a specified path with pagination.
-        The 'id' of each object is derived from its filename if not present in the file.
-        """
+        """List JSON objects, deriving each ID from its filename."""
         storage_dir = construct_storage_path(prefix=self.prefix, path_parts=path_parts)
         directory = self._get_fs_path(storage_dir)
         if not directory.exists():
@@ -80,36 +71,25 @@ class LocalBackend:
         if_match: str | None = None,
         if_none_match: bool = False,
     ) -> None:
-        """
-        Saves a JSON object by its ID to a specified path.
-        Keeps any explicit 'id' field provided by caller.
-        If if_match is provided and the file exists, enforce optimistic concurrency using ETag.
-        """
+        """Persist an object after atomically validating its write preconditions."""
         storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
         file_path = self._get_fs_path(storage_path)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        # Concurrency: if_match must match existing ETag when updating; also skip write when unchanged
-        current_etag: str | None = None
-        if file_path.exists():
-            with file_path.open("r", encoding="utf-8") as f:
-                current = json.load(f)
-            current_etag = compute_etag(current)
-        validate_write_preconditions(if_match, if_none_match, current_etag)
-        # Never persist the 'id' field in the JSON content
-        to_write = strip_id(data)
-        # If content hash matches existing, no-op to avoid churn
-        if current_etag is not None and compute_etag(to_write) == current_etag:
-            return
-        atomic_write_json_file(file_path, to_write, overwrite=not if_none_match)
+        with self._write_lock():
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            _, current_etag = self._read(file_path)
+            validate_write_preconditions(if_match, if_none_match, current_etag)
+            to_write = strip_id(data)
+            if compute_etag(to_write) == current_etag:
+                return
+            atomic_write_json_file(file_path, to_write, overwrite=not if_none_match)
 
     def delete(self, object_id: str, *path_parts: str) -> bool:
-        """
-        Deletes a JSON object by its ID from a specified path.
-        Returns True if the object was deleted, False otherwise.
-        """
+        """Delete an object and report whether it existed."""
         storage_path = construct_storage_path(prefix=self.prefix, path_parts=path_parts, object_id=object_id)
         file_path = self._get_fs_path(storage_path)
-        if not file_path.exists():
-            return False
-        file_path.unlink()
-        return True
+        with self._write_lock():
+            try:
+                file_path.unlink()
+                return True
+            except FileNotFoundError:
+                return False

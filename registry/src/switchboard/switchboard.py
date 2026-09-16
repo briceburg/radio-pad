@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Awaitable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
 
@@ -14,6 +15,7 @@ logger = logging.getLogger("switchboard")
 PLAYER_USER_AGENT_PREFIX = "RadioPad/"
 AUTHENTICATION_REQUIRED_REASON = "Authentication required"
 CONTROLLER_AUTH_TIMEOUT_SECONDS = 10
+WEBSOCKET_SEND_TIMEOUT_SECONDS = 10
 RETAINED_EVENTS = {"radio_dial_state", "player_presence", "playback_state"}
 PLAYER_STATUS_SCOPES = {"radio_dial", "switchboard", "playback"}
 PLAYER_COMMAND_EVENTS = {
@@ -31,6 +33,14 @@ ACTIVE_PLAYER_CONNECTIONS: set[str] = set()
 
 class _SessionExpired(Exception):
     pass
+
+
+async def _send_with_timeout(send: Awaitable[None]) -> None:
+    try:
+        async with asyncio.timeout(WEBSOCKET_SEND_TIMEOUT_SECONDS):
+            await send
+    except Exception as exc:
+        raise WebSocketDisconnect from exc
 
 
 async def _authenticate_controller(websocket: WebSocket, account_id: str, player_id: str) -> tuple[bool, int | None]:
@@ -59,7 +69,10 @@ async def _authenticate_controller(websocket: WebSocket, account_id: str, player
         await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="Validation internal error")
         return False, None
 
-    await websocket.send_json({"event": "authenticated", "data": {"expires_at": expires_at}})
+    try:
+        await _send_with_timeout(websocket.send_json({"event": "authenticated", "data": {"expires_at": expires_at}}))
+    except WebSocketDisconnect:
+        return False, None
     return True, expires_at
 
 
@@ -86,15 +99,23 @@ def _cleared_state_key(event: str, data: object) -> str | None:
     return None
 
 
-async def publish_event(broadcast: Broadcast, channel: str, event: str, data: object) -> None:
+async def publish_event(
+    broadcast: Broadcast,
+    channel: str,
+    event: str,
+    data: object,
+    *,
+    retain: bool = True,
+) -> None:
     message = json.dumps({"event": event, "data": data})
-    key_to_clear = _cleared_state_key(event, data)
-    if key_to_clear:
-        broadcast.clear_state_key(channel, key_to_clear)
+    if retain:
+        key_to_clear = _cleared_state_key(event, data)
+        if key_to_clear:
+            broadcast.clear_state_key(channel, key_to_clear)
 
-    key_to_retain = _state_key(event, data)
-    if key_to_retain:
-        broadcast.set_state(channel, key_to_retain, message)
+        key_to_retain = _state_key(event, data)
+        if key_to_retain:
+            broadcast.set_state(channel, key_to_retain, message)
     await broadcast.publish(channel, message)
 
 
@@ -105,51 +126,56 @@ async def _run_loop(
     is_player: bool,
     expires_at: int | None = None,
 ) -> None:
-    async def sender() -> None:
-        async with broadcast.subscribe(player_key, replay=True) as subscriber:
+    async with broadcast.subscribe(player_key, replay=True) as subscriber:
+        if not is_player and player_key not in ACTIVE_PLAYER_CONNECTIONS:
+            try:
+                await _send_with_timeout(
+                    websocket.send_json({"event": "player_presence", "data": {"connected": False}})
+                )
+            except WebSocketDisconnect:
+                return
+
+        async def sender() -> None:
             async for event in subscriber:
+                await _send_with_timeout(websocket.send_text(event.message))
+            raise WebSocketDisconnect
+
+        async def receiver() -> None:
+            while True:
                 try:
-                    await websocket.send_text(event.message)
-                except Exception:
-                    logger.debug("Send failed for %s: %s", player_key, event.message[:80])
-                    break
-
-    async def receiver() -> None:
-        while True:
-            try:
-                if expires_at is None:
-                    msg = await websocket.receive_text()
-                else:
-                    async with asyncio.timeout(max(expires_at - time.time(), 0)):
+                    if expires_at is None:
                         msg = await websocket.receive_text()
-            except TimeoutError as exc:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
-                raise _SessionExpired from exc
-            try:
-                payload = json.loads(msg)
-                if not isinstance(payload, dict):
-                    continue
-                event = payload.get("event")
-                data = payload.get("data")
-                if not event:
+                    else:
+                        async with asyncio.timeout(max(expires_at - time.time(), 0)):
+                            msg = await websocket.receive_text()
+                except TimeoutError as exc:
+                    await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+                    raise _SessionExpired from exc
+                try:
+                    payload = json.loads(msg)
+                    if not isinstance(payload, dict):
+                        continue
+                    event = payload.get("event")
+                    data = payload.get("data")
+                    if not event:
+                        continue
+
+                    match event:
+                        case player_event if is_player and player_event in PLAYER_STATE_EVENTS:
+                            await publish_event(broadcast, player_key, player_event, data)
+                        case command_event if not is_player and command_event in PLAYER_COMMAND_EVENTS:
+                            await publish_event(broadcast, player_key, command_event, data)
+                        case "ping":
+                            await _send_with_timeout(websocket.send_json({"event": "pong"}))
+                except json.JSONDecodeError:
                     continue
 
-                match event:
-                    case player_event if is_player and player_event in PLAYER_STATE_EVENTS:
-                        await publish_event(broadcast, player_key, player_event, data)
-                    case command_event if not is_player and command_event in PLAYER_COMMAND_EVENTS:
-                        await publish_event(broadcast, player_key, command_event, data)
-                    case "ping":
-                        await websocket.send_json({"event": "pong"})
-            except json.JSONDecodeError:
-                continue
-
-    try:
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(sender())
-            tg.create_task(receiver())
-    except* (_SessionExpired, WebSocketDisconnect):
-        pass
+        try:
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(sender())
+                tg.create_task(receiver())
+        except* (_SessionExpired, WebSocketDisconnect):
+            pass
 
 
 @router.websocket("/{account_id}/{player_id}")
@@ -220,10 +246,12 @@ async def websocket_endpoint(
                 player_key,
                 "player_presence",
                 {"connected": False},
+                retain=False,
             )
             await publish_event(
                 broadcast,
                 player_key,
                 "playback_state",
                 {"call_sign": None, "requested_call_sign": None, "failed_call_sign": None},
+                retain=False,
             )

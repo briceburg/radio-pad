@@ -3,6 +3,8 @@
 
 import { RegistryRequestError } from "../utils/errors.js";
 
+const DISCOVERY_PAGE_SIZE = 100;
+
 function resolveRegistryBaseUrl(registryUrl) {
   return new URL(registryUrl, window.location.origin).toString();
 }
@@ -48,7 +50,9 @@ async function fetchAllPages(
 ) {
   const items = [];
   const registryBaseUrl = resolveRegistryBaseUrl(registryUrl);
-  let url = new URL(startPath, registryBaseUrl).toString();
+  const firstPage = new URL(startPath, registryBaseUrl);
+  firstPage.searchParams.set("per_page", DISCOVERY_PAGE_SIZE);
+  let url = firstPage.toString();
   const options = buildRequestOptions(auth, signal);
 
   while (url) {
@@ -60,7 +64,7 @@ async function fetchAllPages(
     if (Array.isArray(data.items)) items.push(...data.items);
 
     const next = data && data.links ? data.links.next : null;
-    url = next ? new URL(next, registryBaseUrl).toString() : null;
+    url = next ? new URL(next, url).toString() : null;
   }
 
   return items;

@@ -76,6 +76,8 @@ class RegistryAPI(FastAPI):
             from lib.constants import PROFILES
 
             profiles = PROFILES
+        if "switchboard" in profiles and int(os.environ.get("WEB_CONCURRENCY", "1")) != 1:
+            raise ValueError("Switchboard requires WEB_CONCURRENCY=1; shard across instances instead")
         self.state.profiles = tuple(profiles)
         self._register_routes()
         self._register_exception_handlers()

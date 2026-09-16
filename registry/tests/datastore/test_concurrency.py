@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier, BrokenBarrierError
 
 import pytest
 
@@ -8,6 +9,20 @@ from datastore.core import ModelStore, atomic_write_json_file
 from datastore.exceptions import ConcurrencyError
 from datastore.types import JsonDoc, ValueWithETag
 from models import Account, AccountSpec
+
+
+class _CoordinatedLocalBackend(LocalBackend):
+    def __init__(self, base_path: str, barrier: Barrier) -> None:
+        super().__init__(base_path)
+        self._barrier = barrier
+
+    def _read(self, file_path: Path) -> ValueWithETag[JsonDoc]:
+        result = super()._read(file_path)
+        try:
+            self._barrier.wait(timeout=0.5)
+        except BrokenBarrierError:
+            pass
+        return result
 
 
 def test_upsert_conflict_raises_concurrency_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,3 +69,25 @@ def test_atomic_write_json_file_uses_unique_temp_files_under_concurrency(tmp_pat
 
     assert errors == []
     assert target.exists()
+
+
+def test_conditional_writes_are_serialized_across_backend_instances(tmp_path: Path) -> None:
+    seed = LocalBackend(str(tmp_path))
+    seed.save("acct", {"name": "Original"}, "accounts")
+    _, version = seed.get("acct", "accounts")
+    assert version is not None
+
+    barrier = Barrier(2)
+    backends = [_CoordinatedLocalBackend(str(tmp_path), barrier) for _ in range(2)]
+
+    def save(backend: LocalBackend, name: str) -> bool:
+        try:
+            backend.save("acct", {"name": name}, "accounts", if_match=version)
+        except ConcurrencyError:
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writes = [executor.submit(save, backend, name) for backend, name in zip(backends, ["One", "Two"], strict=True)]
+
+    assert sorted(write.result() for write in writes) == [False, True]

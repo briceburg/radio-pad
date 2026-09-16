@@ -15,7 +15,7 @@ router = APIRouter(prefix="/accounts/{account_id}/stations")
 
 
 @router.put("/{call_sign}", response_model=Station, responses=ERROR_409)
-async def register_station(
+def register_station(
     account_id: AccountId,
     call_sign: Annotated[CallSign, Path(..., description="Canonical station call sign")],
     ds: DS,
@@ -27,7 +27,7 @@ async def register_station(
 
 
 @router.get("/{call_sign}", response_model=Station)
-async def get_station(
+def get_station(
     account_id: AccountId,
     call_sign: Annotated[CallSign, Path(..., description="Canonical station call sign")],
     ds: DS,
@@ -41,6 +41,6 @@ async def get_station(
 
 
 @router.get("/", response_model=PaginatedList[Station])
-async def list_stations(account_id: AccountId, ds: DS, paging: PageParams) -> PaginatedList[Station]:
+def list_stations(account_id: AccountId, ds: DS, paging: PageParams) -> PaginatedList[Station]:
     stations = ds.stations.list(account_id, page=paging.page, per_page=paging.per_page)
     return PaginatedList.from_paged(stations, page=paging.page, per_page=paging.per_page)

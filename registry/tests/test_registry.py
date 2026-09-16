@@ -1,6 +1,8 @@
+import pytest
 from starlette.testclient import TestClient
 
 from lib.constants import API_VERSION
+from registry import create_app
 
 
 def test_root_and_healthz(client: TestClient) -> None:
@@ -16,3 +18,11 @@ def test_root_and_healthz(client: TestClient) -> None:
     assert h.content == b""
     assert h.headers.get("cache-control") == "no-store"
     assert h.headers.get("X-RadioPad-Api-Version") == API_VERSION
+
+
+def test_switchboard_requires_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WEB_CONCURRENCY", "2")
+
+    create_app(profiles=["api"])
+    with pytest.raises(ValueError, match="WEB_CONCURRENCY=1"):
+        create_app(profiles=["switchboard"])
