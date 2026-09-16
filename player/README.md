@@ -11,9 +11,9 @@ Streams a player's assigned RadioDial through the host audio system and keeps co
 
 Python packages are installed from `pyproject.toml` and `uv.lock`; they are not separate host dependencies. The locked environment includes yt-dlp and Deno so mpv can resolve audio from supported site URLs such as YouTube in addition to direct streams and playlists.
 
-### Running the player
+### Run on a host
 
-Start the player through the project script:
+From this directory, start the player in the foreground:
 
 ```sh
 ./bin/player
@@ -22,9 +22,11 @@ Start the player through the project script:
 RADIOPAD_PLAYER="briceburg/living-room" ./bin/player
 ```
 
+The player runs in the foreground and stops with the process. Use the [root Compose workflow](../README.md#development) when developing the complete RadioPad stack.
+
 ### Raspberry Pi deployment
 
-Use the player's [Raspberry Pi provisioning tool](./deploy/raspberry-pi/) for a headless, appliance-style player. It combines Raspberry Pi OS Lite, Raspberry Pi Imager, an idempotent Ansible playbook, and a hardened systemd service; console auto-login, shell startup hooks, tmux, and a persistent service account are not required.
+Use the [Raspberry Pi provisioning guide](./deploy/raspberry-pi/) to flash Raspberry Pi OS Lite, configure network and audio hardware, and install the player as a managed systemd service. The guide also covers service status, logs, restarts, and on-device updates.
 
 ### Environment variables
 

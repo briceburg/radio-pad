@@ -23,7 +23,7 @@ An internet radio player with physical, web, and mobile controllers that stay in
 
 This README covers the integrated repository. Each component README owns its standalone requirements, configuration, development workflow, and deployment guidance.
 
-For a dedicated Raspberry Pi player, follow the [headless provisioning guide](./player/deploy/raspberry-pi/). It replaces console auto-login and tmux with an auxiliary Ansible playbook and a supervised system service.
+Run the player directly on a development or general-purpose host with the [player guide](./player/). For a dedicated Raspberry Pi appliance, use the [provisioning guide](./player/deploy/raspberry-pi/) to install a systemd service with status, logs, restart, and update commands.
 
 ## Development
 

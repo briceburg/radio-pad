@@ -129,24 +129,22 @@ The playbook accepts these inventory variables:
 
 ## Operate, update, and troubleshoot
 
-The player is independent of SSH sessions, shell startup files, and console auto-login. Its checkout includes one small service helper. Bare `bin/player` still runs the player in the foreground on any development host; service commands require root, a running systemd instance, and a `radiopad-player.service` whose working directory is that exact checkout. From a workstation, replace `HOST` with the Pi's DNS/mDNS name or DHCP address, then inspect its status, read recent logs, or follow logs live:
+The service starts at boot and runs independently of SSH sessions. Connect to the Pi to check its status, read or follow logs, restart it, or update its code:
 
 ```sh
-ssh -t radiopad@HOST 'sudo /opt/radio-pad/player/bin/player status'
-ssh -t radiopad@HOST 'sudo /opt/radio-pad/player/bin/player logs'
-ssh -t radiopad@HOST 'sudo /opt/radio-pad/player/bin/player logs --follow'
+ssh radiopad@HOST
+cd /opt/radio-pad/player
+sudo bin/player status
+sudo bin/player logs
+sudo bin/player logs --follow
+sudo bin/player restart
+sudo bin/player update
 ```
 
-Routine code updates do not require Ansible or the provisioning workstation. The on-device updater refuses a dirty or detached checkout, fast-forwards its current branch from `origin`, synchronizes the locked environment, restarts the service, and waits for readiness:
+Service commands require `sudo`. The updater refuses a dirty, detached, or divergent checkout; otherwise it fast-forwards from `origin`, synchronizes the locked environment, restarts the service, and waits for readiness. Routine code updates therefore do not require Ansible or the original provisioning workstation.
 
-```sh
-ssh -t radiopad@HOST 'sudo /opt/radio-pad/player/bin/player update'
-```
-
-Use `player/bin/rpi-provision HOST` from a workstation for inventory, operating-system, service, credential, or updater changes. Configuration is owned by the inventory and rendered to `/etc/radiopad/player.env`; do not edit the Pi or run `git pull` there directly. To request an immediate managed restart, use the helper's `restart` command.
+Use `player/bin/rpi-provision HOST` from a workstation for inventory, operating-system, service, credential, or helper changes. Configuration is owned by the inventory and rendered to `/etc/radiopad/player.env`; do not edit the Pi or run `git pull` there directly.
 
 A single `Player already connected` message immediately after a restart can be the switchboard releasing the previous connection; the player reconnects automatically. Repeated messages mean another process or device is using the same player identity.
-
-On an older manually configured Pi, remove the `.bashrc` block and stop the tmux player before provisioning so two players do not compete for audio or the same switchboard identity. In headless mode the playbook also removes Raspberry Pi OS's standard tty1 auto-login override.
 
 To inspect ALSA card names before choosing an mpv device, run `ssh radiopad@HOST cat /proc/asound/cards`. For example, the Cañones Raspberry Pi DAC Plus HAT registers as card `DAC`, corresponding to `alsa/default:CARD=DAC`.
