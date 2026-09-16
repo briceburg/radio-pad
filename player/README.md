@@ -66,6 +66,8 @@ https://registry.radiopad.dev/api/accounts/briceburg/players/living-room
 
 The registry player resource contains a qualified `radio_dial` identity such as `community/briceburg`. The player combines that identity with `RADIOPAD_REGISTRY_URL` to load the complete RadioDial; `switchboard_url` remains an independently configured endpoint.
 
+The switchboard watches each unique active resolved RadioDial and broadcasts `radio_dial_state` only when its HTTP ETag changes. The player then reloads the resource, replaces its in-memory configuration, and pushes an updated station menu to its Macropad when needed. A transient reload failure leaves the last valid RadioDial active and retries with degraded status; normal operation performs no player-side polling.
+
 #### Editing Stations
 
 Stations are account-owned registry resources. RadioDials contain ordered Station keys, so changing a Station's stream URL updates every RadioDial that references it. Use the registry API or edit the [community seed data](../registry/seed-data/data/accounts/community/) during development.

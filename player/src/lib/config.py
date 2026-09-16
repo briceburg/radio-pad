@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import logging
 from urllib.parse import urlsplit, urlunsplit
 
@@ -42,15 +44,15 @@ def http_client_headers(custom_headers=None):
     return {**defaults, **custom_headers}
 
 
-async def fetch_json_url(url, timeout=12, retries=3):
-    """Fetch JSON from URL with retries"""
-    headers = http_client_headers({"Accept": "application/json"})
+async def fetch_json_resource(url, timeout=12, retries=3):
+    """Fetch a JSON resource and its HTTP revision with retries."""
+    headers = http_client_headers({"Accept": "application/json", "Cache-Control": "no-cache"})
     async with httpx2.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
         for attempt in range(retries):
             try:
                 response = await client.get(url)
                 if response.status_code == 200:
-                    return response.json()
+                    return response.json(), response.headers.get("etag")
                 else:
                     logger.warning(
                         "Failed to fetch JSON: %s from %s",
@@ -62,7 +64,13 @@ async def fetch_json_url(url, timeout=12, retries=3):
             if attempt < retries - 1:
                 logger.info("Retrying in %s seconds...", 2**attempt)
                 await asyncio.sleep(2**attempt)
-    return None
+    return None, None
+
+
+async def fetch_json_url(url, timeout=12, retries=3):
+    """Fetch JSON from URL with retries."""
+    data, _ = await fetch_json_resource(url, timeout=timeout, retries=retries)
+    return data
 
 
 async def make(
@@ -88,7 +96,13 @@ async def make(
     logger.info("Using RadioDial URL: %s", radio_dial_url)
     logger.info("Using switchboard URL: %s", switchboard_url)
 
-    radio_dial = await fetch_json_url(radio_dial_url)
+    return await load_radio_dial(radio_dial_url, switchboard_url)
+
+
+async def load_radio_dial(radio_dial_url, switchboard_url=None):
+    """Load and validate a complete RadioDial from its source URL."""
+
+    radio_dial, revision = await fetch_json_resource(radio_dial_url)
     if not radio_dial:
         raise ConfigError("Failed fetching RadioDial", status_summary="RadioDial unavailable")
     stations = radio_dial.get("stations") if isinstance(radio_dial, dict) else None
@@ -110,6 +124,10 @@ async def make(
             status_summary="RadioDial config error",
         )
 
+    revision = (
+        revision
+        or f'"{hashlib.sha256(json.dumps(radio_dial, separators=(",", ":"), sort_keys=True, ensure_ascii=False).encode()).hexdigest()}"'
+    )
     return RadioPadPlayerConfig(
         stations=[
             RadioPadStation(
@@ -119,6 +137,7 @@ async def make(
             for station in stations
         ],
         radio_dial_url=radio_dial_url,
+        radio_dial_revision=revision,
         switchboard_url=switchboard_url,
     )
 

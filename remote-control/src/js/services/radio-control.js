@@ -184,10 +184,15 @@ export class RadioControl extends EventTarget {
             );
             break;
           }
-          case "radio_dial_url":
-            if (typeof data === "string" && data) {
+          case "radio_dial_state":
+            if (
+              typeof data?.url === "string" &&
+              data.url &&
+              typeof data?.revision === "string" &&
+              data.revision
+            ) {
               this.dispatchEvent(
-                new CustomEvent("radiodialurl", { detail: data }),
+                new CustomEvent("radiodialstate", { detail: data }),
               );
             }
             break;

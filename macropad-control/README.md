@@ -7,7 +7,7 @@ Use an [Adafruit Macropad RP2040](https://learn.adafruit.com/adafruit-macropad-r
 ## How it works
 
 - The Macropad communicates with the host [player](../player/) over USB serial (CircuitPython CDC2).
-- The player sends a compact station menu, heartbeat, playback state, and status events; the Macropad renders them on the OLED and NeoPixel keys.
+- The player sends a compact station menu, heartbeat, playback state, and status events; the Macropad renders them on the OLED and NeoPixel keys. A live RadioDial refresh pushes a replacement station menu without reconnecting the controller.
 - Pressing a key sends a playback start command to the player.
 
 ### Visual states

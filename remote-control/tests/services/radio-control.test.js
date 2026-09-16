@@ -184,10 +184,16 @@ describe("RadioControl", () => {
       },
     ],
     [
-      "radio_dial_url",
-      "https://example.test/radio-dial.json",
-      "radiodialurl",
-      "https://example.test/radio-dial.json",
+      "radio_dial_state",
+      {
+        url: "https://example.test/radio-dial.json",
+        revision: '"v2"',
+      },
+      "radiodialstate",
+      {
+        url: "https://example.test/radio-dial.json",
+        revision: '"v2"',
+      },
     ],
     [
       "player_presence",

@@ -23,6 +23,7 @@ class RadioPadPlayerConfig:
     radio_dial_url: str
     stations: list[RadioPadStation]
     switchboard_url: str | None = None
+    radio_dial_revision: str | None = None
 
 
 class RadioPadEvent(TypedDict, total=False):
@@ -51,7 +52,7 @@ class RadioPadPlayer(abc.ABC):
         return self._config
 
     def update_config(self, config: RadioPadPlayerConfig):
-        """Replace the player configuration after discovery succeeds."""
+        """Replace the loaded player configuration."""
         self._config = config
 
     @property
@@ -258,6 +259,7 @@ class RadioPadClient(abc.ABC):
             "playback_state",
             "player_presence",
             "player_status",
+            "radio_dial_state",
         ):
             self.register_event(ignored, self._handle_ignored)
 

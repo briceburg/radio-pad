@@ -11,6 +11,8 @@ services:
       REGISTRY_AUTH_OIDC_ISSUER: "https://accounts.google.com"
       REGISTRY_AUTH_OIDC_CLIENT_IDS: "${GOOGLE_CLIENT_ID:-}"
       REGISTRY_AUTH_SESSION_SECRET: "${REGISTRY_AUTH_SESSION_SECRET:-local-development-session-secret}"
+      REGISTRY_RADIO_DIAL_REFRESH_SECONDS: "${REGISTRY_RADIO_DIAL_REFRESH_SECONDS:-30}"
+      REGISTRY_URL: "http://registry:1980/api/"
     volumes:
       - ./registry:/app
 

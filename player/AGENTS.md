@@ -18,8 +18,9 @@ Guidance for coding agents working in `radio-pad/player`.
 
 ## Conventions
 
-- The player identifies itself to the switchboard with `User-Agent: RadioPad/...` and `RadioPad-Radio-Dial-Url` headers.
+- The player identifies itself to the switchboard with `User-Agent: RadioPad/...`, `RadioPad-Radio-Dial-Url`, and `RadioPad-Radio-Dial-Revision` headers.
 - Registry player configuration carries a qualified `radio_dial` identity. The running player carries the source `radio_dial_url` from which it loaded a complete RadioDial.
+- The player reloads its resolved RadioDial in response to revisioned `radio_dial_state` events. Station changes replace the local Macropad menu without interrupting active playback.
 - The player is a WebSocket client, not a server — it has no HTTP endpoints of its own (the container healthcheck runs `python3 src/healthcheck.py`, which checks a readiness file).
 
 ## Change preferences

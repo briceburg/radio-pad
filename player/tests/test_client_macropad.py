@@ -151,9 +151,24 @@ def test_station_menu_request_writes_call_signs_and_current_station():
     assert writer.drains == 2
 
 
+def test_publish_station_menu_pushes_updated_config():
+    player, client, writer = client_with_writer(register=True)
+    player.update_config(
+        RadioPadPlayerConfig(
+            radio_dial_url="https://example.test/radio-dial",
+            stations=[player.kexp, RadioPadStation("KNCE", "https://example.test/knce")],
+        )
+    )
+
+    asyncio.run(client.publish_station_menu())
+
+    assert written_events(writer) == [event("station_menu", ["KEXP", "KNCE"])]
+
+
 def test_publish_status_writes_scoped_status_payload():
     _, client, writer = client_with_writer(register=True)
 
+    asyncio.run(client.publish_status("switchboard", "warning", "Switchboard down"))
     asyncio.run(client.publish_status("switchboard", "warning", "Switchboard down"))
 
     assert written_events(writer) == [player_status("switchboard", "warning", "Switchboard down")]
@@ -168,6 +183,7 @@ def test_publish_ok_status_clears_retained_status_after_sending():
     assert written_events(writer) == [player_status("switchboard", "ok")]
 
     writer.writes.clear()
+    asyncio.run(client.publish_status("switchboard", "ok"))
     asyncio.run(client.resend_status())
 
     assert written_events(writer) == []

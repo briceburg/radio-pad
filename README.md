@@ -124,9 +124,9 @@ flowchart TD
     Remote["Remote control<br/>(mobile / web)"]
 
     Macropad <-- USB --> Player
-    Player -- ws:playback_state --> Registry
-    Registry -- ws:playback_start/stop --> Player
-    Registry -- ws:playback_state --> Remote
+    Player -- "ws:RadioDial revision + playback_state" --> Registry
+    Registry -- "ws:radio_dial_state + playback_start/stop" --> Player
+    Registry -- "ws:radio_dial_state + playback_state" --> Remote
     Remote -- ws:playback_start/stop --> Registry
 
     style Player stroke:#f9f,stroke-width:3px
