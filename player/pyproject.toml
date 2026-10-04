@@ -21,6 +21,7 @@ dev = [
 
 [tool.uv]
 cache-dir = "tmp/.uv_cache"
+compile-bytecode = true
 package = false
 
 [tool.pytest.ini_options]

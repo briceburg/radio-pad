@@ -42,7 +42,7 @@ The generated first-boot configuration creates a key-only `radiopad` administrat
 As a manual alternative, open [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and make these selections:
 
 1. Select the exact Pi model under **Device**.
-2. Under **OS**, choose **Raspberry Pi OS (other)** and then **Raspberry Pi OS Lite (64-bit)**. This workflow does not support 32-bit-only models or desktop images.
+2. Under **OS**, choose **Raspberry Pi OS (other)** and then **Raspberry Pi OS Lite (64-bit)**. Use Lite for a headless player; 32-bit-only models are unsupported.
 3. Select the storage device and open **OS Customisation**.
 4. Set a hostname such as `radio-kitchen`, create the administrative user `radiopad`, and configure the correct locale, time zone, keyboard layout, and Wi-Fi country.
 5. Configure Wi-Fi only when Ethernet will not be used.
@@ -113,7 +113,7 @@ The country defaults from the workstation locale; add `--wifi-country CC` only w
 
 The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs fast-forward a clean checkout, reconcile configuration, and restart the player only when managed content changes. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
 
-Use `--repo-version REF` to deploy a branch or tag for testing. Subsequent runs use the inventory's version (`main` by default), so repeat the override while testing or set `radiopad_repo_version` in inventory.
+Deployments follow `main`. An inventory can pin `radiopad_repo_version` to a tag or commit instead; update pinned deployments through provisioning.
 
 ## Configure several players
 
@@ -136,7 +136,7 @@ The playbook accepts these inventory variables:
 | `radiopad_audio_output` | mpv audio driver. | `alsa` |
 | `radiopad_extra_environment` | Additional player environment mapping; managed settings take precedence. | `{}` |
 | `radiopad_repo_url` | Git repository installed on the Pi. | RadioPad GitHub repository |
-| `radiopad_repo_version` | Branch or tag to deploy. | `main` |
+| `radiopad_repo_version` | Git ref to deploy; optionally pin a tag or commit. | `main` |
 | `radiopad_registry_url` | Registry API used by validation and the player. | RadioPad production registry |
 | `radiopad_ssh_password_hash` | Optional hashed `radiopad` password that also enables SSH password authentication; use Ansible Vault in persistent inventories. | unset |
 | `radiopad_timezone` | Optional canonical tzdb time zone enforced after first boot. | unset |
@@ -146,7 +146,7 @@ The playbook accepts these inventory variables:
 
 ## Operate, update, and troubleshoot
 
-The service starts at boot and runs independently of SSH sessions. Connect to the Pi to check its status, read or follow logs, restart it, or update its code:
+The service starts immediately during provisioning, starts at boot, and runs independently of SSH sessions. It waits for a controller to select a station. Connect to the Pi to check its status, read or follow logs, restart it, or update its code:
 
 ```sh
 ssh radiopad@HOST
@@ -158,7 +158,7 @@ sudo bin/player restart
 sudo bin/player update
 ```
 
-Service commands require `sudo`. The updater refuses a dirty, detached, or divergent checkout; otherwise it fast-forwards from `origin`, synchronizes the locked environment, restarts the service, and waits for readiness. Routine code updates therefore do not require Ansible or the original provisioning workstation.
+Service commands require `sudo`. The updater requires a clean `main` checkout that can fast-forward from `origin/main`. It stops the service, updates the code and locked dependencies, restarts, and waits for readiness. If dependency synchronization fails, the service stays stopped; retry the update or re-provision. Routine code updates do not require Ansible or the original provisioning workstation.
 
 Use `player/bin/rpi-provision HOST` from a workstation for inventory, operating-system, service, credential, or helper changes. Configuration is owned by the inventory and rendered to `/etc/radiopad/player.env`; do not edit the Pi or run `git pull` there directly.
 
