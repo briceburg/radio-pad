@@ -7,3 +7,8 @@ radiopad_players:
       radiopad_player: briceburg/canones
       radiopad_audio_device: alsa/default:CARD=DAC
       radiopad_timezone: America/Denver
+    radio-living-room:
+      ansible_host: radio.lan
+      radiopad_player: briceburg/living-room
+      radiopad_audio_device: alsa/default:CARD=S3
+      radiopad_timezone: America/Denver

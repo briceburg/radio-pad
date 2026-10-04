@@ -6,13 +6,13 @@ The service uses `DynamicUser=yes`, so it has no persistent login account or pas
 
 ## Quick start
 
-Run both helpers from the repository root. The workstation needs Linux, Raspberry Pi Imager, and `uv`; each helper checks its remaining prerequisites. These commands use the checked-in Cañones deployment as a worked example, not as a required hostname or registry naming convention.
+Run the helpers from the repository root. The workstation needs `uv`; flashing also needs Linux and Raspberry Pi Imager. The checked-in Cañones deployment is a worked example:
 
 1. Attach an unmounted SD card and run `player/bin/rpi-flash radio-canones`.
 2. Move the card to the Pi, connect Ethernet, and power it on.
 3. Run `player/bin/rpi-provision radio-canones`.
 
-The provisioner reads the registered player and hardware settings from `inventory.yml`. It validates the target and audio device, removes one-time cloud-init state, installs the player as a systemd service, and waits for readiness. Wi-Fi can be added during this step or later without reflashing.
+For a Pi that already has an OS and SSH, start with [an existing installation](#use-an-existing-installation). The provisioner reads the registered player and hardware settings from `inventory.yml`, installs the service, and waits for readiness. Wi-Fi can be added later without reflashing.
 
 ## Flash Raspberry Pi OS Lite
 
@@ -49,7 +49,23 @@ As a manual alternative, open [Raspberry Pi Imager](https://www.raspberrypi.com/
 6. Enable SSH with public-key authentication.
 7. Enable passwordless sudo and disable console auto-login when those options are available. Otherwise, pass `--ask-become-pass` to the provisioning helper.
 
-Boot the Pi and proceed directly to provisioning. You can start the command while a newly flashed Pi is still booting; it waits up to five minutes for SSH. For an existing password-only installation, run `ssh-copy-id USER@HOST`. The playbook also selects `multi-user.target` by default, so an existing desktop installation boots without its GUI after the next reboot; reflashing with Lite still produces the leanest installation.
+Boot the Pi and proceed to provisioning; the helper waits up to five minutes for SSH.
+
+## Use an existing installation
+
+A 64-bit Raspberry Pi OS installation with SSH enabled does not need reflashing. Add its registered player identity to `inventory.yml`, then connect through its current administrator for the first run. For the living-room deployment, the inventory name is `radio-living-room` and its network address is `radio.lan`:
+
+```sh
+ssh-copy-id ADMIN@radio.lan
+player/bin/rpi-provision ADMIN@radio-living-room
+ssh radiopad@radio.lan
+```
+
+Replace `ADMIN` with the existing administrator. `ssh-copy-id` installs keys from your SSH agent or a local public-key file and prompts for the current login password; skip it if key access already works. Add `--ask-become-pass` to the provisioning command if the administrator's sudo requires a password.
+
+Provisioning creates `radiopad`, adds the bootstrap administrator's authorized SSH keys without removing existing keys, and enables passwordless sudo. Future runs use `player/bin/rpi-provision radio-living-room`; the original account remains available. The player service uses its own transient identity and needs no console login.
+
+Stop any manually started player and remove its shell startup command before provisioning. Desktop installations boot without the GUI after the next reboot; Lite remains the recommended base for new devices.
 
 ## Register and provision a player
 
@@ -87,15 +103,17 @@ For a new host that is not yet in inventory, provide its registered identity exp
 player/bin/rpi-provision --player ACCOUNT/PLAYER HOSTNAME.local
 ```
 
-Use `USER@HOST` only for a nonstandard existing installation and `--audio-device DEVICE` for a one-run audio override. The helper uses `uvx` to run pinned Ansible Core and collection versions, requires SSH public-key authentication, accepts and records only a previously unknown host key, and expects passwordless sudo by default. Add `--ask-become-pass` for an account that requires a sudo password. A changed host key still fails closed and should be removed from `known_hosts` only after confirming that the device was intentionally reflashed.
+Use the inventory name when a host is declared, even if its network address differs. `--audio-device DEVICE` overrides its audio setting for one run. The helper runs pinned Ansible tooling through `uvx` and requires SSH key access and sudo. Unknown host keys are recorded; changed keys fail and should be removed from `known_hosts` only after confirming an intentional reflash.
 
-SSH remains key-only by default. To add a persistent password fallback for the `radiopad` administrator, use `player/bin/rpi-provision --ssh-password HOST`; the helper prompts twice without echoing the password, keeps public-key access enabled, and does not impose a password-strength policy. Because `radiopad` has passwordless sudo, treat this password as a root credential.
+The `radiopad` administrator has no password by default. To add a password fallback, use `player/bin/rpi-provision --ssh-password HOST`; the helper prompts twice without echoing the password and keeps key access enabled. Because `radiopad` has passwordless sudo, treat this password as a root credential.
 
 Add Wi-Fi during any provisioning run with `player/bin/rpi-provision --wifi NETWORK_NAME HOST`. Each run adds or updates one autoconnect profile without removing Ethernet or existing networks and disables Wi-Fi power saving for reliable playback. A visible network is activated as a connectivity check; an unavailable network is saved for deployment. The passphrase is prompted without echo and exists only in a mode-0600 temporary file on the workstation.
 
 The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
 
 The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs fast-forward a clean checkout, reconcile configuration, and restart the player only when managed content changes. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
+
+Use `--repo-version REF` to deploy a branch or tag for testing. Subsequent runs use the inventory's version (`main` by default), so repeat the override while testing or set `radiopad_repo_version` in inventory.
 
 ## Configure several players
 

@@ -63,29 +63,72 @@
       changed_when: false
 
   tasks:
-    - name: Wait for first-boot cloud-init
-      ansible.builtin.command: cloud-init status --wait
-      changed_when: false
-      failed_when: false
+    - name: Detect cloud-init
+      ansible.builtin.stat:
+        path: /usr/bin/cloud-init
+      register: radiopad_cloud_init
 
-    - name: Disable completed first-boot cloud-init
+    - name: Complete first-boot configuration
+      when: radiopad_cloud_init.stat.exists
+      block:
+        - name: Wait for first-boot cloud-init
+          ansible.builtin.command: cloud-init status --wait
+          check_mode: false
+          changed_when: false
+          register: radiopad_cloud_init_status
+          failed_when: radiopad_cloud_init_status.rc not in [0, 2]
+
+        - name: Disable completed first-boot cloud-init
+          ansible.builtin.copy:
+            content: ""
+            dest: /etc/cloud/cloud-init.disabled
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Remove first-boot cloud-init seed data
+          ansible.builtin.file:
+            path: "/boot/firmware/{{ item }}"
+            state: absent
+          loop:
+            - meta-data
+            - network-config
+            - user-data
+            - vendor-data
+
+    - name: Create the radiopad administrator
+      ansible.builtin.user:
+        name: radiopad
+        shell: /bin/bash
+        groups: sudo
+        append: true
+
+    - name: Transfer SSH access from the bootstrap administrator
+      when: ansible_user | default('radiopad') != 'radiopad'
+      block:
+        - name: Find the bootstrap administrator home
+          ansible.builtin.getent:
+            database: passwd
+            key: "{{ ansible_user }}"
+
+        - name: Read the bootstrap administrator SSH keys
+          ansible.builtin.slurp:
+            src: "{{ ansible_facts.getent_passwd[ansible_user][4] }}/.ssh/authorized_keys"
+          register: radiopad_bootstrap_keys
+
+        - name: Authorize the bootstrap keys for radiopad
+          ansible.posix.authorized_key:
+            user: radiopad
+            key: "{{ radiopad_bootstrap_keys.content | b64decode }}"
+
+    - name: Allow unattended radiopad administration
       ansible.builtin.copy:
-        content: |
-          # Ongoing appliance configuration is managed by RadioPad provisioning.
-        dest: /etc/cloud/cloud-init.disabled
+        content: "radiopad ALL=(ALL) NOPASSWD:ALL\n"
+        dest: /etc/sudoers.d/radiopad
         owner: root
         group: root
-        mode: "0644"
-
-    - name: Remove first-boot cloud-init seed data
-      ansible.builtin.file:
-        path: "/boot/firmware/{{ item }}"
-        state: absent
-      loop:
-        - meta-data
-        - network-config
-        - user-data
-        - vendor-data
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
 
     - name: Read default boot target
       ansible.builtin.command: systemctl get-default
@@ -159,7 +202,7 @@
 
     - name: Validate configured audio device
       ansible.builtin.assert:
-        that: radiopad_audio_device in (radiopad_mpv_audio_devices.stdout ~ radiopad_mpv_audio_devices.stderr)
+        that: ("'" ~ radiopad_audio_device ~ "'") in (radiopad_mpv_audio_devices.stdout ~ radiopad_mpv_audio_devices.stderr)
         fail_msg: >-
           {{ radiopad_audio_device }} is unavailable. Run `mpv --no-config --audio-device=help` on the Pi and update radiopad_audio_device.
       when: radiopad_audio_device | length > 0

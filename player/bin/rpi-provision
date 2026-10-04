@@ -3,8 +3,10 @@ set -euo pipefail
 
 readonly ANSIBLE_CORE_VERSION="2.21.4"
 
-deploy_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../deploy/raspberry-pi" && pwd)"
-collection_root="${XDG_CACHE_HOME:-$HOME/.cache}/radiopad/ansible/collections"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+deploy_root="$PWD/deploy/raspberry-pi"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/tmp/.uv_cache}"
+export UV_TOOL_DIR="${UV_TOOL_DIR:-$PWD/tmp/.uv_tools}"
 
 usage() {
   cat <<'EOF'
@@ -17,6 +19,7 @@ Options:
   --audio-device DEVICE    Override the inventory's mpv audio device
   --ask-become-pass        Prompt for the remote sudo password
   --player ACCOUNT/PLAYER  Registered identity for an undeclared host
+  --repo-version REF       Git branch or tag to deploy (default: inventory or main)
   --ssh-password           Prompt for and enable an SSH password for radiopad
   --wifi SSID              Add or update a WPA Wi-Fi profile, prompting for its passphrase
   --wifi-country CC        Two-letter regulatory country used with --wifi (default: host locale)
@@ -36,6 +39,7 @@ die() {
 become_args=()
 audio_device=""
 player=""
+repo_version=""
 remote_user=""
 ssh_password_requested=false
 wifi_requested=false
@@ -52,11 +56,15 @@ while (($#)); do
       ssh_password_requested=true
       shift
       ;;
-    --audio-device | --player | --wifi | --wifi-country)
+    --audio-device | --player | --repo-version | --wifi | --wifi-country)
       (($# >= 2)) || die "$1 requires a value"
       case "$1" in
         --audio-device) audio_device="$2" ;;
         --player) player="$2" ;;
+        --repo-version)
+          [[ -n "$2" && "$2" != *[[:space:]]* && "$2" != -* ]] || die "invalid Git ref"
+          repo_version="$2"
+          ;;
         --wifi)
           wifi_requested=true
           wifi_ssid="$2"
@@ -114,13 +122,14 @@ if $wifi_requested; then
 fi
 
 export ANSIBLE_CONFIG="$deploy_root/ansible.cfg"
-export ANSIBLE_COLLECTIONS_PATH="$collection_root"
+export ANSIBLE_COLLECTIONS_PATH="$PWD/tmp/ansible/collections"
 uvx --from "ansible-core==$ANSIBLE_CORE_VERSION" ansible-galaxy collection install \
   --requirements-file "$deploy_root/requirements.yml" \
-  --collections-path "$collection_root"
+  --collections-path "$ANSIBLE_COLLECTIONS_PATH"
 
 extra_vars=()
 [[ -z "$player" ]] || extra_vars+=(--extra-vars "radiopad_player=$player")
+[[ -z "$repo_version" ]] || extra_vars+=(--extra-vars "radiopad_repo_version=$repo_version")
 [[ -z "$audio_device" ]] || extra_vars+=(--extra-vars "radiopad_audio_device=$audio_device")
 [[ -z "$remote_user" ]] || extra_vars+=(--extra-vars "ansible_user=$remote_user")
 secret_vars=""
@@ -170,6 +179,6 @@ uvx --from "ansible-core==$ANSIBLE_CORE_VERSION" ansible-playbook \
   --inventory "$deploy_root/inventory.yml" \
   --inventory "$host," \
   --limit "$host" \
-  --ssh-common-args "-o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  --ssh-common-args "-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ClearAllForwardings=yes" \
   "${extra_vars[@]}" \
   "$deploy_root/playbook.yml"
