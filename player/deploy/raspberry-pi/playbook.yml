@@ -7,6 +7,8 @@
     _radiopad_player_root: "{{ radiopad_install_root }}/player"
     _radiopad_player_venv: "{{ _radiopad_player_root }}/tmp/.venv"
     _radiopad_health_path: /run/radiopad/ready
+    _radiopad_uv_version: 0.11.24
+    _radiopad_uv_installer_sha256: b3c113bcb8b5f361805bc2283cb1bcc8f3e07b5f0387a12e4f6e71281f7ec120
     _radiopad_uv_python_dir: /usr/local/lib/radiopad/python
     _radiopad_managed_environment:
       RADIOPAD_PLAYER: "{{ radiopad_player }}"
@@ -94,16 +96,13 @@
     - name: Configure headless boot target
       ansible.builtin.command: systemctl set-default multi-user.target
       changed_when: true
-      when:
-        - radiopad_headless | bool
-        - radiopad_default_target.stdout != 'multi-user.target'
+      when: radiopad_default_target.stdout != 'multi-user.target'
 
     - name: Disable legacy console auto-login
       ansible.builtin.file:
         path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
         state: absent
       notify: Reload systemd
-      when: radiopad_headless | bool
 
     - name: Configure time zone
       community.general.timezone:
@@ -281,13 +280,13 @@
 
     - name: Install the pinned uv version when needed
       when: >-
-        radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (radiopad_uv_version | regex_escape) ~ '(?: |$)')
+        radiopad_uv_installed.rc != 0 or radiopad_uv_installed.stdout is not match('^uv ' ~ (_radiopad_uv_version | regex_escape) ~ '(?: |$)')
       block:
         - name: Download pinned uv installer
           ansible.builtin.get_url:
-            url: "https://astral.sh/uv/{{ radiopad_uv_version }}/install.sh"
+            url: "https://astral.sh/uv/{{ _radiopad_uv_version }}/install.sh"
             dest: /tmp/radiopad-uv-install.sh
-            checksum: "sha256:{{ radiopad_uv_installer_sha256 }}"
+            checksum: "sha256:{{ _radiopad_uv_installer_sha256 }}"
             mode: "0500"
 
         - name: Install pinned uv

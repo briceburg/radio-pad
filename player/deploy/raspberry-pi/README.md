@@ -95,7 +95,7 @@ Add Wi-Fi during any provisioning run with `player/bin/rpi-provision --wifi NETW
 
 The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
 
-The initial run installs system packages, a pinned `uv`, and Python 3.13, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs fast-forward a clean checkout, reconcile configuration, and restart the player only when managed content changes. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
+The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs fast-forward a clean checkout, reconcile configuration, and restart the player only when managed content changes. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
 
 ## Configure several players
 
@@ -117,7 +117,6 @@ The playbook accepts these inventory variables:
 | `radiopad_audio_device` | Optional device reported by `mpv --no-config --audio-device=help`; provisioning verifies it exists. | unset |
 | `radiopad_audio_output` | mpv audio driver. | `alsa` |
 | `radiopad_extra_environment` | Additional player environment mapping; managed settings take precedence. | `{}` |
-| `radiopad_headless` | Make `multi-user.target` the default boot target. | `true` |
 | `radiopad_repo_url` | Git repository installed on the Pi. | RadioPad GitHub repository |
 | `radiopad_repo_version` | Branch or tag to deploy. | `main` |
 | `radiopad_registry_url` | Registry API used by validation and the player. | RadioPad production registry |
