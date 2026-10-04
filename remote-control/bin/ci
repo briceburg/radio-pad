@@ -3,6 +3,8 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-bash -n bin/*
+for script in bin/*; do
+  bash -n "$script"
+done
 npm test
 npm run build

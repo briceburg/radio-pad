@@ -2,14 +2,13 @@
 set -eu
 
 cd "$(dirname "$0")/.."
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/tmp/.uv_cache}"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
+export UV_TOOL_DIR="${UV_TOOL_DIR:-$PWD/tmp/.uv_tools}"
 
-bash -n bin/player
-bash -n bin/rpi-flash
-bash -n bin/rpi-provision
-bin/player --help >/dev/null
-bin/rpi-flash --help >/dev/null
-bin/rpi-provision --help >/dev/null
+for script in bin/*; do
+  bash -n "$script"
+done
 uv run --locked tests/bin/check-url-resolver
 export ANSIBLE_COLLECTIONS_PATH="$PWD/tmp/ansible/collections"
 uvx --from ansible-core==2.21.4 ansible-galaxy collection install \
