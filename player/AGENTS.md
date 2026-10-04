@@ -13,6 +13,7 @@ Guidance for coding agents working in `radio-pad/player`.
 ## Runtime and tooling
 
 - Python dependencies and tool settings live in `pyproject.toml`.
+- Shell entrypoints source `lib/uv.sh` after changing to the player directory for shared uv environment defaults; preserve caller overrides.
 - Use `bin/ci` for validation. It checks the yt-dlp/Deno URL resolver and runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
 - Use `bin/player` or `uv run python src/player.py` for local execution.
 - The Docker image installs dependencies with `uv sync` from `pyproject.toml` and `uv.lock`.

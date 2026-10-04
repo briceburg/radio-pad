@@ -4,6 +4,7 @@ set -euo pipefail
 readonly service="radiopad-player.service"
 readonly health_path="/run/radiopad/ready"
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+. ./lib/uv.sh
 repo_root="${PWD%/*}"
 venv="$PWD/tmp/.venv"
 
@@ -55,6 +56,11 @@ update_player() {
   GIT_TERMINAL_PROMPT=0 git -C "$repo_root" fetch origin main
   git -C "$repo_root" merge-base --is-ancestor HEAD FETCH_HEAD ||
     die "main cannot fast-forward this checkout; run rpi-provision"
+  if [[ "$(git -C "$repo_root" rev-parse HEAD)" == "$(git -C "$repo_root" rev-parse FETCH_HEAD)" ]] &&
+    systemctl is-active --quiet "$service"; then
+    echo "RadioPad is already up to date."
+    exit 0
+  fi
   systemctl stop "$service"
   git -C "$repo_root" merge --ff-only FETCH_HEAD
   VIRTUAL_ENV="$venv" /usr/local/bin/uv sync --active --locked --no-dev --no-python-downloads ||
@@ -68,7 +74,6 @@ case "${1:-run}" in
     ;;
   run)
     (($# == 0)) || shift
-    export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
     exec uv run --locked python src/player.py "$@"
     ;;
   status)

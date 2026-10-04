@@ -354,21 +354,41 @@
         - /etc/radiopad
         - "{{ _radiopad_uv_python_dir }}"
 
-    - name: Synchronize the locked player environment
-      ansible.builtin.command:
-        argv:
-          - /usr/local/bin/uv
-          - sync
-          - --locked
-          - --no-dev
-        chdir: "{{ _radiopad_player_root }}"
+    - name: Prepare the locked player environment
       environment:
         UV_PROJECT_ENVIRONMENT: tmp/.venv
         UV_PYTHON_INSTALL_DIR: "{{ _radiopad_uv_python_dir }}"
-      register: radiopad_uv_sync
-      changed_when: >-
-        radiopad_uv_sync.stderr is search('Creating virtual environment|Installed |Uninstalled |Updated ')
-      notify: Restart RadioPad player
+      block:
+        - name: Check whether dependencies need synchronization
+          ansible.builtin.command:
+            cmd: /usr/local/bin/uv sync --locked --no-dev --check
+            chdir: "{{ _radiopad_player_root }}"
+          check_mode: false
+          changed_when: false
+          failed_when: radiopad_uv_check.rc not in [0, 1]
+          register: radiopad_uv_check
+
+        - name: Discover existing services before updating dependencies
+          ansible.builtin.service_facts:
+          when: radiopad_uv_check.rc == 1
+
+        - name: Stop the installed player before updating dependencies
+          ansible.builtin.systemd_service:
+            name: radiopad-player.service
+            state: stopped
+          when:
+            - radiopad_uv_check.rc == 1
+            - "'radiopad-player.service' in ansible_facts.services"
+            - ansible_facts.services['radiopad-player.service'].status != 'not-found'
+
+        - name: Synchronize the locked player environment
+          ansible.builtin.command:
+            cmd: /usr/local/bin/uv sync --locked --no-dev
+            chdir: "{{ _radiopad_player_root }}"
+          register: radiopad_uv_sync
+          changed_when: >-
+            radiopad_uv_sync.stderr is search('Creating virtual environment|Installed |Uninstalled |Updated ')
+          notify: Restart RadioPad player
 
     - name: Configure player environment
       ansible.builtin.template:

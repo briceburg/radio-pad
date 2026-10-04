@@ -4,9 +4,8 @@ set -euo pipefail
 readonly ANSIBLE_CORE_VERSION="2.21.4"
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+. ./lib/uv.sh
 deploy_root="$PWD/deploy/raspberry-pi"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/tmp/.uv_cache}"
-export UV_TOOL_DIR="${UV_TOOL_DIR:-$PWD/tmp/.uv_tools}"
 
 usage() {
   cat <<'EOF'

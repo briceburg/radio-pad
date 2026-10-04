@@ -111,7 +111,7 @@ Add Wi-Fi during any provisioning run with `player/bin/rpi-provision --wifi NETW
 
 The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
 
-The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs fast-forward a clean checkout, reconcile configuration, and restart the player only when managed content changes. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
+The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs reconcile configuration and restart the player only when managed content changes. Before replacing dependencies, provisioning stops an installed player; a failed synchronization leaves it stopped until a successful retry. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
 
 Deployments follow `main`. An inventory can pin `radiopad_repo_version` to a tag or commit instead; update pinned deployments through provisioning.
 
@@ -158,7 +158,7 @@ sudo bin/player restart
 sudo bin/player update
 ```
 
-Service commands require `sudo`. The updater requires a clean `main` checkout that can fast-forward from `origin/main`. It stops the service, updates the code and locked dependencies, restarts, and waits for readiness. If dependency synchronization fails, the service stays stopped; retry the update or re-provision. Routine code updates do not require Ansible or the original provisioning workstation.
+Service commands require `sudo`. The updater requires a clean `main` checkout that can fast-forward from `origin/main`. An unchanged commit leaves a running service alone; otherwise it stops the service, updates the code and locked dependencies, restarts, and waits for readiness. If dependency synchronization fails, the service stays stopped; retry the update or re-provision. Routine code updates do not require Ansible or the original provisioning workstation.
 
 Use `player/bin/rpi-provision HOST` from a workstation for inventory, operating-system, service, credential, or helper changes. Configuration is owned by the inventory and rendered to `/etc/radiopad/player.env`; do not edit the Pi or run `git pull` there directly.
 
