@@ -9,24 +9,21 @@ Streams a player's assigned RadioDial through the host audio system and keeps co
 - [uv](https://docs.astral.sh/uv/) for the Python environment
 - [mpv](https://mpv.io/) for audio playback
 
-Python packages are installed from `pyproject.toml` and `uv.lock`; they are not separate host dependencies. The locked environment includes yt-dlp and Deno so mpv can resolve audio from supported site URLs such as YouTube in addition to direct streams and playlists.
+The player installs locked Python dependencies with uv, including yt-dlp and Deno for site URLs such as YouTube. mpv handles direct streams and playlists.
 
 ### Run on a host
 
-From this directory, start the player in the foreground:
+From this directory, run a registered player in the foreground; Ctrl+C stops it:
 
 ```sh
-./bin/player
-
-# Select a registered player explicitly
-RADIOPAD_PLAYER="briceburg/living-room" ./bin/player
+RADIOPAD_PLAYER="ACCOUNT/PLAYER" ./bin/player
 ```
 
-The player runs in the foreground and stops with the process. Use the [root Compose workflow](../README.md#development) when developing the complete RadioPad stack.
+`./bin/player` alone uses the default identity listed below.
 
 ### Raspberry Pi deployment
 
-Use the [Raspberry Pi provisioning guide](./deploy/raspberry-pi/) to flash Raspberry Pi OS Lite, configure network and audio hardware, and install the player as a managed systemd service. The guide also covers service status, logs, restarts, and on-device updates.
+Follow the [Raspberry Pi guide](./deploy/raspberry-pi/) for flashing or an existing OS, SSH access, Wi-Fi, audio selection, and service status, logs, and updates.
 
 ### Environment variables
 
@@ -35,19 +32,19 @@ Use the [Raspberry Pi provisioning guide](./deploy/raspberry-pi/) to flash Raspb
 | `RADIOPAD_AUDIO_CHANNELS` | Audio channel mode: `stereo` or `mono`. | `stereo` |
 | `RADIOPAD_AUDIO_DEVICE` | Optional mpv device from `mpv --audio-device=help`, such as `alsa/default:CARD=Generic`. | unset |
 | `RADIOPAD_AUDIO_OUTPUT` | Optional mpv output driver, such as `null` for headless tests. | unset |
-| `RADIOPAD_ENABLE_DISCOVERY` | Enables discovery through `RADIOPAD_PLAYER`; any value other than `true` disables it. | `true` |
+| `RADIOPAD_ENABLE_DISCOVERY` | Case-insensitive `true` enables registry discovery. | `true` |
 | `RADIOPAD_MPV_SOCKET_PATH` | Path to the mpv IPC socket. | `/tmp/radio-pad-mpv.sock` |
 | `RADIOPAD_PLAYBACK_TIMEOUT_SECONDS` | Maximum time to wait for mpv IPC and usable audio. | `15` |
 | `RADIOPAD_HEALTH_PATH` | Path to the player readiness file used by the container healthcheck. | `/tmp/radio-pad-ready` |
 | `RADIOPAD_MACROPAD_PORT` | Explicit Macropad CDC2 serial device. | `auto-detected` |
-| `RADIOPAD_PLAYER` | Name of player in `{account_id}/{player_id}` format, used for [registry discovery](#registry-discovery). | `briceburg/living-room` |
+| `RADIOPAD_PLAYER` | Registered `account/player` identity for [discovery](#registry-discovery). | `briceburg/living-room` |
 | `RADIOPAD_REGISTRY_URL` | Registry URL for [discovery](#registry-discovery). | `https://registry.radiopad.dev/api` |
 | `RADIOPAD_RADIO_DIAL_URL` | URL returning a complete RadioDial; derived from the registry player when unset. | unset |
 | `RADIOPAD_SWITCHBOARD_URL` | Switchboard URL for remote-control synchronization; discovered from the registry when unset. | unset |
 
 ### Registry discovery
 
-The player discovers its RadioDial and switchboard URL from the [registry](../registry/) using `RADIOPAD_PLAYER`. The USB Macropad client starts before discovery completes, so a headless player can report loading or degraded startup state when the registry or RadioDial is unavailable.
+The player discovers its RadioDial and switchboard URL from the [registry](../registry/) using `RADIOPAD_PLAYER`. The USB Macropad starts first and reports loading or degraded state if discovery fails.
 
 For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 
@@ -55,15 +52,15 @@ For example, `RADIOPAD_PLAYER=briceburg/living-room` resolves to:
 https://registry.radiopad.dev/api/accounts/briceburg/players/living-room
 ```
 
-The registry player resource contains a qualified `radio_dial` identity such as `community/briceburg`. The player combines that identity with `RADIOPAD_REGISTRY_URL` to load the complete RadioDial; `switchboard_url` remains an independently configured endpoint.
+The registry's `radio_dial` identity, such as `community/briceburg`, resolves against `RADIOPAD_REGISTRY_URL`; `switchboard_url` is a separate endpoint.
 
-The switchboard watches each unique active resolved RadioDial and broadcasts `radio_dial_state` only when its HTTP ETag changes. The player then reloads the resource, replaces its in-memory configuration, and pushes an updated station menu to its Macropad when needed. A transient reload failure leaves the last valid RadioDial active and retries with degraded status; normal operation performs no player-side polling.
+The switchboard broadcasts `radio_dial_state` when a RadioDial's ETag changes. The player reloads it and updates the Macropad menu without polling or interrupting playback. Reload failures keep the last valid dial and retry with degraded status.
 
 #### Editing Stations
 
-Stations are account-owned registry resources. RadioDials contain ordered Station keys, so changing a Station's stream URL updates every RadioDial that references it. Use the registry API or edit the [community seed data](../registry/seed-data/data/accounts/community/) during development.
+Stations belong to accounts; RadioDials reference ordered Station keys. Changing a Station updates every referencing dial. Use the registry API or edit [community seed data](../registry/seed-data/data/accounts/community/) during development.
 
-To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a complete RadioDial resource:
+To bypass discovery, set `RADIOPAD_ENABLE_DISCOVERY=false` and `RADIOPAD_RADIO_DIAL_URL` to a complete RadioDial URL. Set `RADIOPAD_SWITCHBOARD_URL` if remote control is needed. The dial response has this shape:
 
 ```json
 {
@@ -82,9 +79,7 @@ To bypass registry discovery, set `RADIOPAD_RADIO_DIAL_URL` to a URL returning a
 
 ## Development
 
-For Compose-based development with all services, see the [root README](../README.md#development).
-
-Run player checks with:
+Use [Compose](../README.md#development) for the full stack. From this directory, run player checks with:
 
 ```sh
 bin/ci

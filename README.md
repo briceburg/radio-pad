@@ -23,7 +23,7 @@ An internet radio player with physical, web, and mobile controllers that stay in
 
 This README covers the integrated repository. Each component README owns its standalone requirements, configuration, development workflow, and deployment guidance.
 
-Run the player directly on a development or general-purpose host with the [player guide](./player/). For a dedicated Raspberry Pi appliance, use the [provisioning guide](./player/deploy/raspberry-pi/) to install a systemd service with status, logs, restart, and update commands.
+Run a [player on a host](./player/#run-on-a-host), or [provision a Raspberry Pi](./player/deploy/raspberry-pi/) with service, log, and update commands.
 
 ## Development
 
@@ -94,7 +94,7 @@ Set the public client ID in the root `.env`:
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
-The client ID becomes the registry token audience and is embedded in the Compose remote-control build; the downloaded OAuth JSON and client secret are not used. Recreate `registry` and `remote-control` after changing it. See the [remote-control README](./remote-control/README.md#local-configuration) for standalone and native setup, and the [registry README](./registry/README.md#authentication-and-authz) for server authz.
+The client ID becomes the registry token audience and is embedded in the Compose remote-control build; the downloaded OAuth JSON and client secret are not used. Recreate `registry` and `remote-control` after changing it. See the [remote-control README](./remote-control/README.md#configuration) for standalone and native setup, and the [registry README](./registry/README.md#authentication-and-authz) for server authz.
 
 ### Validation
 

@@ -1,59 +1,59 @@
 # Raspberry Pi provisioning
 
-This auxiliary Ansible project turns a Raspberry Pi OS Lite host into a supervised [RadioPad player](../../). It installs the runtime under `/opt/radio-pad`, synchronizes the locked player environment, writes the player configuration, and enables `radiopad-player.service`. Re-running it updates or repairs the declared configuration rather than layering another startup mechanism on the device.
+Install a [RadioPad player](../../) under `/opt/radio-pad` with Ansible and systemd. Provisioning starts the service immediately and enables it at boot; no console login is needed.
 
-The service uses `DynamicUser=yes`, so it has no persistent login account or password. systemd gives its transient `radiopad-player` identity access to the existing `audio` and `dialout` groups for ALSA and the USB Macropad. A separate `radiopad` administrator exists only for SSH maintenance and provisioning.
+`radiopad` is the SSH administrator with passwordless sudo. Playback runs as a separate, transient systemd user with audio and USB access.
 
 ## Quick start
 
-Run the helpers from the repository root. The workstation needs `uv`; flashing also needs Linux and Raspberry Pi Imager. The checked-in Cañones deployment is a worked example:
+Run commands from the repository root on a workstation with [uv](https://docs.astral.sh/uv/). Flashing also requires Linux and [Raspberry Pi Imager](https://www.raspberrypi.com/software/). Use Raspberry Pi OS Lite (64-bit) and an [8 GB or larger SD card](https://www.raspberrypi.com/documentation/computers/getting-started.html#recommended-minimum-storage-requirements). Pi 1 and original Zero/W models are unsupported.
+
+For the registered [Cañones example](#register-and-provision-a-player):
 
 1. Attach an unmounted SD card and run `player/bin/rpi-flash radio-canones`.
 2. Move the card to the Pi, connect Ethernet, and power it on.
 3. Run `player/bin/rpi-provision radio-canones`.
 
-For a Pi that already has an OS and SSH, start with [an existing installation](#use-an-existing-installation). The provisioner reads the registered player and hardware settings from `inventory.yml`, installs the service, and waits for readiness. Wi-Fi can be added later without reflashing.
+Add `--wifi` when flashing without Ethernet. Already have an OS and SSH? [Use the existing installation](#use-an-existing-installation) without reflashing. For a new player, [register its identity](#register-and-provision-a-player) first.
 
 ## Flash Raspberry Pi OS Lite
 
 ### Automated flash
 
-On Linux, `rpi-flash` writes and verifies a pinned official Raspberry Pi OS Lite 64-bit image. It supports Raspberry Pi 3, 4, 5, and Zero 2 W-class hardware. Original Pi Zero/W and Pi 1 devices require a 32-bit image and are not currently supported by this player workflow.
-
-Create an SSH key once if the workstation does not already have one, attach the SD card, and leave it unmounted:
+Attach an unmounted SD card, then run:
 
 ```sh
-ssh-keygen -t ed25519
 player/bin/rpi-flash radio-kitchen
 ```
 
-The helper uses the first SSH-agent identity, falling back to a standard `~/.ssh/*.pub` key, and detects the target when exactly one removable disk of at least 4 GB is present. Use `--ssh-key` or `--device` to override an ambiguous default. It inherits the workstation locale, time zone, and keyboard layout, derives the Wi-Fi regulatory country from the locale, and falls back to `en_US.UTF-8`, `UTC`, `us`, and `US`; use the corresponding options to override them. The country is configured even for an Ethernet-first flash so Wi-Fi is not rfkill-blocked later. Add `--wifi` for a Wi-Fi-only player; the helper prompts without echoing the passphrase and keeps Ethernet DHCP enabled as a fallback:
+The helper selects the first SSH-agent key or a standard Ed25519, ECDSA, or RSA public-key file. If neither exists, run `ssh-keygen -t ed25519`; use `--ssh-key FILE` to select another public key.
+
+It detects a single removable disk of at least 4 GB, checks tools, image access, key, hostname, and disk safety, and requires the full disk path as confirmation. **Flashing erases the selected disk.** Imager verifies the pinned official image checksum and completed write. Use `--device` when detection is ambiguous:
 
 ```sh
 player/bin/rpi-flash --wifi --device /dev/sdX radio-kitchen
 ```
 
-Before writing, the helper validates its tools, network access, SSH key, hostname, and target type, size, write state, and mounts. It prints the resolved disk and requires its full device path as confirmation. Raspberry Pi Imager verifies both the pinned image checksum and the completed write.
+`--wifi` prompts for the SSID and passphrase; an empty passphrase selects an open network. Ethernet DHCP remains enabled.
 
-The generated first-boot configuration creates a key-only `radiopad` administrator with passwordless sudo, disables console auto-login, selects the headless boot target, and inherits the workstation time zone. Passwordless sudo enables unattended Ansible provisioning; access to the private SSH key is therefore equivalent to root access on the player.
+Locale, time zone, and keyboard defaults come from the workstation; missing settings fall back to `en_US.UTF-8`, `UTC`, and `us`. Wi-Fi country comes from the locale, falling back to `US`, even without `--wifi`. Override these with `--locale`, `--timezone`, `--keyboard-layout`, and `--country` for the deployment location.
 
-### Raspberry Pi Imager GUI
+First boot creates a key-only `radiopad` administrator and disables the GUI and console auto-login. Its SSH key grants root access through passwordless sudo.
 
-As a manual alternative, open [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and make these selections:
+### Imager GUI alternative
 
-1. Select the exact Pi model under **Device**.
-2. Under **OS**, choose **Raspberry Pi OS (other)** and then **Raspberry Pi OS Lite (64-bit)**. Use Lite for a headless player; 32-bit-only models are unsupported.
-3. Select the storage device and open **OS Customisation**.
-4. Set a hostname such as `radio-kitchen`, create the administrative user `radiopad`, and configure the correct locale, time zone, keyboard layout, and Wi-Fi country.
-5. Configure Wi-Fi only when Ethernet will not be used.
-6. Enable SSH with public-key authentication.
-7. Enable passwordless sudo and disable console auto-login when those options are available. Otherwise, pass `--ask-become-pass` to the provisioning helper.
+In [Raspberry Pi Imager](https://www.raspberrypi.com/documentation/computers/getting-started.html#install-using-imager):
 
-Boot the Pi and proceed to provisioning; the helper waits up to five minutes for SSH.
+1. Select the Pi model, **Raspberry Pi OS Lite (64-bit)**, and the SD card.
+2. Set the hostname, user `radiopad`, and localisation settings for the deployment location.
+3. Add Wi-Fi if needed and enable SSH with your public key.
+4. Flash the card and boot the Pi.
+
+Provisioning sets headless boot and removes console auto-login. Add `--ask-become-pass` if sudo requires a password; the provisioner waits up to five minutes for SSH.
 
 ## Use an existing installation
 
-A 64-bit Raspberry Pi OS installation with SSH enabled does not need reflashing. Add its registered player identity to `inventory.yml`, then connect through its current administrator for the first run. For the living-room deployment, the inventory name is `radio-living-room` and its network address is `radio.lan`:
+A 64-bit Raspberry Pi OS host with SSH needs no reflash. Add it to [inventory.yml](./inventory.yml), then use its existing sudo-capable administrator for the first run. Living Room illustrates the distinction between inventory name `radio-living-room` and network address `radio.lan`:
 
 ```sh
 ssh-copy-id ADMIN@radio.lan
@@ -61,15 +61,15 @@ player/bin/rpi-provision ADMIN@radio-living-room
 ssh radiopad@radio.lan
 ```
 
-Replace `ADMIN` with the existing administrator. `ssh-copy-id` installs keys from your SSH agent or a local public-key file and prompts for the current login password; skip it if key access already works. Add `--ask-become-pass` to the provisioning command if the administrator's sudo requires a password.
+Replace `ADMIN` with the current administrator. Skip `ssh-copy-id` if key access already works; otherwise it prompts for the login password. Add `--ask-become-pass` if sudo needs a password.
 
-Provisioning creates `radiopad`, adds the bootstrap administrator's authorized SSH keys without removing existing keys, and enables passwordless sudo. Future runs use `player/bin/rpi-provision radio-living-room`; the original account remains available. The player service uses its own transient identity and needs no console login.
+Provisioning creates `radiopad`, copies the administrator's authorized SSH keys without removing existing keys, and enables passwordless sudo. The original account remains available. Later runs use `player/bin/rpi-provision radio-living-room`.
 
-Stop any manually started player and remove its shell startup command before provisioning. Desktop installations boot without the GUI after the next reboot; Lite remains the recommended base for new devices.
+Stop any manually started player and remove its shell startup command first. An existing desktop boots without the GUI after the next reboot; the player service starts without a reboot.
 
 ## Register and provision a player
 
-Provisioning consumes an existing registry identity; it does not create shared registry data. While the registry API and clients are still evolving, add players through the registry-data workflow. [The PR that registered Cañones](https://github.com/briceburg/radio-pad-registry-data/pull/1) is the concrete onboarding example; it added `data/accounts/briceburg/players/canones.json`:
+Provisioning validates an existing registry identity; it does not register players. Add one through the [registry-data repository](https://github.com/briceburg/radio-pad-registry-data). [The Cañones registration PR](https://github.com/briceburg/radio-pad-registry-data/pull/1) added `data/accounts/briceburg/players/canones.json`:
 
 ```json
 {
@@ -79,9 +79,9 @@ Provisioning consumes an existing registry identity; it does not create shared r
 }
 ```
 
-Display names may contain Unicode characters, while qualified player identities use lowercase registry slugs. Provisioning verifies that the player exists in the deployed registry.
+Display names may contain Unicode; identities such as `briceburg/canones` use lowercase registry slugs. The player must exist in the deployed registry before provisioning.
 
-The checked-in inventory completes the Cañones deployment definition without storing credentials:
+Add its network address, identity, and hardware settings under `radiopad_players.hosts` in [inventory.yml](./inventory.yml):
 
 ```yaml
 radio-canones:
@@ -91,62 +91,50 @@ radio-canones:
   radiopad_timezone: America/Denver
 ```
 
-Provision it by inventory name:
+Provision by inventory name; repeat for each Pi:
 
 ```sh
 player/bin/rpi-provision radio-canones
 ```
 
-For a new host that is not yet in inventory, provide its registered identity explicitly, then add its durable non-secret configuration to `inventory.yml`:
+For a host not yet in inventory, supply its identity:
 
 ```sh
 player/bin/rpi-provision --player ACCOUNT/PLAYER HOSTNAME.local
 ```
 
-Use the inventory name when a host is declared, even if its network address differs. `--audio-device DEVICE` overrides its audio setting for one run. The helper runs pinned Ansible tooling through `uvx` and requires SSH key access and sudo. Unknown host keys are recorded; changed keys fail and should be removed from `known_hosts` only after confirming an intentional reflash.
+SSH key access and sudo are required. Unknown host keys are saved; changed keys are rejected. Remove an old `known_hosts` entry only after verifying a reflash or key change.
 
-The `radiopad` administrator has no password by default. To add a password fallback, use `player/bin/rpi-provision --ssh-password HOST`; the helper prompts twice without echoing the password and keeps key access enabled. Because `radiopad` has passwordless sudo, treat this password as a root credential.
+The first run installs packages and a pinned uv, then synchronizes locked Python dependencies. Allow a few minutes. Later runs reconcile configuration; local checkout changes are not overwritten. Deployments follow `main` unless inventory pins another Git ref.
 
-Add Wi-Fi during any provisioning run with `player/bin/rpi-provision --wifi NETWORK_NAME HOST`. Each run adds or updates one autoconnect profile without removing Ethernet or existing networks and disables Wi-Fi power saving for reliable playback. A visible network is activated as a connectivity check; an unavailable network is saved for deployment. The passphrase is prompted without echo and exists only in a mode-0600 temporary file on the workstation.
+### Audio
 
-The country defaults from the workstation locale; add `--wifi-country CC` only when that default is wrong for the Pi's location.
-
-The initial run installs system packages, a pinned `uv`, and the required Python runtime, so it can take a few minutes. The locked player environment includes yt-dlp and its Deno JavaScript runtime for site URLs such as YouTube; mpv handles direct streams and playlists itself. Later runs reconcile configuration and restart the player only when managed content changes. Before replacing dependencies, provisioning stops an installed player; a failed synchronization leaves it stopped until a successful retry. Ansible refuses to overwrite local changes under `/opt/radio-pad`.
-
-Deployments follow `main`. An inventory can pin `radiopad_repo_version` to a tag or commit instead; update pinned deployments through provisioning.
-
-## Configure several players
-
-Add each Pi's hostname, registered identity, and hardware-specific settings to `inventory.yml`. Keep secrets out of the plain inventory: continue using the wrapper's Wi-Fi prompt for one host, or use Ansible Vault for persistent fleet credentials. Run every inventoried player directly with:
+Find the device on the Pi:
 
 ```sh
-cd player/deploy/raspberry-pi
-uvx --from ansible-core==2.21.4 ansible-galaxy collection install --requirements-file requirements.yml
-uvx --from ansible-core==2.21.4 ansible-playbook playbook.yml
+ssh radiopad@HOST mpv --no-config --audio-device=help
 ```
 
-Add `--ask-become-pass` only when an inventory administrator requires a sudo password. Limit a fleet run with `--limit HOST`.
+Set `radiopad_audio_device` in inventory, or override it once with `--audio-device DEVICE`. Provisioning checks that it exists. Cañones uses `alsa/default:CARD=DAC`; Living Room uses `alsa/default:CARD=S3`. For a HAT that requires a boot overlay, follow its vendor's setup first; provisioning selects an existing device, not HAT drivers.
 
-The playbook accepts these inventory variables:
+### Wi-Fi and password access
 
-| Name | Purpose | Default |
-| --- | --- | --- |
-| `radiopad_player` | Required `account/player` registry identity. | none |
-| `radiopad_audio_device` | Optional device reported by `mpv --no-config --audio-device=help`; provisioning verifies it exists. | unset |
-| `radiopad_audio_output` | mpv audio driver. | `alsa` |
-| `radiopad_extra_environment` | Additional player environment mapping; managed settings take precedence. | `{}` |
-| `radiopad_repo_url` | Git repository installed on the Pi. | RadioPad GitHub repository |
-| `radiopad_repo_version` | Git ref to deploy; optionally pin a tag or commit. | `main` |
-| `radiopad_registry_url` | Registry API used by validation and the player. | RadioPad production registry |
-| `radiopad_ssh_password_hash` | Optional hashed `radiopad` password that also enables SSH password authentication; use Ansible Vault in persistent inventories. | unset |
-| `radiopad_timezone` | Optional canonical tzdb time zone enforced after first boot. | unset |
-| `radiopad_wifi_country` | Two-letter regulatory country when configuring Wi-Fi. | unset |
-| `radiopad_wifi_password` | WPA passphrase; use Ansible Vault in persistent inventories. | unset |
-| `radiopad_wifi_ssid` | One Wi-Fi profile to add or update alongside Ethernet and existing profiles. | unset |
+Add a WPA Wi-Fi network or password fallback over the current SSH connection, without reflashing:
 
-## Operate, update, and troubleshoot
+```sh
+player/bin/rpi-provision --wifi NETWORK_NAME --wifi-country CC HOST
+player/bin/rpi-provision --ssh-password HOST
+```
 
-The service starts immediately during provisioning, starts at boot, and runs independently of SSH sessions. It waits for a controller to select a station. Connect to the Pi to check its status, read or follow logs, restart it, or update its code:
+Repeat `--wifi` to save additional networks. Existing profiles and Ethernet remain; each saved profile autoconnects with power saving disabled. Visible networks are activated, otherwise saved for deployment. Country defaults from the workstation locale or `US`; omit `--wifi-country` when correct.
+
+Prompts hide passwords; temporary credentials are removed after provisioning. Wi-Fi credentials remain in the Pi's NetworkManager profile. Keep secrets out of inventory; use Ansible Vault for stored credentials.
+
+`--ssh-password` sets a password for `radiopad` and enables SSH password authentication while retaining keys. Password authentication also becomes available to other password-enabled accounts. Treat the `radiopad` password as a root credential because sudo is passwordless. Without this option, existing SSH settings are preserved.
+
+## Operate and update
+
+SSH uses the Pi's network address, not its inventory alias. On the Pi:
 
 ```sh
 ssh radiopad@HOST
@@ -158,10 +146,28 @@ sudo bin/player restart
 sudo bin/player update
 ```
 
-Service commands require `sudo`. The updater requires a clean `main` checkout that can fast-forward from `origin/main`. An unchanged commit leaves a running service alone; otherwise it stops the service, updates the code and locked dependencies, restarts, and waits for readiness. If dependency synchronization fails, the service stays stopped; retry the update or re-provision. Routine code updates do not require Ansible or the original provisioning workstation.
+The service runs independently of SSH. Readiness checks startup and connectivity, not audible playback. Restarting stops playback; select a station with a controller to start it again.
 
-Use `player/bin/rpi-provision HOST` from a workstation for inventory, operating-system, service, credential, or helper changes. Configuration is owned by the inventory and rendered to `/etc/radiopad/player.env`; do not edit the Pi or run `git pull` there directly.
+`update` requires a clean `main` checkout that can fast-forward from `origin/main`. Unchanged code leaves a running service alone; otherwise it stops, updates locked dependencies, restarts, and waits for readiness. No Ansible workstation is needed. A failed dependency sync leaves the service stopped; retry the command or re-provision.
 
-A single `Player already connected` message immediately after a restart can be the switchboard releasing the previous connection; the player reconnects automatically. Repeated messages mean another process or device is using the same player identity.
+Use `player/bin/rpi-provision HOST` from the workstation for inventory, OS packages, service configuration, credentials, or pinned Git refs. It stops an installed player before replacing dependencies. Configuration is rendered to `/etc/radiopad/player.env`; change inventory rather than editing the Pi or running `git pull` there. Do not provision and update the same Pi simultaneously.
 
-To inspect ALSA card names before choosing an mpv device, run `ssh radiopad@HOST cat /proc/asound/cards`. For example, the Cañones Raspberry Pi DAC Plus HAT registers as card `DAC`, corresponding to `alsa/default:CARD=DAC`.
+One `Player already connected` message after restart can indicate a lingering switchboard connection; the player retries. Repeated messages suggest another process or device shares the identity.
+
+## Inventory reference
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `radiopad_player` | Required `account/player` identity. | none |
+| `radiopad_audio_device` | mpv device; verified during provisioning. | unset |
+| `radiopad_audio_output` | mpv audio driver. | `alsa` |
+| `radiopad_extra_environment` | Extra player settings; managed values take precedence. | `{}` |
+| `radiopad_install_root` | Checkout directory. | `/opt/radio-pad` |
+| `radiopad_repo_url` | Git repository. | RadioPad GitHub repository |
+| `radiopad_repo_version` | Git ref; use provisioning to update pins. | `main` |
+| `radiopad_registry_url` | Registry API. | `https://registry.radiopad.dev/api` |
+| `radiopad_ssh_password_hash` | Password hash that enables SSH password authentication. | unset |
+| `radiopad_timezone` | Canonical tzdb time zone. | unchanged |
+| `radiopad_wifi_country` | Two-letter country; required with Wi-Fi. | unset |
+| `radiopad_wifi_password` | WPA passphrase or hexadecimal PSK. | unset |
+| `radiopad_wifi_ssid` | Network to add or update. | unset |
