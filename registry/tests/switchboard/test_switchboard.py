@@ -187,6 +187,8 @@ def test_authenticated_controller_receives_retained_player_state(tmp_path: Path)
                     "url": PLAYER_RADIO_DIAL_URL,
                     "revision": PLAYER_RADIO_DIAL_REVISION,
                 }
+                # Let the endpoint task finish before TestClient tears down its portal future.
+                controller.close()
 
             with client.websocket_connect("/switchboard/testuser1/player1") as signed_out:
                 signed_out.send_json({"event": "authenticate", "data": {"token": None}})

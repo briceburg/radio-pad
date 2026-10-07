@@ -1,0 +1,13 @@
+---
+radiopad_install_root: /opt/radio-pad
+radiopad_repo_url: https://github.com/briceburg/radio-pad.git
+radiopad_repo_version: main
+radiopad_registry_url: https://registry.radiopad.dev/api
+radiopad_audio_output: alsa
+radiopad_audio_device: ""
+radiopad_ssh_password_hash: ""
+radiopad_timezone: ""
+radiopad_wifi_ssid: ""
+radiopad_wifi_password: ""
+radiopad_wifi_country: ""
+radiopad_extra_environment: {}

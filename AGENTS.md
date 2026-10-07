@@ -19,7 +19,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Root `bin/ci` verifies formatting and runs every component's CI concurrently without starting Compose. Run cross-service validation explicitly with `bin/ci integration`.
 - Root `npm run format` writes repository Markdown plus supported source, configuration, workflow, and data files; `bin/ci` verifies them without writing.
 - GitHub Actions CI (`.github/workflows/ci.yml`) calls the same root entry point in two job groups:
-  - `components`: runs `bin/ci` after installing uv and both npm packages.
+  - `components`: native AMD64/ARM64 matrix that runs `bin/ci`, builds the production player image, and verifies its mpv plus yt-dlp/Deno URL resolver toolchain.
   - `integration`: matrix over four Compose configurations — runs `bin/ci integration <compose-file>`.
 - Use component `bin/ci` scripts for targeted work, root `bin/ci` for routine repository validation, and `bin/ci integration` when changes warrant cross-service validation.
 
