@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from switchboard.broadcast import Broadcast, Event
+from switchboard.broadcast import Broadcast
 
 RADIO_DIAL_EVENT = '{"event":"radio_dial_state","data":{"url":"http://example.com/dial","revision":"v1"}}'
 PLAYING_KEXP = (
@@ -26,7 +26,7 @@ async def test_single_subscriber_receives_message(broadcast: Broadcast) -> None:
     async with broadcast.subscribe("ch") as sub:
         await broadcast.publish("ch", "hello")
         event = await asyncio.wait_for(sub.__anext__(), timeout=1)
-    assert event == Event(channel="ch", message="hello")
+    assert event == "hello"
 
 
 async def test_multiple_subscribers_receive_same_message(broadcast: Broadcast) -> None:
@@ -34,14 +34,15 @@ async def test_multiple_subscribers_receive_same_message(broadcast: Broadcast) -
         await broadcast.publish("ch", "msg")
         e1 = await asyncio.wait_for(sub1.__anext__(), timeout=1)
         e2 = await asyncio.wait_for(sub2.__anext__(), timeout=1)
-    assert e1.message == "msg"
-    assert e2.message == "msg"
+    assert e1 == "msg"
+    assert e2 == "msg"
 
 
 async def test_publish_to_other_channel_not_received(broadcast: Broadcast) -> None:
     async with broadcast.subscribe("ch-a") as sub:
         await broadcast.publish("ch-b", "nope")
-        assert sub._queue.empty()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(anext(sub), timeout=0.01)
 
 
 async def test_subscriber_cleanup_after_context_exit(broadcast: Broadcast) -> None:
@@ -53,8 +54,8 @@ async def test_subscriber_cleanup_after_context_exit(broadcast: Broadcast) -> No
 async def test_disconnect_signals_all_subscribers(broadcast: Broadcast) -> None:
     async with broadcast.subscribe("ch") as sub:
         await broadcast.disconnect()
-        with pytest.raises(asyncio.QueueShutDown):
-            await asyncio.wait_for(sub._queue.get(), timeout=1)
+        with pytest.raises(StopAsyncIteration):
+            await asyncio.wait_for(anext(sub), timeout=1)
 
 
 async def test_publish_with_no_subscribers(broadcast: Broadcast) -> None:
@@ -69,8 +70,8 @@ async def test_slow_subscriber_is_removed_when_its_queue_fills() -> None:
         await broadcast.publish("ch", "two")
 
         assert "ch" not in broadcast._channels
-        with pytest.raises(asyncio.QueueShutDown):
-            await sub._queue.get()
+        with pytest.raises(StopAsyncIteration):
+            await anext(sub)
 
 
 async def test_replay_can_exceed_live_queue_limit() -> None:
@@ -79,7 +80,7 @@ async def test_replay_can_exceed_live_queue_limit() -> None:
     broadcast.set_state("ch", "second", "two")
 
     async with broadcast.subscribe("ch", replay=True) as sub:
-        assert [await anext(sub), await anext(sub)] == [Event("ch", "one"), Event("ch", "two")]
+        assert [await anext(sub), await anext(sub)] == ["one", "two"]
 
 
 async def test_subscriber_iteration(broadcast: Broadcast) -> None:
@@ -88,7 +89,7 @@ async def test_subscriber_iteration(broadcast: Broadcast) -> None:
     async def consume() -> None:
         async with broadcast.subscribe("ch") as sub:
             async for event in sub:
-                collected.append(event.message)
+                collected.append(event)
 
     task = asyncio.create_task(consume())
     await asyncio.sleep(0.01)
@@ -112,14 +113,15 @@ async def test_set_state_replayed_on_subscribe(broadcast: Broadcast) -> None:
         e1 = await asyncio.wait_for(sub.__anext__(), timeout=1)
         e2 = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert [e1.message, e2.message] == [RADIO_DIAL_EVENT, PLAYING_KEXP]
+    assert [e1, e2] == [RADIO_DIAL_EVENT, PLAYING_KEXP]
 
 
 async def test_no_replay_without_flag(broadcast: Broadcast) -> None:
     broadcast.set_state("ch", "playback_state", PLAYING_KEXP)
 
     async with broadcast.subscribe("ch") as sub:
-        assert sub._queue.empty()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(anext(sub), timeout=0.01)
 
 
 async def test_clear_state_removes_retained(broadcast: Broadcast) -> None:
@@ -127,7 +129,8 @@ async def test_clear_state_removes_retained(broadcast: Broadcast) -> None:
     broadcast.clear_state("ch")
 
     async with broadcast.subscribe("ch", replay=True) as sub:
-        assert sub._queue.empty()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(anext(sub), timeout=0.01)
 
 
 async def test_disconnect_clears_state(broadcast: Broadcast) -> None:
@@ -143,7 +146,7 @@ async def test_set_state_replaces_existing_key(broadcast: Broadcast) -> None:
     async with broadcast.subscribe("ch", replay=True) as sub:
         event = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert event.message == PLAYING_WWOZ
+    assert event == PLAYING_WWOZ
 
 
 async def test_clear_state_key_removes_one_retained_item(broadcast: Broadcast) -> None:
@@ -154,4 +157,4 @@ async def test_clear_state_key_removes_one_retained_item(broadcast: Broadcast) -
     async with broadcast.subscribe("ch", replay=True) as sub:
         event = await asyncio.wait_for(sub.__anext__(), timeout=1)
 
-    assert event.message == PLAYING_KEXP
+    assert event == PLAYING_KEXP

@@ -31,15 +31,11 @@ PLAYER_STATE_EVENTS = {
 ACTIVE_PLAYER_CONNECTIONS: set[str] = set()
 
 
-class _SessionExpired(Exception):
-    pass
-
-
 async def _send_with_timeout(send: Awaitable[None]) -> None:
     try:
         async with asyncio.timeout(WEBSOCKET_SEND_TIMEOUT_SECONDS):
             await send
-    except Exception as exc:
+    except (TimeoutError, OSError) as exc:
         raise WebSocketDisconnect from exc
 
 
@@ -136,8 +132,8 @@ async def _run_loop(
                 return
 
         async def sender() -> None:
-            async for event in subscriber:
-                await _send_with_timeout(websocket.send_text(event.message))
+            async for message in subscriber:
+                await _send_with_timeout(websocket.send_text(message))
             raise WebSocketDisconnect
 
         async def receiver() -> None:
@@ -150,7 +146,7 @@ async def _run_loop(
                             msg = await websocket.receive_text()
                 except TimeoutError as exc:
                     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
-                    raise _SessionExpired from exc
+                    raise WebSocketDisconnect from exc
                 try:
                     payload = json.loads(msg)
                     if not isinstance(payload, dict):
@@ -174,7 +170,7 @@ async def _run_loop(
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(sender())
                 tg.create_task(receiver())
-        except* (_SessionExpired, WebSocketDisconnect):
+        except* WebSocketDisconnect:
             pass
 
 

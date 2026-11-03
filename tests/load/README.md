@@ -1,6 +1,6 @@
 # Load tests
 
-The load tests are manual capacity tools, not correctness tests or part of `bin/ci`. They use a pinned [Grafana k6](https://grafana.com/docs/k6/latest/) container, so they add no application or repository-tooling dependencies. See [RESULTS.md](RESULTS.md) for the dated reference run and current capacity guidance.
+The load tests are manual capacity tools, not part of `bin/ci`. They use a pinned [Grafana k6](https://grafana.com/docs/k6/latest/) container, so they add no application or repository-tooling dependencies. See [RESULTS.md](RESULTS.md) for preliminary observations and follow-up experiments.
 
 ## Switchboard
 
@@ -80,6 +80,8 @@ Capture server CPU, RSS/high-water memory, file descriptors, thread count, activ
 | `RADIOPAD_LOAD_ALLOW_REMOTE` | unset | Set to `1` to acknowledge a non-local target. |
 
 Additional arguments after `switchboard` are passed to `k6 run`.
+
+After changing the workload, run its deterministic lifecycle checks with `node --test tests/load/switchboard.test.cjs` from the repository root. These use Node's built-in test runner and require no live services.
 
 ### Reading a run
 

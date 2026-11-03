@@ -1,6 +1,6 @@
 # Load-test reference results
 
-These results are a dated capacity reference, not a portable service-level guarantee. Repeat the workload after runtime, infrastructure, protocol, or client-traffic changes.
+These preliminary observations describe short runs in one environment. They do not establish a production capacity limit. Repeat the workload after runtime, infrastructure, protocol, or client-traffic changes.
 
 ## 2026-09-16 Fly baseline
 
@@ -25,9 +25,9 @@ The successful runs recorded 100% connection, authentication, command, fan-out, 
 ### Interpretation
 
 - The candidate showed lower connection p95 at both paired points, while steady command and fan-out latency at 250 rooms was effectively unchanged. These are single samples, so repeat runs are required before treating the connection difference as a stable regression result.
-- One shared CPU sustained 250 rooms, 750 sockets, and the corresponding 1 Hz bidirectional traffic for the 45-second hold. At 350 rooms, connection and authentication still succeeded but message delivery accumulated roughly 13 seconds of latency and missed the drain window. This is a throughput/backpressure knee rather than an idle-socket limit.
+- The 250-room run sustained 750 sockets and 1 Hz bidirectional traffic for a 45-second hold. At 350 rooms, connection and authentication still succeeded but message delivery accumulated roughly 13 seconds of latency and missed the drain window. CPU utilization and event-loop lag were not captured, so the bottleneck remains unconfirmed.
 - Both revisions OOM-killed the 256 MiB machine while ramping toward 500 rooms. The bounded application queues in the candidate protect against individual slow subscribers, but they do not remove WebSocket protocol buffers, compression state, proxy cost, or work already queued below the application.
-- Until repeated soaks and runtime telemetry exist, treat roughly 150–200 rooms with two controllers each as a conservative operating envelope for this exact machine and traffic shape. This is capacity guidance, not an admission limit.
+- No safe operating limit is established: these were single short samples with authentication disabled, so they also exclude the production OIDC/session and S3 authorization path. Repeated authenticated runs, runtime telemetry, and longer soaks are needed before recommending capacity.
 
 ### Next experiments
 

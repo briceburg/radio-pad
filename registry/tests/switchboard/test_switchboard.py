@@ -29,6 +29,7 @@ from switchboard.switchboard import (
     ACTIVE_PLAYER_CONNECTIONS,
     _cleared_state_key,
     _run_loop,
+    _send_with_timeout,
     _state_key,
     websocket_endpoint,
 )
@@ -238,6 +239,20 @@ async def test_slow_websocket_send_ends_connection(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr("switchboard.switchboard.WEBSOCKET_SEND_TIMEOUT_SECONDS", 0.01)
 
     await asyncio.wait_for(_run_loop(websocket, broadcast, "acct/player1", is_player=True), timeout=1)
+
+
+async def test_send_transport_failure_disconnects() -> None:
+    send = AsyncMock(side_effect=OSError("peer unavailable"))
+
+    with pytest.raises(WebSocketDisconnect):
+        await _send_with_timeout(send())
+
+
+async def test_send_programming_error_is_not_hidden() -> None:
+    send = AsyncMock(side_effect=TypeError("invalid message"))
+
+    with pytest.raises(TypeError, match="invalid message"):
+        await _send_with_timeout(send())
 
 
 def test_duplicate_player_connection_is_rejected(switchboard_client: TestClient) -> None:

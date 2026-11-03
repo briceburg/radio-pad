@@ -185,9 +185,7 @@ function loadMarker(payload, expectedPlayerId) {
 function send(socket, event, data) {
   if (socket.readyState === 1) {
     socket.send(JSON.stringify({ event, data }));
-    return true;
   }
-  return false;
 }
 
 function openRoom(index, rampDelay) {
@@ -198,6 +196,7 @@ function openRoom(index, rampDelay) {
   let fanoutSent = 0;
   let commandsSent = 0;
   let trafficTimer = null;
+  let stopped = false;
   let closing = false;
 
   const playerState = {
@@ -227,6 +226,7 @@ function openRoom(index, rampDelay) {
 
   function startTraffic() {
     if (
+      stopped ||
       trafficTimer !== null ||
       authenticatedControllers !== controllersPerPlayer
     ) {
@@ -333,6 +333,10 @@ function openRoom(index, rampDelay) {
 
   player.addEventListener("open", () => {
     recordConnection(playerState, true, playerStartedAt);
+    if (stopped) {
+      player.close();
+      return;
+    }
     openControllers();
     startTraffic();
   });
@@ -361,6 +365,7 @@ function openRoom(index, rampDelay) {
 
   const activeMilliseconds = (rampSeconds - rampDelay + holdSeconds) * 1000;
   setTimeout(() => {
+    stopped = true;
     if (trafficTimer !== null) {
       clearInterval(trafficTimer);
     }
