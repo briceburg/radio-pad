@@ -4,6 +4,9 @@ set -eu
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 
+for script in bin/* bin/docker/*; do
+  [ -f "$script" ] && bash -n "$script"
+done
 uv run --locked mypy src/ tests/
 uv run --locked ruff format --check src/ tests/
 uv run --locked ruff check src/ tests/

@@ -1,5 +1,103 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd "$(dirname "$0")/.."
-exec uv run python src/player.py "$@"
+readonly service="radiopad-player.service"
+readonly health_path="/run/radiopad/ready"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+. ./lib/uv.sh
+repo_root="${PWD%/*}"
+venv="$PWD/tmp/.venv"
+
+usage() {
+  cat <<'EOF'
+Usage: bin/player [run]
+       bin/player status
+       bin/player logs [--follow]
+       bin/player restart
+       bin/player update
+
+Run the player in the foreground or operate its systemd deployment.
+EOF
+}
+
+die() {
+  echo "player: $*" >&2
+  exit 2
+}
+
+require_deployment() {
+  ((EUID == 0)) || die "run service commands with sudo"
+  [[ -d /run/systemd/system ]] || die "systemd is not running"
+  [[ "$(systemctl show "$service" --property=LoadState --value)" == "loaded" ]] ||
+    die "$service is not installed"
+  [[ "$(systemctl show "$service" --property=WorkingDirectory --value)" == "$PWD" ]] ||
+    die "this checkout does not manage $service"
+}
+
+wait_until_ready() {
+  for _ in {1..60}; do
+    [[ -r "$health_path" ]] && {
+      echo "RadioPad is ready."
+      return
+    }
+    sleep 1
+  done
+  systemctl status "$service" --no-pager --full || true
+  die "player did not become ready within 60 seconds"
+}
+
+update_player() {
+  exec 9>/run/lock/radiopad-update.lock
+  flock --nonblock 9 || die "another update is running"
+  [[ -x "$venv/bin/python" ]] || die "managed environment is missing; run rpi-provision"
+  [[ -x /usr/local/bin/uv ]] || die "uv is missing; run rpi-provision"
+  [[ -z "$(git -C "$repo_root" status --porcelain)" ]] || die "checkout has local changes; update refused"
+  [[ "$(git -C "$repo_root" branch --show-current)" == main ]] || die "checkout is not on main; run rpi-provision"
+  GIT_TERMINAL_PROMPT=0 git -C "$repo_root" fetch origin main
+  git -C "$repo_root" merge-base --is-ancestor HEAD FETCH_HEAD ||
+    die "main cannot fast-forward this checkout; run rpi-provision"
+  if [[ "$(git -C "$repo_root" rev-parse HEAD)" == "$(git -C "$repo_root" rev-parse FETCH_HEAD)" ]] &&
+    systemctl is-active --quiet "$service"; then
+    echo "RadioPad is already up to date."
+    exit 0
+  fi
+  systemctl stop "$service"
+  git -C "$repo_root" merge --ff-only FETCH_HEAD
+  VIRTUAL_ENV="$venv" /usr/local/bin/uv sync --active --locked --no-dev --no-python-downloads ||
+    die "dependency sync failed; player is stopped; retry update or run rpi-provision"
+}
+
+case "${1:-run}" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  run)
+    (($# == 0)) || shift
+    exec uv run --locked python src/player.py "$@"
+    ;;
+  status)
+    (($# == 1)) || die "status takes no arguments"
+    require_deployment
+    exec systemctl status "$service" --no-pager --full
+    ;;
+  logs)
+    (($# <= 2)) || die "logs accepts only --follow"
+    require_deployment
+    case "${2:-}" in
+      "") exec journalctl --unit "$service" --boot --lines 100 --no-pager ;;
+      -f | --follow)
+        exec journalctl --unit "$service" --boot --follow
+        ;;
+      *) die "unknown logs option: $2" ;;
+    esac
+    ;;
+  restart | update)
+    (($# == 1)) || die "$1 takes no arguments"
+    require_deployment
+    if [[ "$1" == update ]]; then update_player; fi
+    systemctl restart "$service"
+    wait_until_ready
+    ;;
+  *) die "unknown command: $1" ;;
+esac

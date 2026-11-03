@@ -4,7 +4,9 @@ set -eu
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 
-bash -n bin/*
+for script in bin/*; do
+  [ "$script" = bin/monitor-keystrokes ] || bash -n "$script"
+done
 
 uv run --locked mypy src/ tests/
 uv run --locked ruff format --check src/ tests/

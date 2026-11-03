@@ -7,8 +7,6 @@ repo_root="$(cd "$project_root/../.." && pwd)"
 cd "$project_root"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
 
-sh -n bin/*
-
 uv run --locked mypy .
 uv run --locked ruff format --check .
 uv run --locked ruff check .

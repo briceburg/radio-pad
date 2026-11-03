@@ -8,7 +8,16 @@ on:
 
 jobs:
   components:
-    runs-on: ubuntu-latest
+    name: Components and player image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
       - name: Setup uv
@@ -31,6 +40,10 @@ jobs:
         working-directory: ./remote-control
       - name: Run CI
         run: bin/ci
+      - name: Build player image
+        run: docker build --target prod --tag radiopad-player:ci player
+      - name: Verify player image
+        run: docker run --rm --interactive --entrypoint sh radiopad-player:ci -c 'set -eu; mpv --version >/dev/null; sh -s' < player/tests/bin/check-url-resolver
 
   integration:
     runs-on: ubuntu-latest
