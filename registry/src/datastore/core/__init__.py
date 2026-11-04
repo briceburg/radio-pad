@@ -10,11 +10,13 @@ from .helpers import (
     validate_write_preconditions,
 )
 from .interfaces import ModelWithId, ObjectStore, SeedableStore
+from .locking import InterProcessLock
 from .model_store import ModelStore
 from .seeding import seed_from_path, seedable
 
 __all__ = [
     "ExpiringCache",
+    "InterProcessLock",
     "ModelStore",
     "ModelWithId",
     "ObjectStore",

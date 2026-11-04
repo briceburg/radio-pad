@@ -32,19 +32,16 @@ if [ "$AUTHZ_BACKEND" = "git" ]; then
         REGISTRY_AUTHZ_BACKEND_GIT_SSH_KEY_PATH
 fi
 
-CPU_COUNT=$(bin/docker/get_cpus.sh)
-UVICORN_WORKERS=${UVICORN_WORKERS:-$CPU_COUNT}
-
 if [ "$#" -gt 0 ]; then
     exec "$@"
 fi
 
-UVICORN_ARGS="registry:app --host $REGISTRY_BIND_HOST --port $REGISTRY_BIND_PORT --log-level $REGISTRY_LOG_LEVEL"
+UVICORN_ARGS="registry:app --host $REGISTRY_BIND_HOST --port $REGISTRY_BIND_PORT --log-level $REGISTRY_LOG_LEVEL --ws-max-size 65536 --ws-max-queue 16"
 
 if [ "${REGISTRY_ENV:-production}" = "development" ]; then
     echo "starting uvicorn in development mode (--reload)" >&2
     exec uvicorn $UVICORN_ARGS --reload
 else
-    echo "starting uvicorn: $UVICORN_WORKERS workers ($CPU_COUNT detected cpus)" >&2
-    exec uvicorn $UVICORN_ARGS --workers "$UVICORN_WORKERS"
+    echo "starting uvicorn: ${WEB_CONCURRENCY:-1} worker(s)" >&2
+    exec uvicorn $UVICORN_ARGS
 fi

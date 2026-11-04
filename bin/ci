@@ -13,7 +13,7 @@ if [[ $# -gt 0 ]]; then
   exec tests/integration/bin/ci "$@"
 fi
 
-for script in bin/*; do
+for script in bin/* tests/load/bin/*; do
   bash -n "$script"
 done
 npm run lint

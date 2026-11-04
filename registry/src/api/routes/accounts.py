@@ -12,7 +12,7 @@ router = APIRouter(prefix="/accounts")
 
 
 @router.put("/{account_id}", response_model=Account, responses=ERROR_409)
-async def register_account(
+def register_account(
     account_id: AccountId,
     ds: DS,
     account_spec: AccountSpec,
@@ -22,7 +22,7 @@ async def register_account(
 
 
 @router.get("/{account_id}", response_model=Account)
-async def get_account(
+def get_account(
     account_id: AccountId,
     ds: DS,
 ) -> Account:
@@ -30,7 +30,7 @@ async def get_account(
 
 
 @router.get("/", response_model=PaginatedList[Account])
-async def list_accounts(
+def list_accounts(
     ds: DS,
     paging: PageParams,
 ) -> PaginatedList[Account]:

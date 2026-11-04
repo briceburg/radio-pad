@@ -13,6 +13,7 @@ from auth import AccessTokens, RegistryIDToken
 from auth.socket_auth import validate_local, validate_remote
 from authz import AccountOwners, AuthzStore
 from datastore import LocalBackend
+from lib.constants import REGISTRY_URL
 from tests.api._app import build_store
 
 _ACCESS_TOKENS = AccessTokens("test-session-secret-value-32-bytes", clock=lambda: 1_700_000_100)
@@ -116,7 +117,7 @@ async def test_validate_remote_forwards_optional_token(
     expires_at = await validate_remote(mock_request, "acct", "player1", token)
     assert expires_at == (4_102_444_800 if token else None)
     mock_request.app.state.http_client.get.assert_called_once_with(
-        "http://localhost:8000/api/auth/players/acct/player1/control",
+        f"{REGISTRY_URL.rstrip('/')}/auth/players/acct/player1/control",
         headers=headers,
     )
 

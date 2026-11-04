@@ -13,7 +13,7 @@ router = APIRouter(prefix="/accounts/{account_id}/players")
 
 
 @router.put("/{player_id}", response_model=Player, responses=ERROR_409)
-async def register_player(
+def register_player(
     account_id: AccountId,
     player_id: PlayerId,
     ds: DS,
@@ -32,7 +32,7 @@ async def register_player(
 
 
 @router.get("/{player_id}", response_model=Player)
-async def get_player(
+def get_player(
     account_id: AccountId,
     player_id: PlayerId,
     ds: DS,
@@ -46,7 +46,7 @@ async def get_player(
 
 
 @router.get("/", response_model=PaginatedList[PlayerSummary])
-async def list_players(
+def list_players(
     account_id: AccountId,
     ds: DS,
     paging: PageParams,

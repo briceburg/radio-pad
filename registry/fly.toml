@@ -18,6 +18,7 @@ primary_region = 'ord'
   # Public OAuth client ID; keep it aligned with remote-control/wrangler.toml.
   REGISTRY_AUTH_OIDC_CLIENT_IDS = '106477477593-2uj1ft1e8hi4eiq38tl9ldehjfg4evcl.apps.googleusercontent.com'
   REGISTRY_CORS_ORIGINS = 'capacitor://localhost,http://localhost:5173,http://localhost:5174,http://localhost,https://localhost,https://remote.radiopad.dev'
+  WEB_CONCURRENCY = '1'
 
 [http_service]
   internal_port = 8000

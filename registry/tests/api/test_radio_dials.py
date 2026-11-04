@@ -21,6 +21,8 @@ def test_resolved_radio_dial_etag_tracks_linked_station_updates(client: TestClie
     assert initial.headers["cache-control"] == "public, max-age=0, must-revalidate"
     etag = initial.headers["etag"]
     assert client.get(url, headers={"If-None-Match": etag}).status_code == 304
+    assert client.get(url, headers={"If-None-Match": f"W/{etag}"}).status_code == 304
+    assert client.get(url, headers={"If-None-Match": f'"other", W/{etag}'}).status_code == 304
 
     updated = client.put(
         "accounts/community/stations/WWOZ",
