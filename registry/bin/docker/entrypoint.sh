@@ -7,7 +7,7 @@ configure_git_key() {
     key_path_variable=$3
     ssh_dir=${HOME:-/tmp}/.ssh
 
-    [ -n "$private_key" ] || return
+    [ -n "$private_key" ] || return 0
 
     umask 077
     mkdir -p "$(dirname "$key_path")" "$ssh_dir"

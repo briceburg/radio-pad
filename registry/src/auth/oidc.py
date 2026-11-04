@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import HTTPException, status
-from fastapi_oidc.auth import get_auth
-from fastapi_oidc.types import IDToken
+from fastapi_oidc import IDToken, get_auth
 
 
 class RegistryIDToken(IDToken):

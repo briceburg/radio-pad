@@ -14,7 +14,6 @@ dependencies = [
   "pyjwt",
   "starlette>=1.7,<2",
   "uvicorn[standard]>=0.52.1",
-  "websockets>=17.4",
 ]
 
 [dependency-groups]

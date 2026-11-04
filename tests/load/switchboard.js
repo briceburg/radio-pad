@@ -205,6 +205,7 @@ function openRoom(index, rampDelay) {
   };
   const playerStartedAt = Date.now();
   const player = new WebSocket(roomUrl, null, {
+    compression: "deflate",
     headers: {
       "User-Agent": "RadioPad/load-test",
       "RadioPad-Radio-Dial-Url": radioDialUrl,
@@ -277,6 +278,7 @@ function openRoom(index, rampDelay) {
       };
       const startedAt = Date.now();
       const controller = new WebSocket(roomUrl, null, {
+        compression: "deflate",
         tags: { role: "controller" },
       });
       state.socket = controller;

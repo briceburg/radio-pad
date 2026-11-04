@@ -37,6 +37,11 @@ def main() -> None:
         key_count += 1
     assert key_count, "No Git SSH private key configured"
     assert (pathlib.Path.home() / ".ssh").is_dir(), "SSH home not created"
+    subprocess.run(
+        ["bin/docker/entrypoint.sh", "true"],
+        env=os.environ | {f"REGISTRY_{role}_BACKEND_GIT_SSH_PRIVATE_KEY": "" for role in ("DATA", "AUTHZ")},
+        check=True,
+    )
     print("entrypoint: ok")
 
     print(f"system git: {git('--version')}")
