@@ -2,6 +2,28 @@
 
 These preliminary observations describe short runs in one environment. They do not establish a production capacity limit. Repeat the workload after runtime, infrastructure, protocol, or client-traffic changes.
 
+## 2026-11-04 UTC local slow-reader fault probe
+
+Tested the combined #106–#110 review at `174eeaa`, using production image `radiopad-slow-reader-review:current` (`sha256:04bbb4d44b563e494a36c3a21189a2540bdf7a19104632aaed292c8e705826ba`), one worker, one CPU, 256 MiB, and a 128-process limit. The isolated container used its local ephemeral backend and built-in seeds; OIDC was disabled and no API writes or persistent mounts were used. Health, auth mode, player lookup, and controller authentication were checked before traffic.
+
+Python 3.13.14 with websockets 17.4 connected one synthetic player and two controllers over loopback. All peers disabled compression. The player and healthy controller drained messages concurrently; the slow controller stopped receiving after authentication with `max_queue=1` and an 8 KiB effective TCP receive buffer. Its transport stopped reading after 0.012 seconds through the library's built-in queue backpressure. The player sent 2,000 distinct 32,178-byte state messages at 100 Hz for 20.001 seconds, under a 45-second client deadline.
+
+| Observation | Result |
+| --- | --- |
+| Healthy delivery | Exact sequence of all 2,000 messages; no gaps or duplicates |
+| Healthy latency | Median 0.581 ms; p95 0.891 ms; maximum 1.249 ms |
+| Server RSS | 90,792 KiB before connections; 91,256 KiB at every traffic sample; 90,936 KiB after client cleanup |
+| Process high-water RSS | 95,816 KiB throughout |
+| Sampled server CPU | Maximum 5.25% of one CPU |
+| Health | Every response was 204; sampled latency 1.267–1.614 ms |
+| File descriptors | 14 before connections, 18–19 during the probe, 15 after client cleanup |
+
+The server logged `Disconnecting slow subscriber`; the healthy controller and player remained connected. After reads resumed, the slow peer drained 123 buffered messages and closed without a WebSocket Close frame after 5.780 seconds. The probe verified isolation and bounded observed resource use; it did not require an orderly closing handshake. The server had no restart or OOM, and the container and network were removed afterward.
+
+This was one short, compression-disabled, auth-disabled local fault probe. Docker CPU/RSS/FD samples were approximately 2.2 seconds apart; generator CPU and event-loop lag were not measured. It does not establish production capacity, authenticated/S3 behavior, or a strict socket-reclamation deadline.
+
+The local reproduction command was `bash /tmp/radiopad-slow-reader-run.sh`, using temporary script `/tmp/radiopad-slow-reader-probe.py` and the image above. Raw results, client/server logs, and container metadata remain in `/tmp/radiopad-slow-reader-results.json`, `/tmp/radiopad-slow-reader-client.log`, `/tmp/radiopad-slow-reader-server.log`, and `/tmp/radiopad-slow-reader-container.json`. These are session artifacts, not checked-in or portable test tooling.
+
 ## 2026-11-03 local Registry runtime comparison
 
 Compared merged #104 (`4f610c1`) with #105 (`7b079aa`) using production images, one worker, one CPU, and 256 MiB per server. Both used the same disposable Git fixture (`2c11a71`), with remote synchronization and OIDC disabled. The workload offered deflate compression, opened 250 rooms with two controllers each (750 sockets), and sent state and commands at 1 Hz per room. Each run had a 10-second ramp, 60-second hold, and 2-second drain. Runs were sequential in baseline/candidate/candidate/baseline order.
