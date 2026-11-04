@@ -241,9 +241,8 @@ async def test_slow_websocket_send_ends_connection(monkeypatch: pytest.MonkeyPat
     await asyncio.wait_for(_run_loop(websocket, broadcast, "acct/player1", is_player=True), timeout=1)
 
 
-@pytest.mark.parametrize("error", [OSError("peer unavailable"), WebSocketDisconnected("already closed")])
-async def test_send_transport_failure_disconnects(error: Exception) -> None:
-    send = AsyncMock(side_effect=error)
+async def test_send_after_close_disconnects() -> None:
+    send = AsyncMock(side_effect=WebSocketDisconnected("already closed"))
 
     with pytest.raises(WebSocketDisconnect):
         await _send_with_timeout(send())

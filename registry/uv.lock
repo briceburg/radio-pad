@@ -721,7 +721,7 @@ requires-dist = [
     { name = "pydantic" },
     { name = "pyjwt" },
     { name = "starlette", specifier = ">=1.7,<2" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1" },
     { name = "websockets", specifier = ">=17.4" },
 ]
 

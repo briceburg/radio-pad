@@ -9,6 +9,7 @@ import json
 
 import pytest
 import websockets
+from websockets.exceptions import ConnectionClosedError
 
 PLAYER_HEADERS = {
     "User-Agent": "RadioPad/1.0 (integration-test)",
@@ -20,12 +21,26 @@ REGISTERED_PLAYER_ROOM = "briceburg/living-room"
 
 @pytest.mark.asyncio
 async def test_player_connect(switchboard_url):
-    """Player can connect, send ping, receive pong."""
+    """Player can send a fragmented ping, receive pong, and close cleanly."""
     async with websockets.connect(f"{switchboard_url}/test-acct/player1", additional_headers=PLAYER_HEADERS) as ws:
-        await ws.send(json.dumps({"event": "ping"}))
+        await ws.send(['{"event":', '"ping"}'])
         async with asyncio.timeout(5):
             while json.loads(await ws.recv())["event"] != "pong":
                 pass
+    assert ws.close_code == 1000
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fragmented", [False, True])
+async def test_oversized_messages_close_with_1009(switchboard_url, fragmented):
+    async with websockets.connect(f"{switchboard_url}/test-acct/oversized", additional_headers=PLAYER_HEADERS) as ws:
+        await ws.send(["x" * 32768, "x" * 32769] if fragmented else "x" * 65537)
+        with pytest.raises(ConnectionClosedError) as error:
+            async with asyncio.timeout(5):
+                while True:
+                    await ws.recv()
+        assert error.value.rcvd is not None
+        assert error.value.rcvd.code == 1009
 
 
 @pytest.mark.asyncio
