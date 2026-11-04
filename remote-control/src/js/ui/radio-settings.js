@@ -35,15 +35,11 @@ export function getVisiblePreferences(preferences = []) {
   });
 }
 
-function hasOwn(object, key) {
-  return Object.prototype.hasOwnProperty.call(object, key);
-}
-
 export function preferenceValues(preferences, draftValues = {}) {
   return Object.fromEntries(
     Object.entries(preferences).map(([key, pref]) => [
       key,
-      hasOwn(draftValues, key) ? draftValues[key] : (pref.value ?? ""),
+      Object.hasOwn(draftValues, key) ? draftValues[key] : (pref.value ?? ""),
     ]),
   );
 }

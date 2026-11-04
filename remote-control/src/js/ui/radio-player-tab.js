@@ -79,26 +79,22 @@ export function getStationVisualState(tabName, state) {
 }
 
 function renderSkeleton(visualState) {
-  const rows = [1, 2, 3];
   const cssClass =
     visualState === "warning"
       ? "station-placeholder station-placeholder-warning"
       : "station-placeholder";
 
   return html`
-    ${rows.map(
-      () => html`
-        <ion-row class=${cssClass}>
-          ${Array.from({ length: 3 }).map(
-            () => html`
-              <ion-col size="4">
-                <ion-skeleton-text animated></ion-skeleton-text>
-              </ion-col>
-            `,
-          )}
-        </ion-row>
-      `,
-    )}
+    <ion-row class=${cssClass}>
+      ${Array.from(
+        { length: 9 },
+        () => html`
+          <ion-col size="4">
+            <ion-skeleton-text animated></ion-skeleton-text>
+          </ion-col>
+        `,
+      )}
+    </ion-row>
   `;
 }
 
@@ -162,55 +158,45 @@ export class RadioPlayerTab extends RadioElement {
     failedStation,
     visualState,
   ) {
-    const rows = [];
-    const stationsList = stations || [];
-    for (let i = 0; i < stationsList.length; i += 3) {
-      rows.push(stationsList.slice(i, i + 3));
-    }
-
     return html`
-      ${rows.map(
-        (row) => html`
-          <ion-row>
-            ${row.map((station) => {
-              const isActive = station.call_sign === currentStation;
-              const isPending = station.call_sign === requestedStation;
-              const isFailed = station.call_sign === failedStation;
-              const color = isActive
-                ? "success"
-                : isPending
+      <ion-row>
+        ${(stations || []).map((station) => {
+          const isActive = station.call_sign === currentStation;
+          const isPending = station.call_sign === requestedStation;
+          const isFailed = station.call_sign === failedStation;
+          const color = isActive
+            ? "success"
+            : isPending
+              ? "warning"
+              : isFailed
+                ? "danger"
+                : visualState === "warning"
                   ? "warning"
-                  : isFailed
-                    ? "danger"
-                    : visualState === "warning"
-                      ? "warning"
-                      : "primary";
-              return html`
-                <ion-col size="4">
-                  <ion-button
-                    expand="block"
-                    color=${color}
-                    fill=${isPending ? "outline" : "solid"}
-                    aria-pressed=${String(isActive)}
-                    aria-busy=${String(isPending)}
-                    aria-invalid=${String(isFailed)}
-                    aria-label=${
-                      isPending
-                        ? `${station.call_sign}, starting playback`
-                        : isFailed
-                          ? `${station.call_sign}, playback failed`
-                          : station.call_sign
-                    }
-                    @click=${() => this._onSelectStation(station.call_sign)}
-                  >
-                    ${station.call_sign}
-                  </ion-button>
-                </ion-col>
-              `;
-            })}
-          </ion-row>
-        `,
-      )}
+                  : "primary";
+          return html`
+            <ion-col size="4">
+              <ion-button
+                expand="block"
+                color=${color}
+                fill=${isPending ? "outline" : "solid"}
+                aria-pressed=${String(isActive)}
+                aria-busy=${String(isPending)}
+                aria-invalid=${String(isFailed)}
+                aria-label=${
+                  isPending
+                    ? `${station.call_sign}, starting playback`
+                    : isFailed
+                      ? `${station.call_sign}, playback failed`
+                      : station.call_sign
+                }
+                @click=${() => this._onSelectStation(station.call_sign)}
+              >
+                ${station.call_sign}
+              </ion-button>
+            </ion-col>
+          `;
+        })}
+      </ion-row>
     `;
   }
 

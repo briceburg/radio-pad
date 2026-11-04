@@ -35,9 +35,9 @@ class RadioPadPlayer(abc.ABC):
     """Coordinate playback requests and define the audio-backend interface."""
 
     def __init__(self, config: RadioPadPlayerConfig | None = None):
-        self._station: RadioPadStation | None = None
-        self._config = config
-        self._clients: list[RadioPadClient] = []
+        self.station: RadioPadStation | None = None
+        self.config = config
+        self.clients: list[RadioPadClient] = []
         self._playback_revision = 0
         self._desired_station: RadioPadStation | None = None
         self._failed_call_sign: str | None = None
@@ -45,24 +45,6 @@ class RadioPadPlayer(abc.ABC):
         self._playback_changed = asyncio.Event()
         self._broadcast_lock = asyncio.Lock()
         self.status_reporter: Callable[[str, str | None], Awaitable[None]] | None = None
-
-    @property
-    def config(self) -> RadioPadPlayerConfig | None:
-        """Get the player configuration."""
-        return self._config
-
-    def update_config(self, config: RadioPadPlayerConfig):
-        """Replace the loaded player configuration."""
-        self._config = config
-
-    @property
-    def station(self) -> RadioPadStation | None:
-        """Get or set the station with confirmed playback."""
-        return self._station
-
-    @station.setter
-    def station(self, value: RadioPadStation | None):
-        self._station = value
 
     @property
     def requested_call_sign(self) -> str | None:
@@ -74,14 +56,9 @@ class RadioPadPlayer(abc.ABC):
         """Return the station whose latest playback attempt failed."""
         return self._failed_call_sign
 
-    @property
-    def clients(self):
-        """Get the list of connected clients (read-only)."""
-        return self._clients
-
     def register_client(self, client):
         """Register a client with this player."""
-        self._clients.append(client)
+        self.clients.append(client)
 
     async def broadcast(self, event: str, data: object | None = None, limit_to: "RadioPadClient | None" = None):
         """Broadcast an event to registered local and switchboard clients."""
@@ -248,7 +225,7 @@ class RadioPadClient(abc.ABC):
     """
 
     def __init__(self, player: RadioPadPlayer):
-        self._player = player
+        self.player = player
         self._event_handlers: dict[str, Callable[[RadioPadEvent], Awaitable[None]]] = {}
         self.register_event("playback_start", self._handle_playback_start)
         self.register_event("playback_stop", self._handle_playback_stop)
@@ -262,11 +239,6 @@ class RadioPadClient(abc.ABC):
             "radio_dial_state",
         ):
             self.register_event(ignored, self._handle_ignored)
-
-    @property
-    def player(self) -> RadioPadPlayer:
-        """Get the player instance."""
-        return self._player
 
     def register_event(self, event_name: str, handler):
         """Register or override a handler for a specific event."""

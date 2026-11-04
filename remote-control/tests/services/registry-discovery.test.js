@@ -85,7 +85,6 @@ describe("Registry Discovery", () => {
     await expect(discoverAuthEnabled("/api/")).resolves.toBe(false);
     expect(global.fetch).toHaveBeenCalledWith(
       "http://localhost:3000/api/auth/status",
-      {},
     );
   });
 

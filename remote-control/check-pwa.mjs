@@ -1,45 +1,18 @@
+import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
+import { JSDOM } from "jsdom";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const dist = path.join(projectRoot, "dist");
-const indexHtml = await readFile(path.join(dist, "index.html"), "utf8");
-const privacyHtml = await readFile(
-  path.join(dist, "privacy", "index.html"),
-  "utf8",
-);
-
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function attribute(tag, name) {
-  const match = tag?.match(
-    new RegExp(`\\b${name}=(?:"([^"]*)"|'([^']*)')`, "i"),
-  );
-  return match?.[1] ?? match?.[2];
-}
-
-function findTag(
-  element,
-  attributeName,
-  attributeValue,
-  size,
-  html = indexHtml,
-) {
-  return [...html.matchAll(new RegExp(`<${element}\\b[^>]*>`, "gi"))]
-    .map(([tag]) => tag)
-    .find(
-      (tag) =>
-        attribute(tag, attributeName) === attributeValue &&
-        (!size || attribute(tag, "sizes") === `${size}x${size}`),
-    );
-}
+const index = new JSDOM(await readFile(path.join(dist, "index.html"), "utf8"))
+  .window.document;
+const privacy = new JSDOM(
+  await readFile(path.join(dist, "privacy", "index.html"), "utf8"),
+).window.document;
 
 function distPathFromUrl(url) {
   const parsed = new URL(url, "https://remote.radiopad.dev/");
@@ -65,15 +38,17 @@ async function assertPng(url, size, description) {
   );
 }
 
-async function assertHtmlIcon(html, page, rel, size) {
-  const link = findTag("link", "rel", rel, size, html);
+async function assertHtmlIcon(document, page, rel, size) {
+  const link = document.querySelector(
+    `link[rel="${rel}"][sizes="${size}x${size}"]`,
+  );
   assert(link, `The ${page} HTML is missing rel=${rel} ${size}x${size}.`);
-  await assertPng(attribute(link, "href"), size, `The rel=${rel} asset`);
+  await assertPng(link.getAttribute("href"), size, `The rel=${rel} asset`);
 }
 
-const manifestLink = findTag("link", "rel", "manifest");
+const manifestLink = index.querySelector('link[rel="manifest"]');
 assert(manifestLink, "The production HTML does not link a web app manifest.");
-const manifestHref = attribute(manifestLink, "href");
+const manifestHref = manifestLink.getAttribute("href");
 const manifest = JSON.parse(
   await readFile(distPathFromUrl(manifestHref), "utf8"),
 );
@@ -122,30 +97,30 @@ for (const requiredIcon of ["any:192x192", "any:512x512"]) {
   );
 }
 
-const appleCapable = findTag("meta", "name", "apple-mobile-web-app-capable");
 assert(
-  attribute(appleCapable, "content") === "yes",
+  index.querySelector('meta[name="apple-mobile-web-app-capable"]')?.content ===
+    "yes",
   "The production HTML must enable legacy iOS standalone mode.",
 );
-const appleTitle = findTag("meta", "name", "apple-mobile-web-app-title");
 assert(
-  attribute(appleTitle, "content") === "RadioPad",
+  index.querySelector('meta[name="apple-mobile-web-app-title"]')?.content ===
+    "RadioPad",
   "The production HTML must define the iOS Home Screen title.",
 );
 
-for (const [page, html] of [
-  ["application", indexHtml],
-  ["privacy", privacyHtml],
+for (const [page, document] of [
+  ["application", index],
+  ["privacy", privacy],
 ]) {
   for (const size of [16, 32, 256]) {
-    await assertHtmlIcon(html, page, "icon", size);
+    await assertHtmlIcon(document, page, "icon", size);
   }
 }
-await assertHtmlIcon(indexHtml, "application", "apple-touch-icon", 180);
+await assertHtmlIcon(index, "application", "apple-touch-icon", 180);
 
-const themeColor = findTag("meta", "name", "theme-color");
 assert(
-  attribute(themeColor, "content") === manifest.theme_color,
+  index.querySelector('meta[name="theme-color"]')?.content ===
+    manifest.theme_color,
   "HTML and manifest theme colors must match.",
 );
 

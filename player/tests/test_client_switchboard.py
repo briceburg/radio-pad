@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 from lib.client_switchboard import SwitchboardClient
 from lib.interfaces import RadioPadPlayer, RadioPadPlayerConfig
@@ -31,8 +31,6 @@ def test_switchboard_reloads_new_radio_dial_revision():
         stations=[],
     )
     player_state = SimpleNamespace(config=config)
-    reload_config = Mock(side_effect=lambda value: setattr(player_state, "config", value))
-    player_state.update_config = reload_config
     player = cast(RadioPadPlayer, player_state)
     refreshed = RadioPadPlayerConfig(
         radio_dial_url=config.radio_dial_url,
@@ -41,7 +39,7 @@ def test_switchboard_reloads_new_radio_dial_revision():
     )
 
     async def reload(url, revision):
-        player.update_config(refreshed)
+        player.config = refreshed
 
     reload_radio_dial = AsyncMock(side_effect=reload)
     client = SwitchboardClient(player, radio_dial_reloader=reload_radio_dial)
@@ -59,5 +57,5 @@ def test_switchboard_reloads_new_radio_dial_revision():
     asyncio.run(handle_and_settle())
 
     reload_radio_dial.assert_awaited_once_with(config.radio_dial_url, '"v2"')
-    reload_config.assert_called_once_with(refreshed)
+    assert player.config is refreshed
     assert client.http_headers["RadioPad-Radio-Dial-Revision"] == '"v2"'

@@ -1,6 +1,6 @@
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, call, patch
+from unittest.mock import AsyncMock, call, patch
 
 import pytest
 
@@ -19,7 +19,7 @@ def player_config(*stations, revision='"v1"'):
 
 
 def fake_player(config):
-    return SimpleNamespace(config=config, update_config=Mock())
+    return SimpleNamespace(config=config)
 
 
 def fake_macropad():
@@ -38,7 +38,7 @@ def test_reload_updates_revision_and_only_pushes_changed_station_menu(stations_c
         asyncio.run(_reload_radio_dial(player, macropad, current.radio_dial_url, '"v2"'))
 
     load.assert_awaited_once_with(current.radio_dial_url, current.switchboard_url)
-    player.update_config.assert_called_once_with(refreshed)
+    assert player.config is refreshed
     if stations_changed:
         macropad.publish_station_menu.assert_awaited_once_with()
     else:

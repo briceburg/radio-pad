@@ -39,7 +39,7 @@ async def _load_config_with_retry(player, macropad_client, settings, shutdown_ev
     while not shutdown_event.is_set():
         try:
             player_config = await config.make(**settings)
-            player.update_config(player_config)
+            player.config = player_config
             await macropad_client.publish_status("radio_dial", "ok", None)
             return player_config
         except ConfigError as e:
@@ -75,7 +75,7 @@ async def _reload_radio_dial(player, macropad_client, radio_dial_url, revision):
             continue
 
         stations_changed = refreshed_config.stations != current_config.stations
-        player.update_config(refreshed_config)
+        player.config = refreshed_config
         if stations_changed:
             await macropad_client.publish_station_menu()
         await macropad_client.publish_status("radio_dial", "ok", None)
