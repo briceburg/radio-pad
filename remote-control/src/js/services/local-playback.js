@@ -89,13 +89,21 @@ function createNativeAudioPlayer() {
     },
     start: () => AudioPlayer.play(audioRef),
     async stop() {
+      const previousStatusChanged = statusChanged;
       ready = null;
       statusChanged = null;
       await setup?.catch(() => {});
       // Setup can complete after cancellation. Its callbacks must stay disarmed.
       ready = null;
       statusChanged = null;
-      if (initialized) await AudioPlayer.stop(audioRef);
+      if (initialized) {
+        try {
+          await AudioPlayer.stop(audioRef);
+        } catch (error) {
+          statusChanged = previousStatusChanged;
+          throw error;
+        }
+      }
     },
   };
 }
@@ -105,7 +113,7 @@ export class LocalPlayback extends EventTarget {
     super();
     this.native = Capacitor.isNativePlatform();
     this.session = null;
-    this.cleanup = Promise.resolve();
+    this.cleanup = Promise.resolve(true);
     this.nativePlayer = this.native ? createNativeAudioPlayer() : null;
   }
 
@@ -124,11 +132,21 @@ export class LocalPlayback extends EventTarget {
   release() {
     const session = this.session;
     this.session = null;
-    session?.cancel();
+    session?.cancel?.();
     if (!session?.player) return this.cleanup;
     // Complete native setup/stop before reusing the notification player for another station.
-    this.cleanup = Promise.resolve(session.player.stop()).catch((error) =>
-      this.reportError(error),
+    let stopping;
+    try {
+      stopping = session.player.stop();
+    } catch (error) {
+      stopping = Promise.reject(error);
+    }
+    this.cleanup = Promise.resolve(stopping).then(
+      () => true,
+      (error) => {
+        this.reportError(error);
+        return false;
+      },
     );
     return this.cleanup;
   }
@@ -140,9 +158,20 @@ export class LocalPlayback extends EventTarget {
     const cancelled = new Promise((resolve) => {
       cancel = () => resolve(false);
     });
-    const session = { cancel, player: null, started: false };
+    const session = {
+      cancel() {
+        session.cancelled = true;
+        cancel();
+      },
+      cancelled: false,
+      callSign: station.call_sign,
+      currentStation: null,
+      player: null,
+      started: false,
+    };
     this.session = session;
     const isCurrent = () => this.session === session;
+    const mayStart = () => isCurrent() && !session.cancelled;
     const fail = (error) => {
       if (!isCurrent()) return;
       this.release();
@@ -151,29 +180,31 @@ export class LocalPlayback extends EventTarget {
     };
     const onStatus = (status) => {
       if (!isCurrent() || !session.started) return;
-      this.publish(status === "playing" ? station.call_sign : null);
+      session.currentStation = status === "playing" ? station.call_sign : null;
+      this.publish(session.currentStation);
     };
     this.publish(null, station.call_sign);
 
     let timeout;
     const start = async () => {
       if (this.native) await previousCleanup;
-      if (!isCurrent()) return false;
+      if (!mayStart()) return false;
       session.player =
         this.nativePlayer || createWebAudioPlayer(station, onStatus, fail);
       if (this.native) await session.player.prepare(station, onStatus);
       else await session.player.play();
-      if (!isCurrent()) return false;
+      if (!mayStart()) return false;
       if (this.native) await session.player.start();
-      if (!isCurrent()) return false;
+      if (!mayStart()) return false;
       session.started = true;
+      session.currentStation = station.call_sign;
       // Web play() confirms playback. Native acknowledges the selected source/play commands
       // after an unqualified ready signal; the plugin cannot prove audible output or source identity.
       this.publish(station.call_sign);
       return true;
     };
     const starting = start().catch((error) => {
-      fail(error);
+      if (mayStart()) fail(error);
       return false;
     });
     if (this.native) {
@@ -191,8 +222,20 @@ export class LocalPlayback extends EventTarget {
   }
 
   async stop() {
+    if (this.session?.stopping) return this.cleanup;
+    const session = this.session;
     const cleanup = this.release();
-    this.publish();
-    await cleanup;
+    const stopping = { stopping: true };
+    this.session = stopping;
+    const stopped = await cleanup;
+    if (this.session !== stopping) return;
+    this.session = stopped ? null : session;
+    if (stopped) this.publish();
+    else
+      this.publish(
+        session?.currentStation,
+        null,
+        session?.currentStation ? null : session?.callSign,
+      );
   }
 }

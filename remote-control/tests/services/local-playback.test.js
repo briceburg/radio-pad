@@ -271,7 +271,7 @@ describe("Listen playback", () => {
     await actions.stopStation("listen");
   });
 
-  it("surfaces native stop rejection instead of swallowing it", async () => {
+  it("waits for native stop acknowledgement and preserves playback on rejection", async () => {
     Capacitor.isNativePlatform.mockReturnValue(true);
     const { actions } = createActions();
     const selection = actions.clickStation("listen", "KEXP");
@@ -280,10 +280,52 @@ describe("Listen playback", () => {
     );
     nativeCallbacks[0].ready();
     await selection;
-    AudioPlayer.stop.mockRejectedValueOnce(new Error("Stop failed"));
-    await actions.stopStation("listen");
+    const stopped = Promise.withResolvers();
+    AudioPlayer.stop.mockReturnValueOnce(stopped.promise);
+    const stopping = actions.stopStation("listen");
+    expectState("KEXP");
+    stopped.reject(new Error("Stop failed"));
+    await stopping;
+    expectState("KEXP");
     expect(toastStore.get().error.message).toBe("Stop failed");
+    nativeCallbacks[0].status({ status: "paused" });
+    expectState(null);
+    nativeCallbacks[0].status({ status: "playing" });
+    expectState("KEXP");
+    await actions.stopStation("listen");
+    expectState(null);
   });
+
+  it.each(["success", "failure"])(
+    "ignores slow stop %s after a newer station request",
+    async (result) => {
+      Capacitor.isNativePlatform.mockReturnValue(true);
+      const { actions } = createActions();
+      const first = actions.clickStation("listen", "KEXP");
+      await vi.waitFor(() =>
+        expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
+      );
+      nativeCallbacks[0].ready();
+      await first;
+      const stopped = Promise.withResolvers();
+      AudioPlayer.stop.mockReturnValueOnce(stopped.promise);
+      const stopping = actions.stopStation("listen");
+      expectState("KEXP");
+      const next = actions.clickStation("listen", "WXXI");
+      expectState(null, "WXXI");
+      if (result === "success") stopped.resolve();
+      else stopped.reject(new Error("Old stop failed"));
+      await stopping;
+      expectState(null, "WXXI");
+      await vi.waitFor(() =>
+        expect(AudioPlayer.changeAudioSource).toHaveBeenCalledOnce(),
+      );
+      nativeCallbacks[0].ready();
+      await next;
+      expectState("WXXI");
+      await actions.stopStation("listen");
+    },
+  );
 
   it("serializes rapid native selections and registers callbacks once for the service lifetime", async () => {
     Capacitor.isNativePlatform.mockReturnValue(true);
@@ -334,9 +376,10 @@ describe("Listen playback", () => {
     const selection = actions.clickStation("listen", "KEXP");
     await vi.waitFor(() => expect(AudioPlayer.create).toHaveBeenCalledOnce());
     const stopping = actions.stopStation("listen");
-    expectState(null);
+    expectState(null, "KEXP");
     creating.resolve();
     await Promise.all([selection, stopping]);
+    expectState(null);
     expect(AudioPlayer.play).not.toHaveBeenCalled();
     expect(AudioPlayer.destroy).not.toHaveBeenCalled();
   });
