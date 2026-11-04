@@ -697,7 +697,6 @@ dependencies = [
     { name = "pyjwt" },
     { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
-    { name = "websockets" },
 ]
 
 [package.dev-dependencies]
@@ -722,7 +721,6 @@ requires-dist = [
     { name = "pyjwt" },
     { name = "starlette", specifier = ">=1.7,<2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1" },
-    { name = "websockets", specifier = ">=17.4" },
 ]
 
 [package.metadata.requires-dev]

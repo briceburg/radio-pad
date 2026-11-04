@@ -4,7 +4,7 @@ The load tests are manual capacity tools, not part of `bin/ci`. They use a pinne
 
 ## Switchboard
 
-`switchboard.js` models independent rooms containing one player and one or more controllers. Several rooms share each event-driven k6 virtual user so the load generator can sustain many sockets without one JavaScript runtime per player. Connections are spread across the ramp, held concurrently, then drained and closed. During the hold, the player publishes playback state to every controller and one controller sends commands back to the player.
+`switchboard.js` models independent rooms containing one player and one or more controllers. Several rooms share each event-driven k6 virtual user so the load generator can sustain many sockets without one JavaScript runtime per player. Connections offer deflate compression like browsers and Python players; the server decides whether to negotiate it. Connections are spread across the ramp, held concurrently, then drained and closed. During the hold, the player publishes playback state to every controller and one controller sends commands back to the player.
 
 The setup phase registers deterministic players through the Registry API. Repeated runs update the same records, but the records remain afterward because the Registry has no delete API. Use a disposable local or staging data store.
 

@@ -2,6 +2,30 @@
 
 These preliminary observations describe short runs in one environment. They do not establish a production capacity limit. Repeat the workload after runtime, infrastructure, protocol, or client-traffic changes.
 
+## 2026-11-03 local Registry runtime comparison
+
+Compared merged #104 (`4f610c1`) with #105 (`7b079aa`) using production images, one worker, one CPU, and 256 MiB per server. Both used the same disposable Git fixture (`2c11a71`), with remote synchronization and OIDC disabled. The workload offered deflate compression, opened 250 rooms with two controllers each (750 sockets), and sent state and commands at 1 Hz per room. Each run had a 10-second ramp, 60-second hold, and 2-second drain. Runs were sequential in baseline/candidate/candidate/baseline order.
+
+| Build | Repeat | Median server CPU | Peak process RSS | p95 connect | p95 auth | p95 command | p95 fan-out | Delivery |
+| --- | --: | --: | --: | --: | --: | --: | --: | --- |
+| #104 | 1 | 25.0% | 129.1 MiB | 5 ms | 4 ms | 3 ms | 3 ms | 100% |
+| #105 | 1 | 16.1% | 123.0 MiB | 4 ms | 3 ms | 2 ms | 2 ms | 100% |
+| #105 | 2 | 16.1% | 123.1 MiB | 4 ms | 3 ms | 2 ms | 2 ms | 100% |
+| #104 | 2 | 24.6% | 129.2 MiB | 5 ms | 4 ms | 3 ms | 3 ms | 100% |
+
+All connection, authentication, delivery, and planned-disconnect thresholds passed, with no socket errors. CPU is Docker's reported percentage of one CPU, sampled after the ramp and before drain; RSS is `/proc/1/status`'s `VmHWM`. The fixture remained unchanged, and all generators and test servers stopped. An initial staging attempt exited before generating traffic because the entrypoint rejected an unset inline SSH key; the measured runs used the same placeholder key on both builds. The entrypoint now permits an absent key.
+
+The candidate used roughly 35% less CPU and 5% less peak process memory in this workload. This compares the complete runtime update, not individual dependency changes. Both builds used the same 64 KiB ceiling, so these results do not measure its benefit. The workload is busier than normal interactive control; local transport, disabled OIDC, no S3 or remote Git I/O, unmeasured generator CPU/event-loop lag, and short holds prevent production-capacity conclusions. Authenticated correctness is covered separately by Compose integration tests.
+
+To repeat traffic against independently staged baseline and candidate servers with identical pre-registered fixtures:
+
+```sh
+RADIOPAD_LOAD_PLAYERS=250 RADIOPAD_LOAD_CONTROLLERS_PER_PLAYER=2 \
+RADIOPAD_LOAD_REGISTER_PLAYERS=0 RADIOPAD_LOAD_RAMP_SECONDS=10 \
+RADIOPAD_LOAD_HOLD_SECONDS=60 RADIOPAD_LOAD_DRAIN_SECONDS=2 \
+tests/load/bin/run switchboard http://localhost:28751
+```
+
 ## 2026-09-16 Fly baseline
 
 The test targeted the unified Registry and switchboard directly at its Fly hostname. The app ran in `ord` on one shared CPU with 256 MiB RAM and one Uvicorn worker, using the Git data backend with 5,000 temporary deterministic players. Authentication was temporarily disabled, but controller handshakes still performed local player lookup. The remote generator observed a roughly 50 ms network floor.
@@ -31,7 +55,7 @@ The successful runs recorded 100% connection, authentication, command, fan-out, 
 
 ### Next experiments
 
-1. Disable WebSocket per-message deflate and repeat 250, 350, and 500 rooms. [Uvicorn enables it by default](https://www.uvicorn.org/settings/), while RadioPad messages are small; the underlying [`websockets` memory guide](https://websockets.readthedocs.io/en/latest/topics/memory.html) identifies compression as the primary per-connection memory factor and reports a substantially smaller baseline when disabled.
+1. Compare server compression enabled and disabled with clients explicitly offering deflate. The older workload omitted k6's compression option, so the Fly results do not establish compression's cost for real clients. [Uvicorn enables it by default](https://uvicorn.dev/settings/), and the [`websockets` memory guide](https://websockets.readthedocs.io/en/latest/topics/memory.html) identifies compression as a major per-connection memory factor.
 2. Route state only to controllers and commands only to the player. The current all-subscriber broadcast sends six messages per room per tick for three useful deliveries, so audience-aware routing can nearly halve steady outbound work for this workload.
 3. Add low-cardinality runtime metrics for active rooms and sockets by role, event-loop lag, subscriber-queue overflow, send timeout, authentication duration, and process resources. Confirm CPU saturation rather than inferring it from the latency knee.
 4. Revisit controller-auth concurrency only after measurement. The 250-room candidate burst reached 28 threads while offloading blocking Git/authz access; cap or cache that path only if repeated connection storms show it drives memory or tail latency.
