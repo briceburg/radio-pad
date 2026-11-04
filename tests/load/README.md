@@ -1,6 +1,6 @@
 # Load tests
 
-The load tests are manual capacity tools, not part of `bin/ci`. They use a pinned [Grafana k6](https://grafana.com/docs/k6/latest/) container, so they add no application or repository-tooling dependencies. See [RESULTS.md](RESULTS.md) for preliminary observations and follow-up experiments.
+The load tests are manual capacity tools, not part of `bin/ci`. They use a pinned [Grafana k6](https://grafana.com/docs/k6/latest/) container, so they add no application or repository-tooling dependencies.
 
 ## Switchboard
 
@@ -47,15 +47,13 @@ The runner only generates traffic. Keep deployment, fixture creation, backup, an
 
 Prefer a dedicated staging app and disposable data repository. If a sole-user deployment must use its normal Git data source, use this sequence:
 
-1. Record the application revision, image, machine size, worker count, auth mode, backend revision, and test parameters. Freeze unrelated writes for the test window.
+1. Record the [run context](#reading-a-run) and freeze unrelated writes for the test window.
 2. Record the exact data-source `main` SHA and push that SHA to a dated backup branch.
 3. Add deterministic load players in one fixture commit and push it to `main`. Record the fixture SHA and verify the first and last players through the deployed API.
 4. Deploy the baseline application revision. Change only settings required by the test, then verify health, auth mode, and fixture visibility.
 5. Run the same staged workload against the baseline and candidate revisions on the same machine and data. Start small, stop at the first latency, delivery, CPU, or memory knee, and repeat stable points before drawing regression conclusions.
 6. Stop every load generator. Restore data `main` with `--force-with-lease` pinned to the recorded fixture SHA, deploy the intended application revision with its normal configuration, and verify the original SHA, auth mode, known resources, fixture absence, and service health.
 7. Delete the backup branch only after all restoration checks pass.
-
-Capture server CPU, RSS/high-water memory, file descriptors, thread count, active sockets, restarts, and logs alongside k6 output. A short ramp locates a knee; it is not a soak test. Repeat candidate capacity points for at least five minutes, then run a longer soak before setting production limits.
 
 ### Configuration
 
@@ -87,7 +85,11 @@ After changing the workload, run its deterministic lifecycle checks with `node -
 
 The tagged `outcomes` thresholds require more than 99% successful connections, authentications, planned disconnects, fan-out deliveries, and command deliveries, with no unexpected socket errors. Disconnect outcomes distinguish planned closure from an early disconnect; they do not validate the closing handshake. Separate connection, authentication, fan-out, and command latency trends report percentiles without imposing an arbitrary service-level objective.
 
-Watch switchboard CPU, memory, file descriptors, and event-loop responsiveness alongside k6. Also watch the load generator: a saturated generator can look like a server limit. Repeat each step long enough to reach steady state and record the first resource or latency knee.
+Keep dated measurements and raw output with the associated PR or benchmark run. Record application and data revisions, image, machine resources, worker count, authentication/backend/compression settings, workload parameters, and missing telemetry.
+
+Capture server CPU, RSS/high-water memory, file descriptors, thread count, active sockets, restarts, logs, and event-loop responsiveness alongside k6. Track generator CPU and event-loop lag too: a saturated generator can look like a server limit. Repeat each step long enough to reach steady state and record the first resource or latency knee.
+
+A short ramp locates a knee; it is not a soak test. Repeat candidate capacity points for at least five minutes, then run a longer soak before setting production limits. Short local or auth-disabled runs do not establish production capacity. See the Registry's [switchboard guidance](../../registry/README.md#switchboard) for deployment constraints.
 
 k6 consumes WebSocket messages promptly, so this workload does not simulate a TCP peer that stops reading. It exercises high fan-out and disconnect churn; true slow-reader validation requires a small purpose-built client or network shaping and should remain a separate destructive robustness test.
 
