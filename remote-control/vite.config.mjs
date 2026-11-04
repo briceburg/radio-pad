@@ -51,19 +51,11 @@ export default defineConfig({
   envDir: "..",
   publicDir: "../node_modules/@ionic/core/dist/ionic",
   plugins: [emitManifestIcons()],
+  input: { app: "index.html", privacy: "privacy/index.html" },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        app: fileURLToPath(new URL("./src/index.html", import.meta.url)),
-        privacy: fileURLToPath(
-          new URL("./src/privacy/index.html", import.meta.url),
-        ),
-      },
-      output: {
-        manualChunks: undefined,
-      },
+    rolldownOptions: {
       external: ["/ionic.esm.js"],
     },
   },
