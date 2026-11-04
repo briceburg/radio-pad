@@ -7,11 +7,10 @@ dependencies = [
   "boto3",
   "cachetools",
   "fastapi",
-  "fastapi-oidc",
   "httpx2",
   "itsdangerous",
   "pydantic",
-  "pyjwt",
+  "pyjwt[crypto]>=2.15.1",
   "starlette>=1.7,<2",
   "uvicorn[standard]>=0.52.1",
 ]

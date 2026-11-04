@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 import httpx2
 import jwt
@@ -7,7 +8,8 @@ import pytest
 
 _OIDC_AUDIENCE = "radiopad-integration"
 _OIDC_ISSUER = "http://oidc:8080"
-_OIDC_SECRET = "radio-pad-integration-oidc-secret"
+# Public test fixture, never a deployment credential.
+_OIDC_KEY = (Path(__file__).parent / "fixtures/oidc-private-key.pem").read_bytes()
 
 
 def _oidc_token(subject):
@@ -23,8 +25,8 @@ def _oidc_token(subject):
             "name": "Integration User",
             "sub": subject,
         },
-        _OIDC_SECRET,
-        algorithm="HS256",
+        _OIDC_KEY,
+        algorithm="RS256",
         headers={"kid": "integration"},
     )
 

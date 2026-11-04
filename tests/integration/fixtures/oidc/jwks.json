@@ -1,11 +1,13 @@
 {
   "keys": [
     {
-      "alg": "HS256",
-      "k": "cmFkaW8tcGFkLWludGVncmF0aW9uLW9pZGMtc2VjcmV0",
+      "kty": "RSA",
+      "key_ops": ["verify"],
+      "n": "towtkE8zLtU3Xo96Pw7qc-y3kyk2wjV1N87MrQqyU5CpW5fljNW-C1e6Jfs90OP-GNnvqphyduUKr6et3Xo0-kx6ACO-iraUCYJYWGo0ZzPGHmQrL9025mbH6zxMXqdGx3N6su-3akRDk6Tbc6PsdPqfGVUH_4vR1C56lUx7LXZNleSmXCwMrRvDiMbHFN_4XLJFwp45BNJKdkM7IowrUVwBmi7SauKUg3UX92AJptIKFvHH5KGs-VfRICFW_3SQ2tHFeZm5puxWuI7nt8bNRC6GaqbiOA6meBKLaJ3dj4umHIMIuP4Q6MFfgRlRFkhBTMx6cN8IWqkLc_xzgdIqLw",
+      "e": "AQAB",
       "kid": "integration",
-      "kty": "oct",
-      "use": "sig"
+      "use": "sig",
+      "alg": "RS256"
     }
   ]
 }
