@@ -12,7 +12,7 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 - Python dependencies and tool settings live in `pyproject.toml`.
 - Use `bin/ci` for validation. It runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
-- Use `bin/registry` or `uv run python src/registry.py` for local execution.
+- Use `bin/registry` for local execution. It and the container entrypoint delegate server settings to `bin/serve`, which uses Uvicorn's standard CLI and WebSocket backend selection.
 - If host Python tooling or cache permissions are unreliable, run the same checks inside the component image with: `docker compose run --rm --build --no-deps --user "$(id -u):$(id -g)" registry ./bin/ci`
 - uv, pytest, Ruff, and mypy caches live under the ignored project-local `tmp/` directory by default. `bin/ci` also places uv's project environment there. A checkout used for development or CI should be writable.
 

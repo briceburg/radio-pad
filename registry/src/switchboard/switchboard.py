@@ -5,6 +5,7 @@ import time
 from collections.abc import Awaitable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
+from starlette.websockets import WebSocketDisconnected
 
 from auth.socket_auth import validate_socket_client
 from switchboard.broadcast import Broadcast
@@ -35,7 +36,7 @@ async def _send_with_timeout(send: Awaitable[None]) -> None:
     try:
         async with asyncio.timeout(WEBSOCKET_SEND_TIMEOUT_SECONDS):
             await send
-    except (TimeoutError, OSError) as exc:
+    except (TimeoutError, OSError, WebSocketDisconnected) as exc:
         raise WebSocketDisconnect from exc
 
 

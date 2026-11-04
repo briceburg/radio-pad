@@ -3,4 +3,5 @@ set -eu
 
 cd "$(dirname "$0")/.."
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-tmp/.venv}"
-exec uv run --locked python src/registry.py "$@"
+export REGISTRY_ENV="${REGISTRY_ENV:-development}"
+exec uv run --locked bin/serve "$@"

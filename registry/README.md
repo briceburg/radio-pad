@@ -121,7 +121,9 @@ When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry m
 
 Pub-sub queues, retained state, and active-player membership are process-local. A player and controller accepted by different processes therefore cannot communicate. Switchboard deployments require `WEB_CONCURRENCY=1`, which is Uvicorn's default and explicit in `fly.toml`; scale across instances with player-path affinity. One async process can host many player rooms, so this is not a one-process-per-player constraint. API-only deployments may use more workers.
 
-The entrypoint also limits incoming WebSocket messages to 64 KiB and Uvicorn's per-connection receive queue to 16 messages. RadioPad protocol messages are intentionally small; these bounds prevent slow or flooding peers from reserving unbounded memory.
+The container and local runner share `bin/serve`, which uses Uvicorn's maintained default WebSocket backend (`websockets-sansio` in the locked version) and a 64 KiB incoming-message limit. Uvicorn handles framing, receive backpressure, and transport flow control; the switchboard bounds application subscriber queues and times out stalled sends. The legacy-only `--ws-max-queue` setting is intentionally omitted.
+
+Known upstream limitation: Uvicorn 0.54's Sans-I/O message assembly does not enforce websockets 17.4's 4,096-fragment receive limit. The payload-size limit does not bound fragment metadata overhead, and application code receives messages only after reassembly. Resolving that gap requires an upstream transport fix; this project does not maintain a protocol fork or claim complete memory-exhaustion protection.
 
 Two deployment strategies preserve that affinity:
 
