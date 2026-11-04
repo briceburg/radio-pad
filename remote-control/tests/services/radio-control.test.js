@@ -41,11 +41,14 @@ describe("RadioControl", () => {
     };
     vi.stubGlobal(
       "WebSocket",
-      vi.fn(function (url) {
-        this.url = url;
-        Object.assign(this, mockWebSocketInstance);
-        return this;
-      }),
+      Object.assign(
+        vi.fn(function (url) {
+          this.url = url;
+          Object.assign(this, mockWebSocketInstance);
+          return this;
+        }),
+        { CONNECTING: 0, OPEN: 1 },
+      ),
     );
     Capacitor.isNativePlatform.mockReturnValue(false);
   });
