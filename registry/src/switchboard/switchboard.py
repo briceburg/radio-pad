@@ -36,7 +36,7 @@ async def _send_with_timeout(send: Awaitable[None]) -> None:
     try:
         async with asyncio.timeout(WEBSOCKET_SEND_TIMEOUT_SECONDS):
             await send
-    except (TimeoutError, OSError, WebSocketDisconnected) as exc:
+    except (TimeoutError, WebSocketDisconnected) as exc:
         raise WebSocketDisconnect from exc
 
 
