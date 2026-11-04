@@ -17,9 +17,7 @@ PLAYING_WWOZ = (
 
 @pytest.fixture
 async def broadcast() -> Broadcast:
-    b = Broadcast()
-    await b.connect()
-    return b
+    return Broadcast()
 
 
 async def test_single_subscriber_receives_message(broadcast: Broadcast) -> None:

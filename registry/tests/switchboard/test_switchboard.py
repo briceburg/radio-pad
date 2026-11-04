@@ -90,7 +90,7 @@ async def test_controller_auth_validation_receives_missing_token(monkeypatch: py
     websocket = AsyncMock()
     websocket.headers = {}
     websocket.app.state.broadcast = Broadcast()
-    websocket.receive_text.return_value = '{"event":"authenticate","data":{"token":null}}'
+    websocket.receive_json.return_value = {"event": "authenticate", "data": {"token": None}}
     validate = AsyncMock()
     validate.return_value = None
     run_loop = AsyncMock()
@@ -107,7 +107,7 @@ async def test_controller_auth_validation_receives_missing_token(monkeypatch: py
 async def test_controller_auth_internal_error_closes_1011(monkeypatch: pytest.MonkeyPatch) -> None:
     websocket = AsyncMock()
     websocket.headers = {}
-    websocket.receive_text.return_value = '{"event":"authenticate","data":{"token":"token"}}'
+    websocket.receive_json.return_value = {"event": "authenticate", "data": {"token": "token"}}
     validate = AsyncMock(side_effect=RuntimeError("auth backend unavailable"))
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
 
@@ -120,18 +120,18 @@ async def test_controller_auth_internal_error_closes_1011(monkeypatch: pytest.Mo
 @pytest.mark.parametrize(
     "message",
     [
-        '{"event":"authenticate","data":"token"}',
-        '{"event":"authenticate","data":{}}',
-        '{"event":"authenticate","data":{"token":123}}',
+        {"event": "authenticate", "data": "token"},
+        {"event": "authenticate", "data": {}},
+        {"event": "authenticate", "data": {"token": 123}},
     ],
 )
 async def test_controller_auth_rejects_malformed_messages(
     monkeypatch: pytest.MonkeyPatch,
-    message: str,
+    message: dict[str, object],
 ) -> None:
     websocket = AsyncMock()
     websocket.headers = {}
-    websocket.receive_text.return_value = message
+    websocket.receive_json.return_value = message
     validate = AsyncMock()
     monkeypatch.setattr("switchboard.switchboard.validate_socket_client", validate)
 
@@ -210,7 +210,7 @@ async def test_controller_session_closes_at_token_expiry() -> None:
         await asyncio.Event().wait()
         raise AssertionError("unreachable")
 
-    websocket.receive_text.side_effect = wait_for_message
+    websocket.receive_json.side_effect = wait_for_message
 
     await _run_loop(websocket, Broadcast(), "acct/player1", is_player=False, expires_at=0)
 
@@ -219,7 +219,7 @@ async def test_controller_session_closes_at_token_expiry() -> None:
 
 async def test_offline_controller_receives_player_presence() -> None:
     websocket = AsyncMock()
-    websocket.receive_text.side_effect = WebSocketDisconnect()
+    websocket.receive_json.side_effect = WebSocketDisconnect()
 
     await _run_loop(websocket, Broadcast(), "acct/player1", is_player=False)
 
@@ -233,7 +233,7 @@ async def test_slow_websocket_send_ends_connection(monkeypatch: pytest.MonkeyPat
 
     websocket = AsyncMock()
     websocket.send_text.side_effect = wait_forever
-    websocket.receive_text.side_effect = wait_forever
+    websocket.receive_json.side_effect = wait_forever
     broadcast = Broadcast()
     broadcast.set_state("acct/player1", "playback_state", '{"event":"playback_state","data":{}}')
     monkeypatch.setattr("switchboard.switchboard.WEBSOCKET_SEND_TIMEOUT_SECONDS", 0.01)

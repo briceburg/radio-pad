@@ -42,7 +42,7 @@ async def _send_with_timeout(send: Awaitable[None]) -> None:
 async def _authenticate_controller(websocket: WebSocket, account_id: str, player_id: str) -> tuple[bool, int | None]:
     try:
         async with asyncio.timeout(CONTROLLER_AUTH_TIMEOUT_SECONDS):
-            payload = json.loads(await websocket.receive_text())
+            payload = await websocket.receive_json()
         if not isinstance(payload, dict):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
         data = payload.get("data")
@@ -137,34 +137,27 @@ async def _run_loop(
             raise WebSocketDisconnect
 
         async def receiver() -> None:
-            while True:
-                try:
-                    if expires_at is None:
-                        msg = await websocket.receive_text()
-                    else:
-                        async with asyncio.timeout(max(expires_at - time.time(), 0)):
-                            msg = await websocket.receive_text()
-                except TimeoutError as exc:
-                    await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
-                    raise WebSocketDisconnect from exc
-                try:
-                    payload = json.loads(msg)
-                    if not isinstance(payload, dict):
-                        continue
-                    event = payload.get("event")
-                    data = payload.get("data")
-                    if not event:
-                        continue
-
-                    match event:
-                        case player_event if is_player and player_event in PLAYER_STATE_EVENTS:
-                            await publish_event(broadcast, player_key, player_event, data)
-                        case command_event if not is_player and command_event in PLAYER_COMMAND_EVENTS:
-                            await publish_event(broadcast, player_key, command_event, data)
-                        case "ping":
-                            await _send_with_timeout(websocket.send_json({"event": "pong"}))
-                except json.JSONDecodeError:
-                    continue
+            try:
+                async with asyncio.timeout(None if expires_at is None else max(expires_at - time.time(), 0)):
+                    while True:
+                        try:
+                            payload = await websocket.receive_json()
+                        except json.JSONDecodeError:
+                            continue
+                        if not isinstance(payload, dict):
+                            continue
+                        event = payload.get("event")
+                        data = payload.get("data")
+                        match event:
+                            case player_event if is_player and player_event in PLAYER_STATE_EVENTS:
+                                await publish_event(broadcast, player_key, player_event, data)
+                            case command_event if not is_player and command_event in PLAYER_COMMAND_EVENTS:
+                                await publish_event(broadcast, player_key, command_event, data)
+                            case "ping":
+                                await _send_with_timeout(websocket.send_json({"event": "pong"}))
+            except TimeoutError as exc:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=AUTHENTICATION_REQUIRED_REASON)
+                raise WebSocketDisconnect from exc
 
         try:
             async with asyncio.TaskGroup() as tg:

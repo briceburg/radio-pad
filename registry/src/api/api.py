@@ -1,7 +1,7 @@
 import os
 import secrets
 from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
 
 from fastapi import APIRouter, FastAPI, Request, Response
@@ -31,38 +31,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if not hasattr(app.state, "auth"):
             app.state.auth = AuthServices.from_env()
 
-    broadcast: Broadcast | None = None
-    http_client = None
-    radio_dial_watcher = None
-    if "switchboard" in profiles:
-        import httpx2
+    async with AsyncExitStack() as stack:
+        if "switchboard" in profiles:
+            import httpx2
 
-        from switchboard.radio_dials import RadioDialWatcher
-        from switchboard.switchboard import publish_event
+            from switchboard.radio_dials import RadioDialWatcher
+            from switchboard.switchboard import publish_event
 
-        http_client = httpx2.AsyncClient(timeout=5.0)
-        app.state.http_client = http_client
+            http_client = await stack.enter_async_context(httpx2.AsyncClient(timeout=5.0))
+            app.state.http_client = http_client
+            broadcast = Broadcast()
+            stack.push_async_callback(broadcast.disconnect)
+            app.state.broadcast = broadcast
+            radio_dial_watcher = RadioDialWatcher(
+                http_client,
+                partial(publish_event, broadcast),
+                refresh_seconds=float(os.environ.get("REGISTRY_RADIO_DIAL_REFRESH_SECONDS", "30")),
+            )
+            stack.push_async_callback(radio_dial_watcher.close)
+            radio_dial_watcher.start()
+            app.state.radio_dial_watcher = radio_dial_watcher
 
-        broadcast = Broadcast()
-        await broadcast.connect()
-        app.state.broadcast = broadcast
-        refresh_seconds = float(os.environ.get("REGISTRY_RADIO_DIAL_REFRESH_SECONDS", "30"))
-        radio_dial_watcher = RadioDialWatcher(
-            http_client,
-            partial(publish_event, broadcast),
-            refresh_seconds=refresh_seconds,
-        )
-        radio_dial_watcher.start()
-        app.state.radio_dial_watcher = radio_dial_watcher
-
-    yield
-
-    if radio_dial_watcher:
-        await radio_dial_watcher.close()
-    if broadcast:
-        await broadcast.disconnect()
-    if http_client:
-        await http_client.aclose()
+        yield
 
 
 class RegistryAPI(FastAPI):

@@ -37,9 +37,6 @@ class Broadcast:
         if not subscribers:
             del self._channels[channel]
 
-    async def connect(self) -> None:
-        """Prepare the broadcast (no-op for in-memory backend)."""
-
     async def disconnect(self) -> None:
         """Shut down: signal all active subscribers to stop."""
         for queues in self._channels.values():
