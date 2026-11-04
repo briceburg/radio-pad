@@ -52,7 +52,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return match_path_template(path.removesuffix(".json"), self._path_template.removesuffix(".json"))
 
     def seed(self, data: JsonDoc, *, path_params: PathParams | None = None) -> None:
-        self.save(self._model.model_validate(data), path_params=path_params)
+        self.save(self._model.model_validate(data), path_params=path_params, if_none_match=True)
 
     def exists(self, object_id: str, *, path_params: PathParams | None = None) -> bool:
         """Load and validate the resource to check existence."""
@@ -111,13 +111,13 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
             raise ConcurrencyError("Conditional save failed") from e
         return model
 
-    def save(self, model_obj: Entity, *, path_params: PathParams | None = None) -> Entity:
+    def save(self, model_obj: Entity, *, path_params: PathParams | None = None, if_none_match: bool = False) -> Entity:
         """Persist a complete resource; infer path parameters from model fields when omitted."""
         if self._required_keys and path_params is None:
             path_params = self._path_params_from_model(model_obj)
         comps = self._dir_components(path_params=path_params)
         data = self._strip_reserved(model_obj.model_dump(mode="json"))
-        self._backend.save(model_obj.id, data, *comps)
+        self._backend.save(model_obj.id, data, *comps, if_none_match=if_none_match)
         return model_obj
 
     def _dir_components(self, *, path_params: PathParams | None = None) -> tuple[str, ...]:

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from lib.logging import logger
 
+from ..exceptions import ConcurrencyError
 from .interfaces import SeedableStore
 
 
@@ -29,8 +30,12 @@ def seed_from_path(seed_path: Path, stores: list[SeedableStore], *, label: str) 
 
             with seed_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            store.seed({"id": object_id, **params, **data}, path_params=path_params)
-            logger.info("Seeded %s %s", label, relative_path)
+            try:
+                store.seed({"id": object_id, **params, **data}, path_params=path_params)
+            except ConcurrencyError:
+                logger.debug("Skipping existing %s object: %s", label, relative_path)
+            else:
+                logger.info("Seeded %s %s", label, relative_path)
             break
 
 
