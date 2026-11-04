@@ -12,7 +12,9 @@ dependencies = [
   "itsdangerous",
   "pydantic",
   "pyjwt",
-  "uvicorn[standard]",
+  "starlette>=1.7,<2",
+  "uvicorn[standard]>=0.54",
+  "websockets>=17.4",
 ]
 
 [dependency-groups]

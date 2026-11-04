@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient, WebSocketTestSession
-from starlette.websockets import WebSocketDisconnect
+from starlette.websockets import WebSocketDisconnect, WebSocketDisconnected
 
 from api.auth import AuthServices
 from auth import AccessTokens, AuthenticatedIdentity
@@ -241,8 +241,9 @@ async def test_slow_websocket_send_ends_connection(monkeypatch: pytest.MonkeyPat
     await asyncio.wait_for(_run_loop(websocket, broadcast, "acct/player1", is_player=True), timeout=1)
 
 
-async def test_send_transport_failure_disconnects() -> None:
-    send = AsyncMock(side_effect=OSError("peer unavailable"))
+@pytest.mark.parametrize("error", [OSError("peer unavailable"), WebSocketDisconnected("already closed")])
+async def test_send_transport_failure_disconnects(error: Exception) -> None:
+    send = AsyncMock(side_effect=error)
 
     with pytest.raises(WebSocketDisconnect):
         await _send_with_timeout(send())
