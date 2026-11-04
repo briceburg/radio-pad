@@ -12,15 +12,6 @@ An internet radio player with physical, web, and mobile controllers that stay in
 
 ![RadioPad Macropad](./shared/assets/radio-macropad-ai-image.webp)
 
-## Components
-
-| Component | Description |
-| --- | --- |
-| [player](./player/) | Audio runtime that loads its assigned RadioDial, streams the selected Station, and reports playback status. |
-| [macropad-control](./macropad-control/) | Physical USB controller for Station selection, stop, and volume. |
-| [registry](./registry/) | Stores accounts, Stations, RadioDials, and player assignments; serves the API and switchboard. |
-| [remote-control](./remote-control/) | Web/mobile controller for discovering players and RadioDials, selecting Stations, and viewing status. |
-
 This README covers the integrated repository. Each component README owns its standalone requirements, configuration, development workflow, and deployment guidance.
 
 Run a [player on a host](./player/#run-on-a-host), or [provision a Raspberry Pi](./player/deploy/raspberry-pi/) with service, log, and update commands.

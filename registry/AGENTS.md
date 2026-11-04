@@ -10,23 +10,13 @@ Guidance for coding agents working in `radio-pad/registry`.
 
 ## Runtime and tooling
 
-- Python dependencies and tool settings live in `pyproject.toml`.
 - Use `bin/ci` for validation. It runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
 - Use `bin/registry` for local execution. It and the container entrypoint delegate server settings to `bin/serve`, which uses Uvicorn's standard CLI and WebSocket backend selection.
-- If host Python tooling or cache permissions are unreliable, run the same checks inside the component image with: `docker compose run --rm --build --no-deps --user "$(id -u):$(id -g)" registry ./bin/ci`
-- uv, pytest, Ruff, and mypy caches live under the ignored project-local `tmp/` directory by default. `bin/ci` also places uv's project environment there. A checkout used for development or CI should be writable.
-
-## Dependency workflow
-
-- Edit runtime and development dependencies in `pyproject.toml`.
-- Regenerate `uv.lock` with `uv lock` after dependency changes.
-- Do not reintroduce component-level `requirements*.txt` files.
+- Dependency updates and standalone test commands are documented in the [README](README.md#development); inherited Python tooling and container fallbacks are in the [root guidance](../AGENTS.md#agent-workflow).
 
 ## Datastore and backend conventions
 
-- `REGISTRY_DATA_BACKEND_*` configures registry data; `REGISTRY_AUTHZ_BACKEND_*` configures authz data only where it differs.
-- `REGISTRY_DATA_BACKEND_PATH` is the data path setting for both `local` and `git` backends.
-- For the Git backend, `REGISTRY_DATA_BACKEND_PATH` is the local checkout path and defaults to `tmp/data`.
+- Storage configuration and defaults live in the [README](README.md#data-and-authz-storage).
 - Every backend stores registry documents under `data/` and authz documents under `authz/`. A Git-backed data repository therefore uses:
   - `data/accounts/<account>.json`
   - `data/accounts/<account>/players/<player>.json`
@@ -36,7 +26,6 @@ Guidance for coding agents working in `radio-pad/registry`.
 - `*Spec` models are writable persisted shapes without path identity; unsuffixed models are complete resources; `*Summary` models exist only for genuinely reduced list/discovery projections.
 - Player `radio_dial` values are qualified RadioDial identities, not URLs or backend paths.
 - The Git backend uses the system Git executable with fixed subprocess argument lists; do not add a Python Git implementation or shell command construction without a concrete need.
-- `REGISTRY_DATA_BACKEND_GIT_SSH_PRIVATE_KEY` is a deployment secret used by Fly deploy setup; the runtime env var table documents `REGISTRY_DATA_BACKEND_GIT_SSH_KEY_PATH` for file-based key usage.
 
 ## Auth and seeding conventions
 
@@ -53,16 +42,6 @@ Guidance for coding agents working in `radio-pad/registry`.
 - When changing auth or control semantics, ensure any root architecture diagrams or related components (player, remote-control) are updated too.
 - At transport boundaries, map expected authentication, authz, and not-found failures to client errors; map infrastructure and unexpected failures to generic internal errors.
 - Log unexpected failures with stack traces and non-sensitive resource context. Never log bearer tokens, authenticated identities, or authz allowlists.
-
-## Testing conventions
-
-- Default `pytest` excludes performance tests via `-m 'not performance'`.
-- Run functional tests directly with:
-  - `pytest tests/functional -m 'not performance'`
-- Run performance tests directly with:
-  - `pytest tests/functional/test_performance.py -m performance`
-  - add `--log-cli-level=INFO` to see timing output
-- Current performance tests are observational; they log timings and assert result shapes, but they do not enforce numeric thresholds.
 
 ## Switchboard and broadcast
 
