@@ -122,7 +122,7 @@ When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry m
 
 Pub-sub queues, retained state, and active-player membership are process-local. A player and controller accepted by different processes therefore cannot communicate. Switchboard deployments require `WEB_CONCURRENCY=1`; scale across instances with player-path affinity. One async process can host many player rooms. API-only deployments may use more workers. The shared launcher gives `WEB_CONCURRENCY` precedence over CLI worker options and `UVICORN_WORKERS` so the server and application guard agree.
 
-The container and local runner share `bin/serve`, using Uvicorn's default WebSocket backend (`websockets-sansio` in the lockfile). Incoming WebSocket messages are limited to 64 KiB; RadioDial documents are fetched over HTTP. Uvicorn handles framing and transport flow control; the switchboard bounds subscriber queues and times out stalled sends. `bin/registry` enables development reload by default; set `REGISTRY_ENV=production` to disable it. Additional Uvicorn CLI options can be passed to either runner.
+The container and local runner share `bin/serve`, using Uvicorn's default WebSocket backend (`websockets-sansio` in the lockfile). Incoming WebSocket messages are limited to 64 KiB; RadioDial documents are fetched over HTTP. This limits message size without reserving that memory per connection. Uvicorn handles framing and transport flow control; the switchboard bounds subscriber queues and times out stalled sends. `bin/registry` enables development reload by default; set `REGISTRY_ENV=production` to disable it. Additional Uvicorn CLI options can be passed to either runner.
 
 Uvicorn 0.54's SansIO backend does not enforce websockets 17.4's fragment-count limit, so the message-size cap alone does not bound fragment metadata overhead.
 
@@ -168,6 +168,7 @@ bin/ci
 Use `uv run --locked pytest` for tests without static checks. Performance tests are excluded by default; they log timings and check result shapes without timing thresholds. Target functional or performance tests with:
 
 ```sh
+export UV_PROJECT_ENVIRONMENT=tmp/.venv
 uv run --locked pytest tests/functional -m 'not performance'
 uv run --locked pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
 ```
