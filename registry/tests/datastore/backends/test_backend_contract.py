@@ -9,7 +9,7 @@ from _pytest.fixtures import SubRequest
 
 from api.radio_dials import materialize_radio_dial, resolve_station_refs
 from datastore import DataStore
-from datastore.core import ModelStore, compute_etag, seed_from_path, seedable
+from datastore.core import ModelStore, compute_etag, seed_from_path
 from datastore.core.interfaces import ObjectStore
 from datastore.exceptions import ConcurrencyError
 from models.account import Account, AccountSpec
@@ -122,7 +122,7 @@ class TestObjectStoreContract:
             model=Account,
             path_template="accounts/{id}",
         )
-        seed_from_path(seed_root, [seedable(accounts)], label="data")
+        seed_from_path(seed_root, [accounts], label="data")
 
         model = accounts.get("seeded")
         assert model is not None

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from auth import AuthenticatedIdentity
 from datastore.configuration import AUTHZ_NAMESPACE, authz_backend_from_env
-from datastore.core import ExpiringCache, ModelStore, ObjectStore, seed_from_path, seedable
+from datastore.core import ExpiringCache, ModelStore, ObjectStore, seed_from_path
 from lib.constants import BASE_DIR
 
 from .models import AccountOwners, SessionRevocations
@@ -45,7 +45,7 @@ class AuthzStore:
     def seed(self) -> None:
         seed_from_path(
             self.seed_path,
-            [seedable(self._account_owners), seedable(self._session_revocations)],
+            [self._account_owners, self._session_revocations],
             label=AUTHZ_NAMESPACE,
         )
 

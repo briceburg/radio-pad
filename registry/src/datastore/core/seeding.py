@@ -2,47 +2,11 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
 from pathlib import Path
-
-from pydantic import BaseModel
 
 from lib.logging import logger
 
-from ..types import JsonDoc, PathParams
-from .interfaces import ModelWithId, SeedableStore
-from .model_store import ModelStore
-
-
-class _SeedingView[Entity: ModelWithId, Spec: BaseModel](SeedableStore):
-    """Adapter exposing only the seeding-related surface for a ModelStore.
-
-    This keeps seeding concerns out of the main ModelStore's public API.
-    """
-
-    def __init__(self, store: ModelStore[Entity, Spec]) -> None:
-        self._store = store
-
-    def match(self, path: str) -> dict[str, str] | None:
-        # Derive stems to avoid duplicated ".json" suffixes
-        path_stem = path.removesuffix(".json")
-        template_stem = self._store._path_template.removesuffix(".json")
-        return match_path_template(path_stem, template_stem)
-
-    def exists(self, object_id: str, *, path_params: Mapping[str, str] | None = None) -> bool:
-        return self._store.get(object_id, path_params=path_params) is not None
-
-    def seed(self, data: JsonDoc, *, path_params: PathParams | None = None) -> None:
-        # Validate and save via underlying store; mirrors previous ModelStore.seed
-        model = self._store._model.model_validate(data)
-        self._store.save(model, path_params=path_params)
-
-
-def seedable[Entity: ModelWithId, Spec: BaseModel](
-    store: ModelStore[Entity, Spec],
-) -> SeedableStore:
-    """Return a SeedableStore view for the given ModelStore."""
-    return _SeedingView(store)
+from .interfaces import SeedableStore
 
 
 def seed_from_path(seed_path: Path, stores: list[SeedableStore], *, label: str) -> None:

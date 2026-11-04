@@ -5,10 +5,10 @@ from string import Formatter
 
 from pydantic import BaseModel
 
-from ..core import ObjectStore
 from ..exceptions import ConcurrencyError
-from ..types import PagedResult, PathParams
-from .interfaces import ModelWithId
+from ..types import JsonDoc, PagedResult, PathParams
+from .interfaces import ModelWithId, ObjectStore
+from .seeding import match_path_template
 
 
 class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
@@ -58,9 +58,6 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         last = segments[-1]
         if last != "{id}":
             raise ValueError("path_template must end with '{id}'")
-        id_field = last[1:-1]
-        if id_field != "id":
-            raise ValueError("last placeholder must be '{id}'")
         self._path_template = f"{normalized}.json"
         # directory template excludes the final '{id}' segment
         self._dir_template = "/".join(segments[:-1])
@@ -75,14 +72,11 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         self._required_keys: tuple[str, ...] = tuple(req_keys)
         self._reserved_keys: frozenset[str] = frozenset({"id", *self._required_keys})
 
-    def delete(self, object_id: str, *, path_params: PathParams | None = None) -> bool:
-        """Delete a model by id
+    def match(self, path: str) -> dict[str, str] | None:
+        return match_path_template(path.removesuffix(".json"), self._path_template.removesuffix(".json"))
 
-        Returns:
-            True if an object was deleted, False if it did not exist.
-        """
-        comps = self._dir_components(path_params=path_params)
-        return self._backend.delete(object_id, *comps)
+    def seed(self, data: JsonDoc, *, path_params: PathParams | None = None) -> None:
+        self.save(self._model.model_validate(data), path_params=path_params)
 
     def exists(self, object_id: str, *, path_params: PathParams | None = None) -> bool:
         """Return True if a model with the given id exists; otherwise False."""
