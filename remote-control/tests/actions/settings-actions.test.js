@@ -227,7 +227,6 @@ describe("settings-actions", () => {
     expect(discoverPlayers).toHaveBeenCalledWith(
       "pinecrest",
       "https://registry.example/api/",
-      expect.anything(),
     );
     expect(prefs.setOptions).toHaveBeenCalledWith(
       "playerId",
@@ -265,7 +264,6 @@ describe("settings-actions", () => {
       expect(discoverPlayers).toHaveBeenCalledWith(
         "briceburg",
         expect.anything(),
-        expect.anything(),
       ),
     );
     const save = actions.save({ accountId: "pinecrest" });
@@ -275,7 +273,6 @@ describe("settings-actions", () => {
 
     expect(discoverPlayers).toHaveBeenLastCalledWith(
       "pinecrest",
-      expect.anything(),
       expect.anything(),
     );
     expect(discoverPlayers).toHaveBeenCalledTimes(2);

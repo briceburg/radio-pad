@@ -32,21 +32,14 @@ function switchboardUrl(registryUrl, accountId, playerId) {
   return url.toString();
 }
 
-function buildRequestOptions(auth) {
-  const token = auth?.getRegistryBearerToken?.();
-  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-}
-
-async function fetchAllPages(startPath, registryUrl, auth = null) {
+async function fetchAllPages(startPath, registryUrl) {
   const items = [];
   const registryBaseUrl = resolveRegistryBaseUrl(registryUrl);
   const firstPage = new URL(startPath, registryBaseUrl);
   firstPage.searchParams.set("per_page", DISCOVERY_PAGE_SIZE);
   let url = firstPage.toString();
-  const options = buildRequestOptions(auth);
-
   while (url) {
-    const resp = await fetch(url, options);
+    const resp = await fetch(url);
     if (!resp.ok) {
       throw new RegistryRequestError({ url, status: resp.status });
     }
@@ -60,9 +53,9 @@ async function fetchAllPages(startPath, registryUrl, auth = null) {
   return items;
 }
 
-export async function discoverAccounts(registryUrl, auth = null) {
+export async function discoverAccounts(registryUrl) {
   if (!registryUrl) return [];
-  const items = await fetchAllPages("accounts/", registryUrl, auth);
+  const items = await fetchAllPages("accounts/", registryUrl);
   return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
@@ -85,18 +78,17 @@ export async function discoverAuthEnabled(registryUrl) {
   return status.enabled;
 }
 
-export async function discoverPlayers(accountId, registryUrl, auth = null) {
+export async function discoverPlayers(accountId, registryUrl) {
   if (!(accountId && registryUrl)) return [];
 
   const items = await fetchAllPages(
     `accounts/${accountId}/players/`,
     registryUrl,
-    auth,
   );
   return items.map((i) => ({ value: i.id, label: i.name || i.id }));
 }
 
-export async function discoverRadioDials(accountId, registryUrl, auth = null) {
+export async function discoverRadioDials(accountId, registryUrl) {
   if (!registryUrl) return [];
   const owners = [...new Set([accountId, "community"].filter(Boolean))];
 
@@ -105,7 +97,6 @@ export async function discoverRadioDials(accountId, registryUrl, auth = null) {
       const items = await fetchAllPages(
         `accounts/${owner}/radio-dials/`,
         registryUrl,
-        auth,
       );
       return items
         .filter((item) => owner === accountId || item.discoverable)
@@ -118,19 +109,14 @@ export async function discoverRadioDials(accountId, registryUrl, auth = null) {
   return discovered.flat();
 }
 
-export async function discoverPlayer(
-  accountId,
-  playerId,
-  registryUrl,
-  auth = null,
-) {
+export async function discoverPlayer(accountId, playerId, registryUrl) {
   if (!(accountId && playerId && registryUrl)) return null;
 
   const url = new URL(
     `accounts/${accountId}/players/${playerId}`,
     resolveRegistryBaseUrl(registryUrl),
   ).toString();
-  const response = await fetch(url, buildRequestOptions(auth));
+  const response = await fetch(url);
   if (!response.ok) {
     throw new RegistryRequestError({ url, status: response.status });
   }
