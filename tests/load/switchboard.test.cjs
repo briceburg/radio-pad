@@ -14,7 +14,8 @@ function room() {
   const timers = [];
   const intervals = new Set();
   class Socket {
-    readyState = 1;
+    static OPEN = 1;
+    readyState = Socket.OPEN;
     handlers = {};
     sent = [];
     constructor() {
