@@ -85,15 +85,13 @@ class SwitchboardClient(RadioPadClient):
                 self._closing = True
                 raise
             except websockets.exceptions.ConnectionClosed:
-                # If the connection fails with a transient error, it is retried with exponential backoff. If it fails with a fatal error, the exception is raised, breaking out of the loop.
-                continue
+                pass
             except (ConnectionRefusedError, OSError) as e:
                 logger.warning("failed to connect to %s: %s", self.url, e)
                 logger.warning(
                     "If this is the wrong URL, please set the RADIOPAD_SWITCHBOARD_URL environment variable."
                 )
                 await self._report_status("warning", self._status_summary(e))
-                continue
             finally:
                 self.ws = None
                 if self._connected:
@@ -102,6 +100,9 @@ class SwitchboardClient(RadioPadClient):
                         self.on_disconnect()
                     if not self._closing:
                         await self._report_status("warning", "Switchboard down")
+
+            # Wait 5s after established closes; connect() backs off failed handshakes.
+            await asyncio.sleep(5)
 
     async def _send(self, message):
         """Send a message to the macropad or switchboard."""

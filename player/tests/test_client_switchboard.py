@@ -1,10 +1,43 @@
 import asyncio
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from websockets.exceptions import ConnectionClosedError
 
 from lib.client_switchboard import SwitchboardClient
 from lib.interfaces import RadioPadPlayer, RadioPadPlayerConfig
+
+
+@pytest.mark.parametrize("closed_with_error", [False, True], ids=["clean-close", "error-close"])
+def test_switchboard_waits_before_reconnecting_and_cancels_promptly(closed_with_error):
+    config = RadioPadPlayerConfig(
+        radio_dial_url="https://registry.example/radio-dial",
+        radio_dial_revision='"v1"',
+        switchboard_url="wss://registry.example/switchboard/account/player",
+        stations=[],
+    )
+    player = cast(RadioPadPlayer, SimpleNamespace(config=config, broadcast=AsyncMock()))
+    client = SwitchboardClient(player)
+    ws = AsyncMock()
+    if closed_with_error:
+        ws.__aiter__.side_effect = ConnectionClosedError(None, None)
+
+    async def connections(*args, **kwargs):
+        yield ws
+        pytest.fail("reconnected without a delay")
+
+    with (
+        patch("lib.client_switchboard.websockets.connect", side_effect=connections),
+        patch("lib.client_switchboard.asyncio.sleep", AsyncMock(side_effect=asyncio.CancelledError)) as sleep,
+        pytest.raises(asyncio.CancelledError),
+    ):
+        asyncio.run(client.run())
+
+    sleep.assert_awaited_once_with(5)
+    assert client.ws is None
+    assert client._closing
 
 
 def test_switchboard_identifies_loaded_radio_dial_revision():
