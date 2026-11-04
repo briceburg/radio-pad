@@ -36,7 +36,6 @@ describe("Registry Discovery", () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       "http://mock-registry/v1/accounts?page=2",
-      {},
     );
   });
 
@@ -50,19 +49,6 @@ describe("Registry Discovery", () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       "http://mock-registry/api/accounts/?page=2&per_page=100",
-      {},
-    );
-  });
-
-  it("attaches registry bearer tokens to authenticated discovery", async () => {
-    global.fetch.mockResolvedValueOnce(page([]));
-    const auth = { getRegistryBearerToken: () => "token" };
-
-    await discoverAccounts("/api/", auth);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/accounts/?per_page=100",
-      { headers: { Authorization: "Bearer token" } },
     );
   });
 
@@ -75,7 +61,6 @@ describe("Registry Discovery", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       "http://localhost:3000/api/accounts/?per_page=100",
-      {},
     );
   });
 
@@ -85,7 +70,6 @@ describe("Registry Discovery", () => {
     await expect(discoverAuthEnabled("/api/")).resolves.toBe(false);
     expect(global.fetch).toHaveBeenCalledWith(
       "http://localhost:3000/api/auth/status",
-      {},
     );
   });
 
@@ -99,13 +83,11 @@ describe("Registry Discovery", () => {
           radio_dial: "community/briceburg",
         }),
       );
-    const auth = { signedIn: false };
-
-    await expect(discoverPlayers("briceburg", "/api/", auth)).resolves.toEqual([
+    await expect(discoverPlayers("briceburg", "/api/")).resolves.toEqual([
       { value: "living-room", label: "Living Room" },
     ]);
     await expect(
-      discoverPlayer("briceburg", "living-room", "/api/", auth),
+      discoverPlayer("briceburg", "living-room", "/api/"),
     ).resolves.toMatchObject({
       id: "living-room",
       configured_radio_dial_url:

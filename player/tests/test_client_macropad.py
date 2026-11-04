@@ -153,11 +153,9 @@ def test_station_menu_request_writes_call_signs_and_current_station():
 
 def test_publish_station_menu_pushes_updated_config():
     player, client, writer = client_with_writer(register=True)
-    player.update_config(
-        RadioPadPlayerConfig(
-            radio_dial_url="https://example.test/radio-dial",
-            stations=[player.kexp, RadioPadStation("KNCE", "https://example.test/knce")],
-        )
+    player.config = RadioPadPlayerConfig(
+        radio_dial_url="https://example.test/radio-dial",
+        stations=[player.kexp, RadioPadStation("KNCE", "https://example.test/knce")],
     )
 
     asyncio.run(client.publish_station_menu())

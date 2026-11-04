@@ -52,7 +52,7 @@ export function createSettingsActions({
         if (!registryUrl) return;
 
         const [accountsResult, authEnabledResult] = await Promise.allSettled([
-          discoverAccounts(registryUrl, auth),
+          discoverAccounts(registryUrl),
           discoverAuthEnabled(registryUrl),
         ]);
         // null means discovery failed; [] means the registry was reachable and returned no items.
@@ -85,12 +85,12 @@ export function createSettingsActions({
           ? Promise.resolve(null)
           : authEnabled && !auth.signedIn
             ? Promise.resolve([])
-            : discoverPlayers(accountId, registryUrl, auth);
+            : discoverPlayers(accountId, registryUrl);
 
         // Discover APIs natively handle null accountId safely
         const results = await Promise.allSettled([
           playerDiscovery,
-          discoverRadioDials(accountId, registryUrl, auth),
+          discoverRadioDials(accountId, registryUrl),
         ]);
         const players =
           results[0].status === "fulfilled" ? results[0].value : null;
@@ -135,7 +135,6 @@ export function createSettingsActions({
                 accountId,
                 resolvedPlayerId,
                 registryUrl,
-                auth,
               );
             } catch (err) {
               noteRegistryFailure("Failed to discover selected player", err);

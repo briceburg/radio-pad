@@ -33,6 +33,7 @@ def test_resolved_radio_dial_etag_tracks_linked_station_updates(client: TestClie
     refreshed = client.get(url, headers={"If-None-Match": etag})
     assert refreshed.status_code == 200
     assert refreshed.headers["etag"] != etag
+    assert refreshed.json()["stations"][0]["stream_url"] == "https://new.example/wwoz"
 
 
 def test_radio_dial_can_mix_account_station_libraries(
@@ -54,21 +55,6 @@ def test_radio_dial_can_mix_account_station_libraries(
     dial = radio_dial_api.put("testuser1", "mixed", payload)
 
     assert [station["key"] for station in dial["stations"]] == ["community/WWOZ", "testuser1/LOFI"]
-
-
-def test_station_update_is_visible_in_resolved_radio_dial(
-    station_api: StationApi,
-    radio_dial_api: RadioDialApi,
-) -> None:
-    station_api.put(
-        "community",
-        "WWOZ",
-        StationSpec.model_validate({"stream_url": "https://new.example/wwoz"}),
-    )
-
-    dial = radio_dial_api.get("community", "briceburg")
-
-    assert dial["stations"][0]["stream_url"] == "https://new.example/wwoz"
 
 
 def test_radio_dial_put_replaces_optional_metadata(radio_dial_api: RadioDialApi) -> None:

@@ -8,15 +8,13 @@ Guidance for coding agents working in `radio-pad/player`.
 - Connects to the registry switchboard via WebSocket to receive station requests and broadcast currently playing station.
 - Uses `mpv` as the audio backend (system dependency, installed through APT in Docker).
 - Raspberry Pi deployment is auxiliary tooling under `deploy/raspberry-pi`; `bin/rpi-flash` writes the pinned base image and `bin/rpi-provision` runs its Ansible playbook without adding deployment tools to the player runtime.
-- Unit tests live in `tests/` and cover macropad serial-port selection and serial message handling with fake readers/writers.
 
 ## Runtime and tooling
 
 - Python dependencies and tool settings live in `pyproject.toml`.
 - Shell entrypoints source `lib/uv.sh` after changing to the player directory for shared uv environment defaults; preserve caller overrides.
 - Use `bin/ci` for validation. It checks the yt-dlp/Deno URL resolver and runs mypy, Ruff format/lint checks, and pytest through `uv run --locked`.
-- Use `bin/player` or `uv run python src/player.py` for local execution.
-- The Docker image installs dependencies with `uv sync` from `pyproject.toml` and `uv.lock`.
+- Use `bin/player` for local execution.
 - Validate provisioning changes with the pinned Ansible Core and collection versions under `deploy/raspberry-pi`; keep the playbook idempotent.
 
 ## Conventions

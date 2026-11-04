@@ -5,13 +5,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 ## Project shape
 
 - Monorepo containing four components (`player`, `registry`, `remote-control`, `macropad-control`), the Compose integration suite in `tests/integration`, and opt-in k6 workloads in `tests/load`.
-- Docker Compose provides the local development and integration test environment.
-- `compose.yaml` runs unified mode (registry serves API + switchboard in one process).
-- `compose.split.yaml` runs split mode (registry and switchboard as separate services).
-- `compose.auth.yaml` adds local OIDC and revocation fixtures to a registry/switchboard topology.
-- `compose.prod-smoke.yaml` builds all services with `target: prod` and verifies healthchecks.
-- `bin/dev` wraps local Compose usage and auto-adds `compose.macropad.yaml` only when a Macropad CDC2 data port is available, unless `RADIOPAD_MACROPAD=off` or `RADIOPAD_MACROPAD=required` is set.
-- `bin/dev` also adds `compose.audio.yaml` for host Pulse-compatible or native PipeWire audio unless `RADIOPAD_AUDIO=off` is set.
+- Docker Compose provides local development and integration testing; the [README](README.md#development) documents topologies, `bin/dev`, and host audio/USB integration.
 - Each component and the integration suite has its own `bin/ci`; components and the load suite also have a `README.md` and (where applicable) `AGENTS.md`.
 
 ## Runtime and tooling
@@ -19,14 +13,13 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - Root `bin/ci` verifies formatting and runs every component's CI concurrently without starting Compose. Run cross-service validation explicitly with `bin/ci integration`.
 - `tests/load/bin/run` runs manual capacity workloads against discovered Compose ports or configured remote endpoints; load tests never run in CI. Follow `tests/load/AGENTS.md` for remote-test safety and evidence conventions.
 - Root `npm run format` writes repository Markdown plus supported source, configuration, workflow, and data files; `bin/ci` verifies them without writing.
-- GitHub Actions CI (`.github/workflows/ci.yml`) calls the same root entry point in two job groups:
-  - `components`: native AMD64/ARM64 matrix that runs `bin/ci`, builds the production player image, and verifies its mpv plus yt-dlp/Deno URL resolver toolchain.
-  - `integration`: matrix over four Compose configurations — runs `bin/ci integration <compose-file>`.
+- [GitHub Actions CI](.github/workflows/ci.yml) uses these entry points for component/image and Compose integration checks.
 - Use component `bin/ci` scripts for targeted work, root `bin/ci` for routine repository validation, and `bin/ci integration` when changes warrant cross-service validation.
 
 ## Agent workflow
 
-- Use the root [README toolchain policy](README.md#toolchain-and-dependency-policy) for dependency-update scope; keep updates within their documented project boundary and do not introduce workspaces or consolidate lockfiles unless intentionally changing repository structure.
+- Follow the [README toolchain policy](README.md#toolchain-and-dependency-policy) for dependency ownership and repository structure.
+- Review intervening upstream changelogs when upgrading dependencies, including relevant transitive changes. Look for built-in features that can replace custom code, preserve application behavior, and explain useful fixes or simplifications in the PR.
 - Prefer starting PR work in a dedicated git worktree created from the latest `origin/main`, for example: `git fetch origin` then `git worktree add ../radio-pad-<topic> -b <topic> origin/main`.
 - Before committing, check `git status --short --branch`. Do not commit PR work on local `main` or leave local `main` ahead of `origin/main`.
 - Python projects are `uv`/`pyproject.toml` driven. Use each project's `bin/ci`; checks run through `uv run --locked` with Ruff and mypy so stale lockfiles fail CI.
@@ -38,7 +31,6 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 - `macropad-control` has no compose service; run `bin/ci` locally with `uv` installed.
 - Python components keep uv environments and tool caches under ignored project-local `tmp/` paths. A checkout used for development or CI should be writable.
 - Keep PR descriptions durable: describe behavior and breaking changes, but omit transient validation results and test counts.
-- Root `package.json` owns repository tooling dependencies (Prettier and `concurrently`); `bin/ci` owns orchestration. The root package is not a workspace, and application dependencies and their lockfile remain in `remote-control`.
 - Keep Markdown paragraphs and individual list items on one source line and let editors wrap them visually.
 
 ## Domain conventions
@@ -59,7 +51,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 ## Integration test conventions
 
 - Tests live in `tests/integration/` and run inside a container built from `tests/integration/Dockerfile`.
-- `tests/integration/bin/ci` runs static checks and collection before exercising the requested Compose files. With no arguments it runs the unified, split, and production-smoke configurations.
+- `tests/integration/bin/ci` runs static checks and collection before exercising the requested Compose files. With no arguments it runs unified, split, authenticated, and production-smoke configurations.
 - They use `httpx2` for HTTP and `websockets` + `pytest-asyncio` for WebSocket tests.
 - Environment variables (`REGISTRY_URL`, `SWITCHBOARD_URL`, `REMOTE_CONTROL_URL`) are injected by Compose.
 - Tests cover cross-service behavior that unit tests cannot: message routing through the broadcaster, auth enforcement in the running stack, and service reachability.

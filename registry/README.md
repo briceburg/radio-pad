@@ -55,6 +55,7 @@ Registry resources are account-scoped:
 | `REGISTRY_DATA_BACKEND_GIT_SSH_KEY_PATH` | Data Git SSH key. | unset |
 | `REGISTRY_DATA_BACKEND_PATH` | Data local root or Git checkout. | `tmp/data` |
 | `REGISTRY_DATA_BACKEND_S3_BUCKET` | Data S3 bucket. | unset; required for S3 |
+| `REGISTRY_ENV` | `development` enables Uvicorn reload; `production` disables it. | `development` via `bin/registry`; `production` otherwise |
 | `REGISTRY_GIT_AUTHOR_EMAIL` | Author email for Git writes. | `briceburg@users.noreply.github.com` |
 | `REGISTRY_GIT_AUTHOR_NAME` | Author name for Git writes. | `briceburg` |
 | `REGISTRY_GIT_BRANCH` | Branch used by Git backends. | `main` |
@@ -119,9 +120,9 @@ Use `REGISTRY_AUTHZ_BACKEND_GIT_SSH_PRIVATE_KEY` for a separate authz Git remote
 
 When the `switchboard` profile is enabled in `REGISTRY_PROFILES`, the registry mounts a WebSocket router that facilitates event-driven communication between the [RadioPad player](../player/) and connected [remote controls](../remote-control/).
 
-Pub-sub queues, retained state, and active-player membership are process-local. A player and controller accepted by different processes therefore cannot communicate. Switchboard deployments require `WEB_CONCURRENCY=1`, which is Uvicorn's default and explicit in `fly.toml`; scale across instances with player-path affinity. One async process can host many player rooms, so this is not a one-process-per-player constraint. API-only deployments may use more workers. The shared launcher gives `WEB_CONCURRENCY` precedence over CLI worker options and `UVICORN_WORKERS` so the server and application guard agree.
+Pub-sub queues, retained state, and active-player membership are process-local. A player and controller accepted by different processes therefore cannot communicate. Switchboard deployments require `WEB_CONCURRENCY=1`; scale across instances with player-path affinity. One async process can host many player rooms. API-only deployments may use more workers. The shared launcher gives `WEB_CONCURRENCY` precedence over CLI worker options and `UVICORN_WORKERS` so the server and application guard agree.
 
-The container and local runner share `bin/serve`, using Uvicorn's default WebSocket backend (`websockets-sansio` in the lockfile). The 64 KiB incoming-message limit bounds control and status messages; RadioDial documents are fetched over HTTP. This ceiling limits oversized messages, rather than reserving memory per connection. Uvicorn handles framing and transport flow control; the switchboard bounds subscriber queues and times out stalled sends. `bin/registry` enables development reload by default; set `REGISTRY_ENV=production` to disable it. Additional Uvicorn CLI options can be passed to either runner.
+The container and local runner share `bin/serve`, using Uvicorn's default WebSocket backend (`websockets-sansio` in the lockfile). Incoming WebSocket messages are limited to 64 KiB; RadioDial documents are fetched over HTTP. This limits message size without reserving that memory per connection. Uvicorn handles framing and transport flow control; the switchboard bounds subscriber queues and times out stalled sends. `bin/registry` enables development reload by default; set `REGISTRY_ENV=production` to disable it. Additional Uvicorn CLI options can be passed to either runner.
 
 Uvicorn 0.54's SansIO backend does not enforce websockets 17.4's fragment-count limit, so the message-size cap alone does not bound fragment metadata overhead.
 
@@ -130,13 +131,9 @@ Two deployment strategies preserve that affinity:
 1. **Path-based affinity:** A stable switchboard endpoint routes a given `/{account_id}/{player_id}` path to one active process. Dynamically registered players need no static process assignment when the routing layer owns this mapping.
 2. **Registry-assigned shards:** Player resources provide opaque `switchboard_url` values, so registration can assign a stable switchboard domain or cluster without changing the client protocol.
 
-Both approaches preserve one active switchboard process per player room. Running interchangeable processes for the same room requires an external event bus plus distributed retained state and player-presence coordination; multiple in-memory processes cannot provide that topology.
+Running interchangeable processes for the same room requires an external event bus plus distributed retained state and player-presence coordination.
 
-The switchboard partitions connections by request path and expects clients to connect to that opaque URL, which takes the form:
-
-`wss://<switchboard_domain>/switchboard/<account_id>/<player_id>`
-
-Example: `wss://registry.radiopad.dev/switchboard/briceburg/living-room`
+Clients connect to their player's opaque `switchboard_url`, typically `wss://<switchboard_domain>/switchboard/<account_id>/<player_id>`.
 
 Controllers must send `{"event":"authenticate","data":{"token":...}}` as their first message. The token is null when auth is disabled. The switchboard validates access and replies with `authenticated` before subscribing the controller, replaying state, or accepting commands. It closes rejected and expired sessions with WebSocket policy code `1008`. Bearer tokens are never placed in switchboard URLs.
 
@@ -148,7 +145,7 @@ Registry API reads are currently unauthenticated. Writes and player control beco
 
 The registry exchanges a verified OIDC ID token for a rolling 30-day signed cookie and one-hour bearer token. Its issuer and audience must match `REGISTRY_AUTH_OIDC_ISSUER` and `REGISTRY_AUTH_OIDC_CLIENT_IDS`; email ownership also requires an explicitly verified email claim. The cookie is refreshed while the remote is active and on its next visit, and is never sent to the switchboard.
 
-For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#local-configuration).
+For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#configuration).
 
 Registry and account-owner seeds live under `seed-data/data/` and `seed-data/authz/`. Owner documents live at `authz/accounts/<account>.json` and contain email addresses or issuer-qualified OIDC subjects.
 
@@ -168,12 +165,12 @@ Run the default test suite and static checks with:
 bin/ci
 ```
 
-Use `uv run pytest` for tests without static checks. Performance tests are excluded by default; target functional or performance tests with:
+Use `uv run --locked pytest` for tests without static checks. Performance tests are excluded by default; they log timings and check result shapes without timing thresholds. Target functional or performance tests with:
 
 ```sh
-uv run pytest tests/functional -m 'not performance'
-uv run pytest tests/functional/test_performance.py -m performance
-uv run pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
+export UV_PROJECT_ENVIRONMENT=tmp/.venv
+uv run --locked pytest tests/functional -m 'not performance'
+uv run --locked pytest tests/functional/test_performance.py -m performance --log-cli-level=INFO
 ```
 
 ## License

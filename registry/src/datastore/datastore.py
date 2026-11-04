@@ -4,7 +4,7 @@ from pathlib import Path
 from lib.constants import BASE_DIR
 
 from .configuration import DATA_NAMESPACE, data_backend_from_env
-from .core import ObjectStore, SeedableStore, seed_from_path, seedable
+from .core import ObjectStore, seed_from_path
 from .stores import Accounts, Players, RadioDials, Stations
 
 
@@ -32,12 +32,8 @@ class DataStore:
         Seeds the datastore with initial data from the data-seed directory.
         Only seeds data if it doesn't already exist in the backend.
         """
-        seed_from_path(self.seed_path, self._seedable_stores(), label=DATA_NAMESPACE)
-
-    def _seedable_stores(self) -> list[SeedableStore]:
-        return [
-            seedable(self.accounts),
-            seedable(self.players),
-            self.stations,
-            seedable(self.radio_dials),
-        ]
+        seed_from_path(
+            self.seed_path,
+            [self.accounts, self.players, self.stations, self.radio_dials],
+            label=DATA_NAMESPACE,
+        )

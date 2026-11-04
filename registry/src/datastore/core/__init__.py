@@ -12,7 +12,7 @@ from .helpers import (
 from .interfaces import ModelWithId, ObjectStore, SeedableStore
 from .locking import InterProcessLock
 from .model_store import ModelStore
-from .seeding import seed_from_path, seedable
+from .seeding import seed_from_path
 
 __all__ = [
     "ExpiringCache",
@@ -27,7 +27,6 @@ __all__ = [
     "deconstruct_storage_path",
     "extract_object_id_from_path",
     "seed_from_path",
-    "seedable",
     "storage_json",
     "strip_id",
     "validate_write_preconditions",
