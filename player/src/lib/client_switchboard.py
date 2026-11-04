@@ -105,7 +105,7 @@ class SwitchboardClient(RadioPadClient):
             await asyncio.sleep(5)
 
     async def _send(self, message):
-        """Send a message to the macropad or switchboard."""
+        """Send a message to the switchboard."""
         if self.ws:
             await self.ws.send(message)
 
