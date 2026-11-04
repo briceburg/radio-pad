@@ -1,12 +1,17 @@
+import os
+import subprocess
 from contextlib import nullcontext
-from unittest.mock import AsyncMock, Mock
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from click.testing import CliRunner
 from fastapi import FastAPI
 from starlette.testclient import TestClient
+from uvicorn.main import main as uvicorn_cli
 
 from api.api import lifespan
-from lib.constants import API_VERSION
+from lib.constants import API_VERSION, BASE_DIR
 from registry import create_app
 
 
@@ -31,6 +36,26 @@ def test_switchboard_requires_one_worker(monkeypatch: pytest.MonkeyPatch) -> Non
     create_app(profiles=["api"])
     with pytest.raises(ValueError, match="WEB_CONCURRENCY=1"):
         create_app(profiles=["switchboard"])
+
+
+@pytest.mark.parametrize("workers", [None, "1", "3"])
+def test_launcher_worker_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workers: str | None) -> None:
+    uvicorn = tmp_path / "uvicorn"
+    uvicorn.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+    uvicorn.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path), prepend=os.pathsep)
+    monkeypatch.setenv("REGISTRY_ENV", "production")
+    monkeypatch.setenv("UVICORN_WORKERS", "2")
+    monkeypatch.delenv("WEB_CONCURRENCY", raising=False)
+    if workers is not None:
+        monkeypatch.setenv("WEB_CONCURRENCY", workers)
+    args = [str(BASE_DIR / "bin/serve"), "--workers", "2", "--workers=2", "--port", "9010"]
+    result = subprocess.run(args, capture_output=True, text=True, check=True, timeout=5)
+    with patch("uvicorn.main.run") as run:
+        parsed = CliRunner().invoke(uvicorn_cli, result.stdout.splitlines())
+    assert parsed.exit_code == 0, parsed.output
+    assert run.call_args.kwargs["workers"] == int(workers or "1")
+    assert run.call_args.kwargs["port"] == 9010
 
 
 @pytest.mark.parametrize("failure", [None, "startup", "body"])
