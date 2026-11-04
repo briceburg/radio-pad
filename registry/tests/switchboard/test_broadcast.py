@@ -60,16 +60,18 @@ async def test_publish_with_no_subscribers(broadcast: Broadcast) -> None:
     await broadcast.publish("nobody-listening", "echo")
 
 
-async def test_slow_subscriber_is_removed_when_its_queue_fills() -> None:
+async def test_slow_subscriber_is_disconnected_without_blocking_healthy_subscriber() -> None:
     broadcast = Broadcast(subscriber_queue_size=1)
 
-    async with broadcast.subscribe("ch") as sub:
+    async with broadcast.subscribe("ch") as slow, broadcast.subscribe("ch") as healthy:
         await broadcast.publish("ch", "one")
+        assert await anext(healthy) == "one"
         await broadcast.publish("ch", "two")
-
-        assert "ch" not in broadcast._channels
+        assert await anext(healthy) == "two"
         with pytest.raises(StopAsyncIteration):
-            await anext(sub)
+            await anext(slow)
+        await broadcast.publish("ch", "three")
+        assert await anext(healthy) == "three"
 
 
 async def test_replay_can_exceed_live_queue_limit() -> None:
@@ -83,17 +85,22 @@ async def test_replay_can_exceed_live_queue_limit() -> None:
 
 async def test_subscriber_iteration(broadcast: Broadcast) -> None:
     collected: list[str] = []
+    subscribed = asyncio.Event()
+    received = asyncio.Event()
 
     async def consume() -> None:
         async with broadcast.subscribe("ch") as sub:
+            subscribed.set()
             async for event in sub:
                 collected.append(event)
+                if len(collected) == 2:
+                    received.set()
 
     task = asyncio.create_task(consume())
-    await asyncio.sleep(0.01)
+    await asyncio.wait_for(subscribed.wait(), timeout=1)
     await broadcast.publish("ch", "one")
     await broadcast.publish("ch", "two")
-    await asyncio.sleep(0.01)
+    await asyncio.wait_for(received.wait(), timeout=1)
     await broadcast.disconnect()
     await asyncio.wait_for(task, timeout=1)
 
