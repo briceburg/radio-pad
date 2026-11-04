@@ -257,6 +257,16 @@ export function createControlActions({ localPlayback, control }) {
   control.addEventListener("playerstatus", (event) =>
     setStatusMap("playerStatuses", event.detail),
   );
+  localPlayback.addEventListener("playbackstate", (event) =>
+    updateTab("listen", {
+      currentStation: event.detail.callSign,
+      requestedStation: event.detail.requestedCallSign,
+      failedStation: event.detail.failedCallSign,
+    }),
+  );
+  localPlayback.addEventListener("error", (event) =>
+    toastWarning("Local audio playback failed.", event.detail),
+  );
 
   let lastAuthToken = authStore.get()?.registryBearerToken;
   authStore.subscribe((authState) => {
@@ -319,17 +329,15 @@ export function createControlActions({ localPlayback, control }) {
           .radioDial?.stations?.find(
             (candidate) => candidate.call_sign === callSign,
           );
-        const started = await localPlayback.play(station);
-        if (!started) return toastWarning("Couldn’t start station playback.");
-        return updateTab("listen", { currentStation: callSign });
+        if (!station) return toastWarning("Couldn’t start station playback.");
+        return localPlayback.play(station);
       }
       control.startPlayback(callSign);
     },
 
     async stopStation(tabName) {
       if (tabName === "listen") {
-        await localPlayback.stop();
-        return updateTab("listen", { currentStation: null });
+        return localPlayback.stop();
       }
       control.stopPlayback();
     },

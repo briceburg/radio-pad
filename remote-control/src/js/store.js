@@ -38,6 +38,8 @@ export const controlStore = atom({
 export const listenStore = atom({
   radioDial: null,
   currentStation: null,
+  requestedStation: null,
+  failedStation: null,
   loading: false,
 });
 

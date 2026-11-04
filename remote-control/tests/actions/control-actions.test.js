@@ -12,7 +12,7 @@ function createMockControl() {
 }
 
 function createMockLocalPlayback() {
-  return { play: vi.fn(), stop: vi.fn() };
+  return Object.assign(new EventTarget(), { play: vi.fn(), stop: vi.fn() });
 }
 
 function createActions() {
@@ -298,11 +298,24 @@ describe("control-actions", () => {
     };
     const { actions, localPlayback } = createActions();
     localPlayback.play.mockResolvedValue(true);
-    listenStore.set({ radioDial: { stations: [station] } });
+    listenStore.set({
+      ...listenStore.get(),
+      radioDial: { stations: [station] },
+    });
 
     await actions.clickStation("listen", "KEXP");
 
     expect(localPlayback.play).toHaveBeenCalledWith(station);
+    expect(listenStore.get().currentStation).toBeNull();
+    localPlayback.dispatchEvent(
+      new CustomEvent("playbackstate", {
+        detail: {
+          callSign: "KEXP",
+          requestedCallSign: null,
+          failedCallSign: null,
+        },
+      }),
+    );
     expect(listenStore.get().currentStation).toBe("KEXP");
   });
 });

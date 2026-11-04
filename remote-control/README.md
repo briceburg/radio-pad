@@ -4,6 +4,10 @@ A web and native mobile controller for [RadioPad](https://github.com/briceburg/r
 
 The Control tab uses a compact, state-driven title whose shared playback states align with the [Macropad title row](../macropad-control/README.md#visual-states): `Starting <call sign>`, the confirmed call sign, and `Failed <call sign>`. The selected player name is the idle fallback instead of a prefix on every state.
 
+The Listen tab also distinguishes starting, playing, and failed stations. Web playback is confirmed when the browser's `play()` promise resolves; stream errors clear that confirmation. Native playback acknowledges acceptance of the selected source and play commands after a plugin readiness signal, and follows notification playback controls without stopping audio when the app enters the background. Native readiness events do not identify their source, so that acknowledgement cannot prove which source became ready or guarantee audible output. The plugin also lacks stream-error events; startup fails after 30 seconds without acknowledgement. Stop and station changes cancel pending requests so superseded commands cannot restore an old station.
+
+The native player and its three callbacks are retained for the app's lifetime because the plugin provides no callback removal API. Stop pauses playback, resets its position and releases audio focus; it retains the prepared source for subsequent station selection rather than destroying and repeatedly registering callbacks.
+
 ## Development
 
 ### Configuration

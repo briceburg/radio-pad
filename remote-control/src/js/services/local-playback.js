@@ -5,136 +5,194 @@ import { Capacitor } from "@capacitor/core";
 import { AudioPlayer } from "@mediagrid/capacitor-native-audio";
 
 const AUDIO_ID = "radio-pad-stream";
+const NATIVE_START_TIMEOUT_MS = 30000;
 
-const createWebAudioPlayer = () => {
-  let audio;
-
-  const cleanup = () => {
-    if (!audio) return;
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
-    audio = null;
-  };
+function createWebAudioPlayer(station, onStatus, onError) {
+  const audio = new Audio(station.stream_url);
+  audio.addEventListener("error", () =>
+    onError(audio.error || new Error("Audio stream failed.")),
+  );
+  audio.addEventListener("playing", () => onStatus("playing"));
+  audio.addEventListener("pause", () => onStatus("stopped"));
+  audio.addEventListener("ended", () => onStatus("stopped"));
 
   return {
-    async play(url) {
-      if (!url) return;
-      cleanup();
-
-      const next = new Audio(url);
-      audio = next;
-
-      const bail = () => {
-        if (audio === next) {
-          cleanup();
-        }
-      };
-
-      next.addEventListener("error", bail, { once: true });
-      next.play().catch(bail);
-    },
-    async stop() {
-      cleanup();
+    play: () => audio.play(),
+    stop() {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
     },
   };
-};
+}
 
-const createNativeAudioPlayer = () => {
+function createNativeAudioPlayer() {
+  const audioRef = { audioId: AUDIO_ID };
+  let setup;
+  let created = false;
   let initialized = false;
-  let readyListener;
-
-  const audioRef = (extra = {}) => ({ audioId: AUDIO_ID, ...extra });
-
-  const teardown = async () => {
-    if (readyListener) {
-      try {
-        await readyListener.remove();
-      } catch (error) {
-        console.warn("Failed to remove audio ready listener", error);
-      }
-      readyListener = null;
-    }
-
-    try {
-      await AudioPlayer.destroy(audioRef());
-    } catch (error) {
-      if (initialized) {
-        console.error("Native audio destroy error:", error);
-      }
-    }
-
-    initialized = false;
-  };
-
-  const ensureInitialized = async (url, title) => {
-    if (initialized) {
-      await AudioPlayer.changeAudioSource(audioRef({ source: url }));
-      await AudioPlayer.changeMetadata(audioRef({ friendlyTitle: title }));
-      await AudioPlayer.play(audioRef());
-      return;
-    }
-
-    await AudioPlayer.create({
-      audioId: AUDIO_ID,
-      audioSource: url,
-      friendlyTitle: title,
-      useForNotification: true,
-      isBackgroundMusic: false,
-      loop: false,
-    });
-
-    try {
-      readyListener = await AudioPlayer.onAudioReady(audioRef(), async () => {
-        await AudioPlayer.play(audioRef());
-      });
-
-      await AudioPlayer.initialize(audioRef());
-      initialized = true;
-    } catch (error) {
-      await teardown();
-      throw error;
-    }
-  };
+  let ready;
+  let statusChanged;
+  let registered = 0;
+  // Callback IDs have no public removal API. Keep one source/callback set for the
+  // service's entire app lifetime; stop pauses it and releases native audio focus.
+  const listeners = [
+    ["onAudioReady", () => ready?.()],
+    ["onAudioEnd", () => statusChanged?.("stopped")],
+    ["onPlaybackStatusChange", ({ status }) => statusChanged?.(status)],
+  ];
 
   return {
-    async play(url, title) {
-      if (!url) return;
-      try {
-        await ensureInitialized(url, title);
-      } catch (error) {
-        console.error("Native audio playback error:", error);
-      }
+    async prepare(station, onStatus) {
+      let resolveReady;
+      const readiness = new Promise((resolve) => {
+        resolveReady = resolve;
+      });
+      setup = (async () => {
+        statusChanged = onStatus;
+        const newSource = !created;
+        if (newSource) {
+          await AudioPlayer.create({
+            ...audioRef,
+            audioSource: station.stream_url,
+            friendlyTitle: station.call_sign,
+            useForNotification: true,
+            isBackgroundMusic: false,
+            loop: false,
+          });
+          created = true;
+        }
+        while (registered < listeners.length) {
+          const [method, callback] = listeners[registered];
+          await AudioPlayer[method](audioRef, callback);
+          registered += 1;
+        }
+        if (!initialized) {
+          ready = newSource ? resolveReady : null;
+          await AudioPlayer.initialize(audioRef);
+          initialized = true;
+        }
+        if (!newSource) {
+          await AudioPlayer.changeMetadata({
+            ...audioRef,
+            friendlyTitle: station.call_sign,
+          });
+          ready = resolveReady;
+          await AudioPlayer.changeAudioSource({
+            ...audioRef,
+            source: station.stream_url,
+          });
+        }
+      })();
+      await setup;
+      await readiness;
     },
+    start: () => AudioPlayer.play(audioRef),
     async stop() {
-      if (!initialized) return;
-
-      try {
-        await AudioPlayer.stop(audioRef());
-      } catch (error) {
-        console.error("Native audio stop error:", error);
-      }
-
-      await teardown();
+      ready = null;
+      statusChanged = null;
+      await setup?.catch(() => {});
+      // Setup can complete after cancellation. Its callbacks must stay disarmed.
+      ready = null;
+      statusChanged = null;
+      if (initialized) await AudioPlayer.stop(audioRef);
     },
   };
-};
+}
 
-export class LocalPlayback {
+export class LocalPlayback extends EventTarget {
   constructor() {
-    this.player = Capacitor.isNativePlatform()
-      ? createNativeAudioPlayer()
-      : createWebAudioPlayer();
+    super();
+    this.native = Capacitor.isNativePlatform();
+    this.session = null;
+    this.cleanup = Promise.resolve();
+    this.nativePlayer = this.native ? createNativeAudioPlayer() : null;
+  }
+
+  publish(callSign = null, requestedCallSign = null, failedCallSign = null) {
+    this.dispatchEvent(
+      new CustomEvent("playbackstate", {
+        detail: { callSign, requestedCallSign, failedCallSign },
+      }),
+    );
+  }
+
+  reportError(error) {
+    this.dispatchEvent(new CustomEvent("error", { detail: error }));
+  }
+
+  release() {
+    const session = this.session;
+    this.session = null;
+    session?.cancel();
+    if (!session?.player) return this.cleanup;
+    // Complete native setup/stop before reusing the notification player for another station.
+    this.cleanup = Promise.resolve(session.player.stop()).catch((error) =>
+      this.reportError(error),
+    );
+    return this.cleanup;
   }
 
   async play(station) {
     if (!station?.stream_url) return false;
+    const previousCleanup = this.release();
+    let cancel;
+    const cancelled = new Promise((resolve) => {
+      cancel = () => resolve(false);
+    });
+    const session = { cancel, player: null, started: false };
+    this.session = session;
+    const isCurrent = () => this.session === session;
+    const fail = (error) => {
+      if (!isCurrent()) return;
+      this.release();
+      this.publish(null, null, station.call_sign);
+      this.reportError(error);
+    };
+    const onStatus = (status) => {
+      if (!isCurrent() || !session.started) return;
+      this.publish(status === "playing" ? station.call_sign : null);
+    };
+    this.publish(null, station.call_sign);
 
-    await this.player.play(station.stream_url, station.call_sign);
-    return true;
+    let timeout;
+    const start = async () => {
+      if (this.native) await previousCleanup;
+      if (!isCurrent()) return false;
+      session.player =
+        this.nativePlayer || createWebAudioPlayer(station, onStatus, fail);
+      if (this.native) await session.player.prepare(station, onStatus);
+      else await session.player.play();
+      if (!isCurrent()) return false;
+      if (this.native) await session.player.start();
+      if (!isCurrent()) return false;
+      session.started = true;
+      // Web play() confirms playback. Native acknowledges the selected source/play commands
+      // after an unqualified ready signal; the plugin cannot prove audible output or source identity.
+      this.publish(station.call_sign);
+      return true;
+    };
+    const starting = start().catch((error) => {
+      fail(error);
+      return false;
+    });
+    if (this.native) {
+      // The plugin has no stream-error callback; a source may otherwise never become ready.
+      timeout = setTimeout(
+        () => fail(new Error("Audio stream did not become ready in time.")),
+        NATIVE_START_TIMEOUT_MS,
+      );
+    }
+    try {
+      return await Promise.race([starting, cancelled]);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async stop() {
-    await this.player.stop();
+    const cleanup = this.release();
+    this.publish();
+    await cleanup;
   }
 }

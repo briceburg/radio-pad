@@ -228,7 +228,11 @@ export class RadioPlayerTab extends RadioElement {
     const listenTitle = s.radioDial?.name
       ? [
           s.radioDial.name,
-          s.currentStation || (s.loading ? "Loading..." : null),
+          s.requestedStation
+            ? `Starting ${s.requestedStation}`
+            : s.failedStation
+              ? `Failed ${s.failedStation}`
+              : s.currentStation || (s.loading ? "Loading..." : null),
         ]
           .filter(Boolean)
           .join(": ")
