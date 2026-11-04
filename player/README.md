@@ -58,7 +58,7 @@ The switchboard broadcasts `radio_dial_state` when a RadioDial's ETag changes. T
 
 #### Editing Stations
 
-Stations belong to accounts; RadioDials reference ordered Station keys. Changing a Station updates every referencing dial. Use the registry API or edit [community seed data](../registry/seed-data/data/accounts/community/) during development.
+Stations belong to accounts; RadioDials reference ordered Station keys. Update Stations through the registry API or its configured data backend; active referencing dials refresh automatically. [Seed data](../registry/seed-data/data/accounts/community/) initializes missing documents at startup and does not overwrite existing Stations.
 
 To bypass discovery, set `RADIOPAD_ENABLE_DISCOVERY=false` and `RADIOPAD_RADIO_DIAL_URL` to a complete RadioDial URL. Set `RADIOPAD_SWITCHBOARD_URL` if remote control is needed. The dial response has this shape:
 

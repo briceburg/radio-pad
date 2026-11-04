@@ -19,7 +19,7 @@ The registry defaults to `https://registry.radiopad.dev/api/`. An explicit playe
 
 Standalone builds read the Google Web client ID from `VITE_GOOGLE_CLIENT_ID`; Vite embeds it at build time, so set it before building or syncing Capacitor. Register `http://localhost:5173` and `https://remote.radiopad.dev` as authorized JavaScript origins, with their trailing-slash forms as redirect URIs. Compose uses `GOOGLE_CLIENT_ID` from the root `.env`; see the root [Google sign-in setup](../README.md#google-sign-in).
 
-Authentication follows the registry's runtime status. After Google sign-in, the registry keeps a rolling 30-day session and the remote keeps only its short-lived access token in memory; opening or actively using the app refreshes both. Public discovery and tokenless control remain available when authentication is disabled, and authorization failures remain visible in the Control title.
+Authentication follows the registry's runtime status. After Google sign-in, the registry keeps a rolling 30-day session and the remote keeps only its short-lived access token in memory; opening or actively using the app refreshes both. Registry discovery reads are public; control requires sign-in only when authentication is enabled. Authorization failures remain visible in the Control title.
 
 ### Web
 
@@ -35,7 +35,7 @@ Cloudflare Pages uses `remote-control` as its Git root and `npm run build` as it
 
 ### PWA and application assets
 
-`src/manifest.webmanifest` owns the installed web app's identity, scope, display mode, colors, and icons. RadioPad intentionally has no service worker: current Chrome and Safari installation flows do not require one, and its control, authentication, WebSocket, and streaming behavior requires the network.
+`src/manifest.webmanifest` owns the installed web app's identity, scope, display mode, colors, and icons. RadioPad has no service worker; control, authentication, WebSocket, and streaming operations require a network connection.
 
 The four canonical files in `../shared/assets` are the icon foreground, transparent icon glow, and light and dark splash SVGs. Checked-in web PNGs, Android launcher and splash resources, and iOS asset-catalog PNGs are generated outputs; regenerate all platforms after changing a source:
 
