@@ -85,7 +85,7 @@ class Stations:
         if payload.get("account_id") == account_id:
             payload.pop("account_id")
         stations_by_call_sign = self._parse(payload)
-        self._backend.save("stations", self._dump(stations_by_call_sign), "accounts", account_id)
+        self._backend.save("stations", self._dump(stations_by_call_sign), "accounts", account_id, if_none_match=True)
 
     def _load(self, account_id: str) -> tuple[dict[CallSign, StationSpec], str | None]:
         data, version = self._backend.get("stations", "accounts", account_id)

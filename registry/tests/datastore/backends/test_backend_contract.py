@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from pathlib import Path
 
@@ -9,10 +10,10 @@ from _pytest.fixtures import SubRequest
 
 from api.radio_dials import materialize_radio_dial, resolve_station_refs
 from datastore import DataStore
-from datastore.core import ModelStore, compute_etag, seed_from_path
+from datastore.core import compute_etag
 from datastore.core.interfaces import ObjectStore
 from datastore.exceptions import ConcurrencyError
-from models.account import Account, AccountSpec
+from datastore.types import JsonDoc, ValueWithETag
 from models.radio_dial import RadioDialSpec
 from models.station import StationSpec
 
@@ -112,26 +113,55 @@ class TestObjectStoreContract:
         with pytest.raises(ConcurrencyError):
             object_store.save("item", {"value": 3}, *path, if_match=stale_version)
 
-    def test_seeding_preserves_existing_edits_across_backends(self, object_store: ObjectStore, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("object_id", "path", "seed_data", "edited_data"),
+        [
+            ("seeded", ("accounts",), {"name": "Seeded"}, {"name": "Edited"}),
+            (
+                "stations",
+                ("accounts", "seeded"),
+                {"WWOZ": {"stream_url": "https://example.test/seeded"}},
+                {"WWOZ": {"stream_url": "https://example.test/edited"}},
+            ),
+        ],
+        ids=["account", "stations"],
+    )
+    def test_seeding_preserves_existing_edits_across_backends(
+        self,
+        object_store: ObjectStore,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        object_id: str,
+        path: tuple[str, ...],
+        seed_data: JsonDoc,
+        edited_data: JsonDoc,
+    ) -> None:
         seed_root = tmp_path / "seed"
-        (seed_root / "accounts").mkdir(parents=True)
-        (seed_root / "accounts" / "seeded.json").write_text('{\n  "name": "Seeded"\n}\n', encoding="utf-8")
+        seed_file = seed_root.joinpath(*path, f"{object_id}.json")
+        seed_file.parent.mkdir(parents=True)
+        seed_file.write_text(json.dumps(seed_data), encoding="utf-8")
+        datastore = DataStore(backend=object_store, seed_path=str(seed_root))
+        datastore.seed()
+        assert object_store.get(object_id, *path)[0] == seed_data
 
-        accounts: ModelStore[Account, AccountSpec] = ModelStore(
-            object_store,
-            model=Account,
-            path_template="accounts/{id}",
-        )
-        seed_from_path(seed_root, [accounts], label="data")
+        object_store.save(object_id, edited_data, *path)
+        edited = object_store.get(object_id, *path)
+        datastore.seed()
+        assert object_store.get(object_id, *path) == edited
 
-        model = accounts.get("seeded")
-        assert model is not None
-        assert model.id == "seeded"
-        assert model.name == "Seeded"
+        object_store.delete(object_id, *path)
+        original_get = object_store.get
 
-        edited = accounts.upsert("seeded", AccountSpec(name="Edited"))
-        seed_from_path(seed_root, [accounts], label="data")
-        assert accounts.get("seeded") == edited
+        def create_after_missing_read(object_id: str, *path: str) -> ValueWithETag[JsonDoc]:
+            missing = original_get(object_id, *path)
+            assert missing == (None, None)
+            object_store.save(object_id, edited_data, *path)
+            return missing
+
+        with monkeypatch.context() as patch:
+            patch.setattr(object_store, "get", create_after_missing_read)
+            datastore.seed()
+        assert object_store.get(object_id, *path)[0] == edited_data
 
     def test_linked_station_update_changes_resolved_radio_dial_revision(self, object_store: ObjectStore) -> None:
         datastore = DataStore(backend=object_store)
