@@ -145,7 +145,7 @@ Registry API reads are currently unauthenticated. Writes and player control beco
 
 The registry exchanges a verified OIDC ID token for a rolling 30-day signed cookie and one-hour bearer token. Its issuer and audience must match `REGISTRY_AUTH_OIDC_ISSUER` and `REGISTRY_AUTH_OIDC_CLIENT_IDS`; email ownership also requires an explicitly verified email claim. The cookie is refreshed while the remote is active and on its next visit, and is never sent to the switchboard.
 
-For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#local-configuration).
+For Google sign-in, `REGISTRY_AUTH_OIDC_CLIENT_IDS` must contain the same Web client ID used by the remote-control build; native Android and iOS client IDs are not token audiences. The root [Google sign-in setup](../README.md#google-sign-in) covers local Compose wiring; standalone browser and native setup lives in the [remote-control README](../remote-control/README.md#configuration).
 
 Registry and account-owner seeds live under `seed-data/data/` and `seed-data/authz/`. Owner documents live at `authz/accounts/<account>.json` and contain email addresses or issuer-qualified OIDC subjects.
 
