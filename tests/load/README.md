@@ -85,7 +85,7 @@ After changing the workload, run its deterministic lifecycle checks with `node -
 
 ### Reading a run
 
-The tagged `outcomes` thresholds require more than 99% successful connections, authentications, clean shutdowns, fan-out deliveries, and command deliveries, with no unexpected socket errors. Separate connection, authentication, fan-out, and command latency trends report percentiles without imposing an arbitrary service-level objective.
+The tagged `outcomes` thresholds require more than 99% successful connections, authentications, planned disconnects, fan-out deliveries, and command deliveries, with no unexpected socket errors. Disconnect outcomes distinguish planned closure from an early disconnect; they do not validate the closing handshake. Separate connection, authentication, fan-out, and command latency trends report percentiles without imposing an arbitrary service-level objective.
 
 Watch switchboard CPU, memory, file descriptors, and event-loop responsiveness alongside k6. Also watch the load generator: a saturated generator can look like a server limit. Repeat each step long enough to reach steady state and record the first resource or latency knee.
 
