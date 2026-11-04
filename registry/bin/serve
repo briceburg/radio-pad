@@ -6,7 +6,8 @@ set -- registry:app --app-dir src \
     --host "${REGISTRY_BIND_HOST:-localhost}" \
     --port "${REGISTRY_BIND_PORT:-8000}" \
     --log-level "${REGISTRY_LOG_LEVEL:-info}" \
-    --ws-max-size 65536 "$@"
+    --ws-max-size 65536 "$@" \
+    --workers "${WEB_CONCURRENCY:-1}"
 
 if [ "${REGISTRY_ENV:-production}" = development ]; then
     set -- "$@" --reload --reload-dir src
