@@ -14,7 +14,6 @@ services:
       - "${RADIOPAD_SWITCHBOARD_PORT:-0}:1980"
     environment:
       REGISTRY_PROFILES: "switchboard"
-      REGISTRY_URL: "http://registry:1980/api/"
 
   player:
     extends:
@@ -28,8 +27,6 @@ services:
       file: compose.yaml
       service: remote-control
     depends_on:
-      registry:
-        condition: service_healthy
       switchboard:
         condition: service_healthy
     environment:
@@ -39,11 +36,5 @@ services:
     extends:
       file: compose.yaml
       service: integration-tests
-    depends_on:
-      player:
-        condition: service_healthy
-      remote-control:
-        condition: service_healthy
     environment:
-      REGISTRY_URL: "http://registry:1980/api"
       SWITCHBOARD_URL: "ws://switchboard:1980/switchboard"
