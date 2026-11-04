@@ -39,7 +39,9 @@ export function preferenceValues(preferences, draftValues = {}) {
   return Object.fromEntries(
     Object.entries(preferences).map(([key, pref]) => [
       key,
-      Object.hasOwn(draftValues, key) ? draftValues[key] : (pref.value ?? ""),
+      Object.prototype.hasOwnProperty.call(draftValues, key)
+        ? draftValues[key]
+        : (pref.value ?? ""),
     ]),
   );
 }
