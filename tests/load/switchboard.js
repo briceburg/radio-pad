@@ -183,7 +183,7 @@ function loadMarker(payload, expectedPlayerId) {
 }
 
 function send(socket, event, data) {
-  if (socket.readyState === 1) {
+  if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ event, data }));
   }
 }

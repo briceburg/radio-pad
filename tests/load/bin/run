@@ -3,7 +3,7 @@ set -euo pipefail
 
 load_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_root="$(cd "$load_root/../.." && pwd)"
-k6_image="grafana/k6:2.2.0"
+k6_image="grafana/k6:2.3.0"
 
 usage() {
   cat >&2 <<'EOF'
