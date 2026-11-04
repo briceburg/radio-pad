@@ -12,25 +12,11 @@ from .seeding import match_path_template
 
 
 class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
-    """
-    Minimal, hierarchical repository backed by an ObjectStore (e.g., local fs, s3fs).
+    """Typed JSON resources backed by an ObjectStore.
 
-    path_template must end with the `{id}` placeholder.
-    - Example: "accounts/{account_id}/radio-dials/{id}"
-
-    placeholders other than `{id}` in the path_template are passed as `path_params`.
-    - Example: "accounts/{account_id}/radio-dials/{id}", path_params={"account_id": "123"}
-
-    Examples:
-    - Flat collection:
-      ModelStore(backend, model=Station, path_template="stations/{id}")
-
-    - Account-scoped:
-      ModelStore(backend, model=RadioDial, path_template="accounts/{account_id}/radio-dials/{id}")
-      store.get("morning", path_params={"account_id": "acct-123"})
-
-    Notes:
-    - save() will infer path params from model fields if not provided.
+    path_template must end with `{id}`, e.g. `accounts/{account_id}/players/{id}`.
+    Other placeholders require path_params; save() can infer them from model fields.
+    Path-derived identity is restored on reads and excluded from stored JSON.
     """
 
     def __init__(
@@ -40,17 +26,9 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         model: type[Entity],
         path_template: str,
     ):
-        """Initialize a ModelStore.
-
-        Args:
-            backend: Object storage backend used for persistence.
-            model: Concrete model type
-            path_template: Hierarchical JSON path template ending with "{id}".
-        """
         self._backend = backend
         self._model = model
 
-        # normalize and validate template
         normalized = path_template.strip().strip("/")
         segments = [s for s in normalized.split("/") if s]
         if not segments:
@@ -59,9 +37,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         if last != "{id}":
             raise ValueError("path_template must end with '{id}'")
         self._path_template = f"{normalized}.json"
-        # directory template excludes the final '{id}' segment
         self._dir_template = "/".join(segments[:-1])
-        # collect required keys from the directory template
         formatter = Formatter()
         req_keys: list[str] = []
         for _, field_name, _, _ in formatter.parse(self._dir_template):
@@ -79,14 +55,11 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         self.save(self._model.model_validate(data), path_params=path_params)
 
     def exists(self, object_id: str, *, path_params: PathParams | None = None) -> bool:
-        """Return True if a model with the given id exists; otherwise False."""
+        """Load and validate the resource to check existence."""
         return self.get(object_id, path_params=path_params) is not None
 
     def get(self, object_id: str, *, path_params: PathParams | None = None) -> Entity | None:
-        """Fetch a single model by id.
-        Returns:
-            The validated model instance, or None if it does not exist.
-        """
+        """Return a validated resource, or None when missing."""
         comps = self._dir_components(path_params=path_params)
         data, _ = self._backend.get(object_id, *comps)
         if data is None:
@@ -98,10 +71,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return self._model.model_validate({**base, **payload})
 
     def list(self, *, path_params: PathParams | None = None, page: int = 1, per_page: int = 10) -> PagedResult[Entity]:
-        """List models under the path, paginated.
-        Returns:
-            A list of validated model instances.
-        """
+        """Return a page of validated resources."""
         comps = self._dir_components(path_params=path_params)
         items = self._backend.list(*comps, page=page, per_page=per_page)
 
@@ -116,18 +86,10 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return models
 
     def upsert(self, object_id: str, spec: Spec, *, path_params: PathParams | None = None) -> Entity:
-        """Replace a writable resource spec or create it, using OCC for concurrent writes.
+        """Replace or create a resource using a conditional write.
 
-        This implements PUT semantics: omitted optional fields take their Spec defaults
-        rather than retaining values from an existing resource.
-
-        This is used by PUT methods in the API.
-
-        Raises:
-            ConcurrencyError: If a conditional save fails due to a version conflict.
-
-        Returns:
-            The validated, persisted model instance.
+        Omitted optional fields take Spec defaults (PUT replacement semantics).
+        Raises ConcurrencyError if storage changed since the initial read.
         """
         comps = self._dir_components(path_params=path_params)
         current, version = self._backend.get(object_id, *comps)
@@ -145,19 +107,12 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
                 if_match=version,
                 if_none_match=current is None,
             )
-        except ConcurrencyError as e:  # backend conflict (e.g., ETag mismatch)
+        except ConcurrencyError as e:
             raise ConcurrencyError("Conditional save failed") from e
         return model
 
     def save(self, model_obj: Entity, *, path_params: PathParams | None = None) -> Entity:
-        """Persist a complete model
-
-        If required path parameters are not provided, this method attempts to
-        infer them from identically named string fields on the model.
-
-        Returns:
-            The saved model (same instance).
-        """
+        """Persist a complete resource; infer path parameters from model fields when omitted."""
         if self._required_keys and path_params is None:
             path_params = self._path_params_from_model(model_obj)
         comps = self._dir_components(path_params=path_params)
@@ -166,14 +121,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return model_obj
 
     def _dir_components(self, *, path_params: PathParams | None = None) -> tuple[str, ...]:
-        """Render the directory portion of the path into components.
-
-        Raises:
-            ValueError: If required path parameters are missing.
-
-        Returns:
-            A tuple of components to prefix before the object id.
-        """
+        """Render path parameters, requiring every directory placeholder."""
         if not self._dir_template:
             return ()
         if self._required_keys and not path_params:
@@ -183,10 +131,7 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return tuple(c for c in rendered.split("/") if c)
 
     def _path_params_from_model(self, model_obj: Entity) -> PathParams:
-        """Extract required path parameters from a model instance.
-
-        Each required key must exist on the model and be of type str.
-        """
+        """Infer directory placeholders from same-named string fields on the model."""
         values: dict[str, str] = {}
         for key in self._required_keys:
             v = getattr(model_obj, key)
@@ -196,8 +141,5 @@ class ModelStore[Entity: ModelWithId, Spec: BaseModel]:
         return values
 
     def _strip_reserved(self, mapping: Mapping[str, object]) -> dict[str, object]:
-        """Return a shallow copy of mapping without reserved keys.
-
-        Reserved keys include the object id and any required directory placeholders.
-        """
+        """Remove the object ID and directory placeholders from a payload."""
         return {k: v for k, v in mapping.items() if k not in self._reserved_keys}
