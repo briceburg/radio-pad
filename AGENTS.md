@@ -27,6 +27,7 @@ Guidance for coding agents working in `radio-pad` (monorepo root).
 ## Agent workflow
 
 - Use the root [README toolchain policy](README.md#toolchain-and-dependency-policy) for dependency-update scope; keep updates within their documented project boundary and do not introduce workspaces or consolidate lockfiles unless intentionally changing repository structure.
+- Review intervening upstream changelogs when upgrading dependencies, including relevant transitive changes. Look for built-in features that can replace custom code, preserve application behavior, and explain useful fixes or simplifications in the PR.
 - Prefer starting PR work in a dedicated git worktree created from the latest `origin/main`, for example: `git fetch origin` then `git worktree add ../radio-pad-<topic> -b <topic> origin/main`.
 - Before committing, check `git status --short --branch`. Do not commit PR work on local `main` or leave local `main` ahead of `origin/main`.
 - Python projects are `uv`/`pyproject.toml` driven. Use each project's `bin/ci`; checks run through `uv run --locked` with Ruff and mypy so stale lockfiles fail CI.
