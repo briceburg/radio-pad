@@ -112,7 +112,7 @@ class TestObjectStoreContract:
         with pytest.raises(ConcurrencyError):
             object_store.save("item", {"value": 3}, *path, if_match=stale_version)
 
-    def test_seed_from_path_works_across_backends(self, object_store: ObjectStore, tmp_path: Path) -> None:
+    def test_seeding_preserves_existing_edits_across_backends(self, object_store: ObjectStore, tmp_path: Path) -> None:
         seed_root = tmp_path / "seed"
         (seed_root / "accounts").mkdir(parents=True)
         (seed_root / "accounts" / "seeded.json").write_text('{\n  "name": "Seeded"\n}\n', encoding="utf-8")
@@ -128,6 +128,10 @@ class TestObjectStoreContract:
         assert model is not None
         assert model.id == "seeded"
         assert model.name == "Seeded"
+
+        edited = accounts.upsert("seeded", AccountSpec(name="Edited"))
+        seed_from_path(seed_root, [accounts], label="data")
+        assert accounts.get("seeded") == edited
 
     def test_linked_station_update_changes_resolved_radio_dial_revision(self, object_store: ObjectStore) -> None:
         datastore = DataStore(backend=object_store)
