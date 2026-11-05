@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -330,34 +330,37 @@ async function generateIosAssets() {
     "AppIcon-512@2x.png",
   );
   const splashDirectory = path.join(iosAssets, "Splash.imageset");
-  const splashSuffixes = ["", "-1", "-2"];
   const splashLogoWidth = Math.round(2732 * iosSplashLogoScale);
+
+  // All three catalog scales use the same 2732px image.
+  async function renderSplashCopies(source, filename, background) {
+    const destination = path.join(splashDirectory, `${filename}.png`);
+    await renderSplash(
+      source,
+      destination,
+      2732,
+      2732,
+      background,
+      splashLogoWidth,
+    );
+    await Promise.all(
+      ["-1", "-2"].map((suffix) =>
+        copyFile(
+          destination,
+          path.join(splashDirectory, `${filename}${suffix}.png`),
+        ),
+      ),
+    );
+    generatedCount += 2;
+  }
   await Promise.all([
     renderIcon(appIcon, 1024, {
       background: "#ffffff",
       glow: true,
       padding: conventionalIconPadding,
     }),
-    ...splashSuffixes.map((suffix) =>
-      renderSplash(
-        sources.splash,
-        path.join(splashDirectory, `splash-2732x2732${suffix}.png`),
-        2732,
-        2732,
-        "#ffffff",
-        splashLogoWidth,
-      ),
-    ),
-    ...splashSuffixes.map((suffix) =>
-      renderSplash(
-        sources.splashDark,
-        path.join(splashDirectory, `splash-dark-2732x2732${suffix}.png`),
-        2732,
-        2732,
-        "#111111",
-        splashLogoWidth,
-      ),
-    ),
+    renderSplashCopies(sources.splash, "splash-2732x2732", "#ffffff"),
+    renderSplashCopies(sources.splashDark, "splash-dark-2732x2732", "#111111"),
   ]);
 }
 
