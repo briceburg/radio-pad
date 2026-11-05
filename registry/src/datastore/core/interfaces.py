@@ -13,7 +13,12 @@ class ModelWithId(Protocol):
 
 
 class ObjectStore(Protocol):
-    """Interface for a versioned, hierarchical object store."""
+    """Versioned, hierarchical objects with optional write preconditions.
+
+    save() replaces unconditionally by default. if_match requires the ETag returned
+    by get(); if_none_match=True requires absence (HTTP If-None-Match: *).
+    The two preconditions are mutually exclusive.
+    """
 
     def get(self, object_id: str, *path: str) -> ValueWithETag[JsonDoc]: ...
 
