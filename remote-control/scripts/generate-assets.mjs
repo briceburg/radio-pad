@@ -28,9 +28,12 @@ const iosAssets = path.join(
 const sources = {
   foreground: path.join(sharedAssets, "app-icon-foreground.svg"),
   background: path.join(sharedAssets, "app-icon-background.svg"),
-  splash: path.join(sharedAssets, "app-splash.svg"),
-  splashDark: path.join(sharedAssets, "app-splash-dark.svg"),
 };
+
+const splashThemes = [
+  { name: "splash", background: "#ffffff", androidQualifier: "" },
+  { name: "splash-dark", background: "#111111", androidQualifier: "-night" },
+];
 
 const conventionalIconPadding = 0.1;
 const adaptiveForegroundPadding = 0.14;
@@ -56,27 +59,16 @@ function sourceImage(source) {
   return sharp(source, { density: 384 });
 }
 
-async function renderSource(source, size, padding = 0) {
+function renderSource(source, size, padding = 0) {
   const innerSize = Math.round(size * (1 - padding * 2));
-  let pipeline = sourceImage(source).resize({
-    width: innerSize,
-    height: innerSize,
-    fit: "contain",
-  });
-  if (innerSize > size) {
-    const offset = Math.floor((innerSize - size) / 2);
-    pipeline = pipeline.extract({
-      left: offset,
-      top: offset,
-      width: size,
-      height: size,
-    });
-  }
-  return pipeline.png().toBuffer();
-}
-
-async function renderAsset(source, destination, size) {
-  await writePng(sharp(await renderSource(source, size)), destination);
+  return sourceImage(source)
+    .resize({
+      width: innerSize,
+      height: innerSize,
+      fit: "contain",
+    })
+    .png()
+    .toBuffer();
 }
 
 async function renderIcon(
@@ -176,14 +168,15 @@ async function validateGlow() {
 }
 
 async function renderSplash(
-  source,
+  { name, background },
   destination,
   width,
   height,
-  background,
   logoWidth,
 ) {
-  let logoPipeline = sourceImage(source).resize({
+  let logoPipeline = sourceImage(
+    path.join(sharedAssets, `app-${name}.svg`),
+  ).resize({
     width: logoWidth,
     fit: "inside",
   });
@@ -219,18 +212,21 @@ async function generateWebAssets() {
   ]);
 }
 
-const androidDensityScales = {
-  ldpi: 0.75,
-  mdpi: 1,
-  hdpi: 1.5,
-  xhdpi: 2,
-  xxhdpi: 3,
-  xxxhdpi: 4,
+// Density scale and portrait splash dimensions, shared by icons and splashes.
+const androidDensities = {
+  ldpi: [0.75, 240, 320],
+  mdpi: [1, 320, 480],
+  hdpi: [1.5, 480, 800],
+  xhdpi: [2, 720, 1280],
+  xxhdpi: [3, 960, 1600],
+  xxxhdpi: [4, 1280, 1920],
 };
 
-async function generateAndroidIcons() {
+async function generateAndroidAssets() {
   const operations = [];
-  for (const [density, scale] of Object.entries(androidDensityScales)) {
+  for (const [density, [scale, width, height]] of Object.entries(
+    androidDensities,
+  )) {
     const directory = path.join(androidResources, `mipmap-${density}`);
     const conventionalSize = Math.round(48 * scale);
     const adaptiveSize = Math.round(108 * scale);
@@ -252,73 +248,39 @@ async function generateAndroidIcons() {
         adaptiveSize,
         { padding: adaptiveForegroundPadding },
       ),
-      renderAsset(
-        sources.background,
+      writePng(
+        sourceImage(sources.background).resize(adaptiveSize, adaptiveSize, {
+          fit: "contain",
+        }),
         path.join(directory, "ic_launcher_background.png"),
-        adaptiveSize,
       ),
     );
-  }
-  await Promise.all(operations);
-}
-
-const androidSplashDimensions = {
-  ldpi: [240, 320],
-  mdpi: [320, 480],
-  hdpi: [480, 800],
-  xhdpi: [720, 1280],
-  xxhdpi: [960, 1600],
-  xxxhdpi: [1280, 1920],
-};
-
-function darkAndroidDirectory(directory) {
-  if (directory === "drawable") {
-    return "drawable-night";
-  }
-  const [prefix, orientation, density] = directory.split("-");
-  return [prefix, orientation, "night", density].join("-");
-}
-
-async function generateAndroidSplashes() {
-  const operations = [];
-  const variants = [["drawable", "mdpi", 320, 480]];
-  for (const [density, [width, height]] of Object.entries(
-    androidSplashDimensions,
-  )) {
-    variants.push(
-      [`drawable-port-${density}`, density, width, height],
-      [`drawable-land-${density}`, density, height, width],
-    );
-  }
-  for (const [directory, density, width, height] of variants) {
     const opticalScale = ["ldpi", "mdpi"].includes(density)
       ? androidLowDensitySplashOpticalScale
       : 1;
     const logoWidth = Math.round(
-      androidSplashLogoWidthDp * androidDensityScales[density] * opticalScale,
+      androidSplashLogoWidthDp * scale * opticalScale,
     );
-    operations.push(
-      renderSplash(
-        sources.splash,
-        path.join(androidResources, directory, "splash.png"),
-        width,
-        height,
-        "#ffffff",
-        logoWidth,
-      ),
-      renderSplash(
-        sources.splashDark,
-        path.join(
-          androidResources,
-          darkAndroidDirectory(directory),
-          "splash.png",
-        ),
-        width,
-        height,
-        "#111111",
-        logoWidth,
-      ),
-    );
+    for (const theme of splashThemes) {
+      const variants = [
+        [`drawable-port${theme.androidQualifier}-${density}`, width, height],
+        [`drawable-land${theme.androidQualifier}-${density}`, height, width],
+      ];
+      if (density === "mdpi") {
+        variants.push([`drawable${theme.androidQualifier}`, width, height]);
+      }
+      for (const [directory, width, height] of variants) {
+        operations.push(
+          renderSplash(
+            theme,
+            path.join(androidResources, directory, "splash.png"),
+            width,
+            height,
+            logoWidth,
+          ),
+        );
+      }
+    }
   }
   await Promise.all(operations);
 }
@@ -332,43 +294,34 @@ async function generateIosAssets() {
   const splashDirectory = path.join(iosAssets, "Splash.imageset");
   const splashLogoWidth = Math.round(2732 * iosSplashLogoScale);
 
-  // All three catalog scales use the same 2732px image.
-  async function renderSplashCopies(source, filename, background) {
-    const destination = path.join(splashDirectory, `${filename}.png`);
-    await renderSplash(
-      source,
-      destination,
-      2732,
-      2732,
-      background,
-      splashLogoWidth,
-    );
-    await Promise.all(
-      ["-1", "-2"].map((suffix) =>
-        copyFile(
-          destination,
-          path.join(splashDirectory, `${filename}${suffix}.png`),
-        ),
-      ),
-    );
-    generatedCount += 2;
-  }
   await Promise.all([
     renderIcon(appIcon, 1024, {
       background: "#ffffff",
       glow: true,
       padding: conventionalIconPadding,
     }),
-    renderSplashCopies(sources.splash, "splash-2732x2732", "#ffffff"),
-    renderSplashCopies(sources.splashDark, "splash-dark-2732x2732", "#111111"),
+    ...splashThemes.map(async (theme) => {
+      const filename = `${theme.name}-2732x2732`;
+      const destination = path.join(splashDirectory, `${filename}.png`);
+      // All three catalog scales use the same 2732px image.
+      await renderSplash(theme, destination, 2732, 2732, splashLogoWidth);
+      await Promise.all(
+        ["-1", "-2"].map((suffix) =>
+          copyFile(
+            destination,
+            path.join(splashDirectory, `${filename}${suffix}.png`),
+          ),
+        ),
+      );
+      generatedCount += 2;
+    }),
   ]);
 }
 
 await validateGlow();
 await Promise.all([
   generateWebAssets(),
-  generateAndroidIcons(),
-  generateAndroidSplashes(),
+  generateAndroidAssets(),
   generateIosAssets(),
 ]);
 
