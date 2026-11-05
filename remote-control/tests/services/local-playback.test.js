@@ -113,12 +113,14 @@ describe("Listen playback", () => {
     nextPlay = playing.promise;
     const { actions } = createActions();
     actions.clickStation("listen", "KEXP");
+    // Browser autoplay permission depends on invoking play within the click gesture.
+    expect(audioInstances[0].play).toHaveBeenCalledOnce();
+    expect(global.Audio).toHaveBeenCalledWith(STATION.stream_url);
     expectState(null, "KEXP");
     playing.resolve();
     await waitForState("KEXP");
     await actions.stopStation("listen");
     expectState(null);
-    expect(global.Audio).toHaveBeenCalledWith(STATION.stream_url);
     expect(audioInstances[0].pause).toHaveBeenCalledOnce();
     expect(audioInstances[0].removeAttribute).toHaveBeenCalledWith("src");
     expect(audioInstances[0].load).toHaveBeenCalledOnce();

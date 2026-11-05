@@ -35,7 +35,7 @@ function createNativeAudioPlayer() {
   let statusChanged;
   let registered = 0;
   // Callback IDs have no public removal API. Keep one source/callback set for the
-  // service's entire app lifetime; stop pauses it and releases native audio focus.
+  // service's entire app lifetime; stop pauses it and retains the prepared source.
   const listeners = [
     ["onAudioReady", () => ready?.()],
     ["onAudioEnd", () => statusChanged?.("stopped")],

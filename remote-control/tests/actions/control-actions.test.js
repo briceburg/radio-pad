@@ -291,19 +291,18 @@ describe("control-actions", () => {
     });
   });
 
-  it("resolves listen stations from the loaded RadioDial", async () => {
+  it("resolves listen stations from the loaded RadioDial and waits for state events", () => {
     const station = {
       call_sign: "KEXP",
       stream_url: "https://example.test/kexp",
     };
     const { actions, localPlayback } = createActions();
-    localPlayback.play.mockResolvedValue(true);
     listenStore.set({
       ...listenStore.get(),
       radioDial: { stations: [station] },
     });
 
-    await actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
 
     expect(localPlayback.play).toHaveBeenCalledWith(station);
     expect(listenStore.get().currentStation).toBeNull();
