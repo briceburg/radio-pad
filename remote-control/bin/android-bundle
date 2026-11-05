@@ -45,11 +45,23 @@ unset RADIOPAD_RELEASE_KEY_ALIAS RADIOPAD_RELEASE_KEY_PASSWORD
 if [ -z "${JAVA_HOME:-}" ] && [ -x /opt/android-studio/jbr/bin/java ]; then
   export JAVA_HOME=/opt/android-studio/jbr
 fi
+if [ -n "${JAVA_HOME:-}" ]; then
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
 
-command -v jarsigner >/dev/null || die "jarsigner is required; install a JDK"
+for tool in keytool jarsigner; do
+  command -v "$tool" >/dev/null || die "$tool is required; install a JDK"
+done
 prompt_required store_file RADIOPAD_RELEASE_STORE_FILE "Upload keystore path" false "$default_store_file"
+[ -f "$store_file" ] || die "keystore not found: $store_file"
+store_file="$(cd "$(dirname "$store_file")" && pwd -P)/$(basename "$store_file")"
 prompt_required key_alias RADIOPAD_RELEASE_KEY_ALIAS "Upload key alias" false "$default_key_alias"
 prompt_required store_password RADIOPAD_RELEASE_STORE_PASSWORD "Keystore password" true
+
+echo "Checking upload keystore password and alias..."
+RADIOPAD_RELEASE_STORE_PASSWORD="$store_password" \
+  keytool -list -keystore "$store_file" -alias "$key_alias" \
+    -storepass:env RADIOPAD_RELEASE_STORE_PASSWORD
 
 if [ -z "$key_password" ] && [ -t 0 ]; then
   read -r -s -p "Key password (Enter to reuse keystore password): " key_password
@@ -57,13 +69,12 @@ if [ -z "$key_password" ] && [ -t 0 ]; then
 fi
 key_password="${key_password:-$store_password}"
 
-[ -f "$store_file" ] || die "keystore not found: $store_file"
-store_file="$(cd "$(dirname "$store_file")" && pwd -P)/$(basename "$store_file")"
-
 cd "$PROJECT_ROOT"
+echo "Building web assets and syncing Android..."
 npm run build
 npx cap sync android
 
+echo "Building and signing Android release (private-key password checked here)..."
 (
   cd android
   ORG_GRADLE_PROJECT_radioPadReleaseStoreFile="$store_file" \
@@ -73,22 +84,19 @@ npx cap sync android
     ./gradlew --no-daemon bundleRelease
 )
 
-unset store_password key_password
-
 [ -f "$AAB_PATH" ] || die "Gradle did not create $AAB_PATH"
-verification_log="$(mktemp "${TMPDIR:-/tmp}/radiopad-aab-verify.XXXXXX")"
-trap 'rm -f "$verification_log"' EXIT
-if ! LC_ALL=C jarsigner -verify "$AAB_PATH" >"$verification_log" 2>&1; then
-  cat "$verification_log" >&2
+echo "Verifying bundle signature against upload key '$key_alias'..."
+if ! verification_output="$(
+  RADIOPAD_RELEASE_STORE_PASSWORD="$store_password" LC_ALL=C jarsigner -verify -strict \
+    -keystore "$store_file" -storepass:env RADIOPAD_RELEASE_STORE_PASSWORD "$AAB_PATH" "$key_alias" 2>&1
+)" || ! grep -Fqx "jar verified." <<<"$verification_output"; then
+  printf '%s\n' "$verification_output" >&2
   die "AAB signature verification failed"
 fi
-grep -Fqx "jar verified." "$verification_log" || {
-  cat "$verification_log" >&2
-  die "AAB signature verification failed"
-}
+unset store_password key_password
 
 echo
-echo "Created signed Android App Bundle:"
+echo "Verified signed Android App Bundle:"
 echo "  $AAB_PATH"
 if command -v sha256sum >/dev/null; then
   sha256sum "$AAB_PATH"
@@ -97,3 +105,4 @@ elif command -v shasum >/dev/null; then
 else
   die "sha256sum or shasum is required to checksum the AAB"
 fi
+echo "Ready for Google Play Console → Internal testing."

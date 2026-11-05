@@ -90,7 +90,7 @@ Package names are permanent, and each update must increase `versionCode` in `and
 ./bin/android-bundle
 ```
 
-The helper defaults to alias `radiopad` in `~/.android/radiopad.jks`, prompts for passwords, builds and syncs the app, and prints the AAB path and SHA-256 checksum. Non-interactive builds accept:
+The helper defaults to alias `radiopad` in `~/.android/radiopad.jks` and checks the keystore password and alias before building. Gradle checks the private-key password during signing. A successful run verifies the bundle against the selected upload key and prints its path and SHA-256 checksum, ready for Play Console. Non-interactive builds accept:
 
 - `RADIOPAD_RELEASE_STORE_FILE` (optional; defaults to `~/.android/radiopad.jks`)
 - `RADIOPAD_RELEASE_STORE_PASSWORD`
