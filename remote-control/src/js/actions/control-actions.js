@@ -233,13 +233,18 @@ export function createControlActions({ localPlayback, control }) {
     toastWarning(event.detail);
   });
   control.addEventListener("error", (event) => toastWarning(event.detail));
-  control.addEventListener("playbackstate", (event) =>
-    updateTab("control", {
-      currentStation: event.detail.callSign,
-      requestedStation: event.detail.requestedCallSign,
-      failedStation: event.detail.failedCallSign,
-    }),
-  );
+  for (const [tabName, playback] of [
+    ["control", control],
+    ["listen", localPlayback],
+  ]) {
+    playback.addEventListener("playbackstate", ({ detail }) =>
+      updateTab(tabName, {
+        currentStation: detail.callSign,
+        requestedStation: detail.requestedCallSign,
+        failedStation: detail.failedCallSign,
+      }),
+    );
+  }
   control.addEventListener("radiodialstate", (event) => {
     const player = controlStore.get().player;
     loadRadioDial(
@@ -256,6 +261,9 @@ export function createControlActions({ localPlayback, control }) {
   });
   control.addEventListener("playerstatus", (event) =>
     setStatusMap("playerStatuses", event.detail),
+  );
+  localPlayback.addEventListener("error", (event) =>
+    toastWarning("Local audio playback failed.", event.detail),
   );
 
   let lastAuthToken = authStore.get()?.registryBearerToken;
@@ -312,24 +320,22 @@ export function createControlActions({ localPlayback, control }) {
       return loadRadioDial(url, "listen");
     },
 
-    async clickStation(tabName, callSign) {
+    clickStation(tabName, callSign) {
       if (tabName === "listen") {
         const station = listenStore
           .get()
           .radioDial?.stations?.find(
             (candidate) => candidate.call_sign === callSign,
           );
-        const started = await localPlayback.play(station);
-        if (!started) return toastWarning("Couldn’t start station playback.");
-        return updateTab("listen", { currentStation: callSign });
+        if (!station) return toastWarning("Couldn’t start station playback.");
+        return localPlayback.play(station);
       }
       control.startPlayback(callSign);
     },
 
-    async stopStation(tabName) {
+    stopStation(tabName) {
       if (tabName === "listen") {
-        await localPlayback.stop();
-        return updateTab("listen", { currentStation: null });
+        return localPlayback.stop();
       }
       control.stopPlayback();
     },

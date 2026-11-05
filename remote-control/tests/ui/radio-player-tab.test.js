@@ -5,7 +5,7 @@ import {
   isControlDegraded,
   RadioPlayerTab,
 } from "../../src/js/ui/radio-player-tab.js";
-import { controlStore } from "../../src/js/store.js";
+import { controlStore, listenStore } from "../../src/js/store.js";
 import controllerTitleContract from "../../../shared/controller-title-cases.json";
 
 afterEach(() => document.body.replaceChildren());
@@ -44,6 +44,46 @@ function controlTitleState(titleCase) {
 }
 
 describe("radio-player-tab", () => {
+  it("shows Listen startup, failure, confirmation, and a usable pending stop button", async () => {
+    listenStore.set({
+      radioDial: { name: "Radio", stations: [{ call_sign: "KEXP" }] },
+      currentStation: null,
+      requestedStation: "KEXP",
+      failedStation: null,
+      loading: false,
+    });
+    const element = new RadioPlayerTab();
+    element.tabName = "listen";
+    document.body.append(element);
+    await element.updateComplete;
+    const title = element.querySelector("ion-title");
+    const station = element.querySelector("ion-button[aria-pressed]");
+    const stop = element.querySelector('[aria-label="Stop playback"]');
+    expect(title.textContent.trim()).toBe("Radio: Starting KEXP");
+    expect(station.getAttribute("aria-pressed")).toBe("false");
+    expect(station.getAttribute("aria-busy")).toBe("true");
+    expect(stop.disabled).toBe(false);
+
+    listenStore.set({
+      ...listenStore.get(),
+      requestedStation: null,
+      failedStation: "KEXP",
+    });
+    await element.updateComplete;
+    expect(title.textContent.trim()).toBe("Radio: Failed KEXP");
+    expect(station.getAttribute("aria-invalid")).toBe("true");
+    expect(stop.disabled).toBe(true);
+
+    listenStore.set({
+      ...listenStore.get(),
+      failedStation: null,
+      currentStation: "KEXP",
+    });
+    await element.updateComplete;
+    expect(title.textContent.trim()).toBe("Radio: KEXP");
+    expect(station.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("treats disconnected, unauthorized, and offline control states as degraded", () => {
     expect(isControlDegraded({ connectionState: "disconnected" })).toBe(true);
     expect(isControlDegraded({ connectionState: "unauthorized" })).toBe(true);
