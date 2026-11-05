@@ -56,6 +56,12 @@ describe("Listen playback", () => {
   let nativeCallbacks;
   let nextPlay;
 
+  const waitForState = (...state) => vi.waitFor(() => expectState(...state));
+  async function readyNative(method = "initialize") {
+    await vi.waitFor(() => expect(AudioPlayer[method]).toHaveBeenCalledOnce());
+    nativeCallbacks[0].ready();
+  }
+
   beforeEach(() => {
     vi.resetAllMocks();
     Capacitor.isNativePlatform.mockReturnValue(false);
@@ -106,11 +112,10 @@ describe("Listen playback", () => {
     const playing = Promise.withResolvers();
     nextPlay = playing.promise;
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     expectState(null, "KEXP");
     playing.resolve();
-    await selection;
-    expectState("KEXP");
+    await waitForState("KEXP");
     await actions.stopStation("listen");
     expectState(null);
     expect(global.Audio).toHaveBeenCalledWith(STATION.stream_url);
@@ -122,36 +127,47 @@ describe("Listen playback", () => {
   it("reports a rejected web play and a later stream error", async () => {
     const { actions } = createActions();
     nextPlay = Promise.reject(new Error("Playback blocked"));
-    await actions.clickStation("listen", "KEXP");
-    expectState(null, null, "KEXP");
+    actions.clickStation("listen", "KEXP");
+    await waitForState(null, null, "KEXP");
     expect(toastStore.get().error.message).toBe("Playback blocked");
     nextPlay = Promise.resolve();
-    await actions.clickStation("listen", "WXXI");
-    expectState("WXXI");
+    actions.clickStation("listen", "WXXI");
+    await waitForState("WXXI");
     audioInstances[1].error = new Error("Stream disconnected");
     audioInstances[1].dispatchEvent(new Event("error"));
     expectState(null, null, "WXXI");
     expect(toastStore.get().error.message).toBe("Stream disconnected");
   });
 
+  it("reports a missing stream without interrupting acknowledged playback", async () => {
+    const { actions, playback } = createActions();
+    actions.clickStation("listen", "KEXP");
+    await waitForState("KEXP");
+    playback.play({ call_sign: "WXXI" });
+    expectState("KEXP");
+    expect(toastStore.get().error.message).toBe("Station has no audio stream.");
+    expect(audioInstances).toHaveLength(1);
+    await actions.stopStation("listen");
+  });
+
   it("ignores superseded web startup results and errors, including after stop", async () => {
     const first = Promise.withResolvers();
     nextPlay = first.promise;
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     nextPlay = Promise.resolve();
-    await actions.clickStation("listen", "WXXI");
+    actions.clickStation("listen", "WXXI");
+    await waitForState("WXXI");
     first.reject(new Error("Old stream failed"));
     audioInstances[0].dispatchEvent(new Event("error"));
-    await selection;
+    await first.promise.catch(() => {});
     expectState("WXXI");
     expect(toastStore.get().id).toBe(0);
 
     const last = Promise.withResolvers();
     nextPlay = last.promise;
-    const stopped = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await actions.stopStation("listen");
-    await stopped;
     expectState(null);
     last.resolve();
     await Promise.resolve();
@@ -160,7 +176,8 @@ describe("Listen playback", () => {
 
   it.each(["pause", "ended"])("clears web playback on %s", async (event) => {
     const { actions } = createActions();
-    await actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
+    await waitForState("KEXP");
     audioInstances[0].dispatchEvent(new Event(event));
     expectState(null);
     await actions.stopStation("listen");
@@ -171,7 +188,7 @@ describe("Listen playback", () => {
     const playing = Promise.withResolvers();
     AudioPlayer.play.mockReturnValue(playing.promise);
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await vi.waitFor(() =>
       expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
     );
@@ -181,8 +198,7 @@ describe("Listen playback", () => {
     await vi.waitFor(() => expect(AudioPlayer.play).toHaveBeenCalledOnce());
     expectState(null, "KEXP");
     playing.resolve();
-    await selection;
-    expectState("KEXP");
+    await waitForState("KEXP");
     nativeCallbacks[0].ready();
     expect(AudioPlayer.play).toHaveBeenCalledOnce();
     nativeCallbacks[0].status({ status: "paused" });
@@ -196,13 +212,9 @@ describe("Listen playback", () => {
       audioId: "radio-pad-stream",
     });
     expect(AudioPlayer.destroy).not.toHaveBeenCalled();
-    const next = actions.clickStation("listen", "WXXI");
-    await vi.waitFor(() =>
-      expect(AudioPlayer.changeAudioSource).toHaveBeenCalledOnce(),
-    );
-    nativeCallbacks[0].ready();
-    await next;
-    expectState("WXXI");
+    actions.clickStation("listen", "WXXI");
+    await readyNative("changeAudioSource");
+    await waitForState("WXXI");
     expect(AudioPlayer.create).toHaveBeenCalledOnce();
     expect(AudioPlayer.onAudioReady).toHaveBeenCalledOnce();
     expect(AudioPlayer.onAudioEnd).toHaveBeenCalledOnce();
@@ -216,15 +228,9 @@ describe("Listen playback", () => {
       Capacitor.isNativePlatform.mockReturnValue(true);
       AudioPlayer[method].mockRejectedValueOnce(new Error(`${method} failed`));
       const { actions } = createActions();
-      const selection = actions.clickStation("listen", "KEXP");
-      if (method === "play") {
-        await vi.waitFor(() =>
-          expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
-        );
-        nativeCallbacks[0].ready();
-      }
-      await selection;
-      expectState(null, null, "KEXP");
+      actions.clickStation("listen", "KEXP");
+      if (method === "play") await readyNative();
+      await waitForState(null, null, "KEXP");
       expect(toastStore.get().error.message).toBe(`${method} failed`);
       await actions.stopStation("listen");
     },
@@ -234,17 +240,16 @@ describe("Listen playback", () => {
     vi.useFakeTimers();
     Capacitor.isNativePlatform.mockReturnValue(true);
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await vi.advanceTimersByTimeAsync(30000);
-    await selection;
     expectState(null, null, "KEXP");
     expect(toastStore.get().error.message).toContain("did not become ready");
     nativeCallbacks[0].ready();
     expect(AudioPlayer.play).not.toHaveBeenCalled();
-    const retry = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await vi.advanceTimersByTimeAsync(0);
     nativeCallbacks[0].ready();
-    await retry;
+    await vi.advanceTimersByTimeAsync(0);
     expectState("KEXP");
     await actions.stopStation("listen");
     expect(vi.getTimerCount()).toBe(0);
@@ -256,15 +261,11 @@ describe("Listen playback", () => {
       new Error("Initialization failed"),
     );
     const { actions } = createActions();
-    await actions.clickStation("listen", "KEXP");
-    expectState(null, null, "KEXP");
-    const retry = actions.clickStation("listen", "WXXI");
-    await vi.waitFor(() =>
-      expect(AudioPlayer.changeAudioSource).toHaveBeenCalledOnce(),
-    );
-    nativeCallbacks[0].ready();
-    await retry;
-    expectState("WXXI");
+    actions.clickStation("listen", "KEXP");
+    await waitForState(null, null, "KEXP");
+    actions.clickStation("listen", "WXXI");
+    await readyNative("changeAudioSource");
+    await waitForState("WXXI");
     expect(AudioPlayer.create).toHaveBeenCalledOnce();
     expect(AudioPlayer.initialize).toHaveBeenCalledTimes(2);
     expect(AudioPlayer.onAudioReady).toHaveBeenCalledOnce();
@@ -274,12 +275,9 @@ describe("Listen playback", () => {
   it("waits for native stop acknowledgement and preserves playback on rejection", async () => {
     Capacitor.isNativePlatform.mockReturnValue(true);
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
-    await vi.waitFor(() =>
-      expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
-    );
-    nativeCallbacks[0].ready();
-    await selection;
+    actions.clickStation("listen", "KEXP");
+    await readyNative();
+    await waitForState("KEXP");
     const stopped = Promise.withResolvers();
     AudioPlayer.stop.mockReturnValueOnce(stopped.promise);
     const stopping = actions.stopStation("listen");
@@ -301,28 +299,21 @@ describe("Listen playback", () => {
     async (result) => {
       Capacitor.isNativePlatform.mockReturnValue(true);
       const { actions } = createActions();
-      const first = actions.clickStation("listen", "KEXP");
-      await vi.waitFor(() =>
-        expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
-      );
-      nativeCallbacks[0].ready();
-      await first;
+      actions.clickStation("listen", "KEXP");
+      await readyNative();
+      await waitForState("KEXP");
       const stopped = Promise.withResolvers();
       AudioPlayer.stop.mockReturnValueOnce(stopped.promise);
       const stopping = actions.stopStation("listen");
       expectState("KEXP");
-      const next = actions.clickStation("listen", "WXXI");
+      actions.clickStation("listen", "WXXI");
       expectState(null, "WXXI");
       if (result === "success") stopped.resolve();
       else stopped.reject(new Error("Old stop failed"));
       await stopping;
       expectState(null, "WXXI");
-      await vi.waitFor(() =>
-        expect(AudioPlayer.changeAudioSource).toHaveBeenCalledOnce(),
-      );
-      nativeCallbacks[0].ready();
-      await next;
-      expectState("WXXI");
+      await readyNative("changeAudioSource");
+      await waitForState("WXXI");
       await actions.stopStation("listen");
     },
   );
@@ -332,12 +323,12 @@ describe("Listen playback", () => {
     const initializing = Promise.withResolvers();
     AudioPlayer.initialize.mockReturnValueOnce(initializing.promise);
     const { actions } = createActions();
-    const first = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await vi.waitFor(() =>
       expect(AudioPlayer.initialize).toHaveBeenCalledOnce(),
     );
-    const second = actions.clickStation("listen", "WXXI");
-    const third = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "WXXI");
+    actions.clickStation("listen", "KEXP");
     expectState(null, "KEXP");
     expect(AudioPlayer.create).toHaveBeenCalledOnce();
     nativeCallbacks[0].ready();
@@ -356,8 +347,7 @@ describe("Listen playback", () => {
     expectState(null, "KEXP");
     expect(AudioPlayer.play).not.toHaveBeenCalled();
     nativeCallbacks[0].ready();
-    await Promise.all([first, second, third]);
-    expectState("KEXP");
+    await waitForState("KEXP");
     await actions.stopStation("listen");
     nativeCallbacks[0].ready();
     nativeCallbacks[0].status({ status: "playing" });
@@ -366,6 +356,7 @@ describe("Listen playback", () => {
   });
 
   it("stops a pending native request before create completes", async () => {
+    vi.useFakeTimers();
     Capacitor.isNativePlatform.mockReturnValue(true);
     const creating = Promise.withResolvers();
     AudioPlayer.create.mockImplementationOnce(async () => {
@@ -373,13 +364,16 @@ describe("Listen playback", () => {
       await creating.promise;
     });
     const { actions } = createActions();
-    const selection = actions.clickStation("listen", "KEXP");
+    actions.clickStation("listen", "KEXP");
     await vi.waitFor(() => expect(AudioPlayer.create).toHaveBeenCalledOnce());
     const stopping = actions.stopStation("listen");
     expectState(null, "KEXP");
     creating.resolve();
-    await Promise.all([selection, stopping]);
+    await stopping;
     expectState(null);
+    expect(vi.getTimerCount()).toBe(0);
+    nativeCallbacks[0].ready();
+    await vi.advanceTimersByTimeAsync(0);
     expect(AudioPlayer.play).not.toHaveBeenCalled();
     expect(AudioPlayer.destroy).not.toHaveBeenCalled();
   });

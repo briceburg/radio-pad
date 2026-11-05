@@ -233,13 +233,18 @@ export function createControlActions({ localPlayback, control }) {
     toastWarning(event.detail);
   });
   control.addEventListener("error", (event) => toastWarning(event.detail));
-  control.addEventListener("playbackstate", (event) =>
-    updateTab("control", {
-      currentStation: event.detail.callSign,
-      requestedStation: event.detail.requestedCallSign,
-      failedStation: event.detail.failedCallSign,
-    }),
-  );
+  for (const [tabName, playback] of [
+    ["control", control],
+    ["listen", localPlayback],
+  ]) {
+    playback.addEventListener("playbackstate", ({ detail }) =>
+      updateTab(tabName, {
+        currentStation: detail.callSign,
+        requestedStation: detail.requestedCallSign,
+        failedStation: detail.failedCallSign,
+      }),
+    );
+  }
   control.addEventListener("radiodialstate", (event) => {
     const player = controlStore.get().player;
     loadRadioDial(
@@ -256,13 +261,6 @@ export function createControlActions({ localPlayback, control }) {
   });
   control.addEventListener("playerstatus", (event) =>
     setStatusMap("playerStatuses", event.detail),
-  );
-  localPlayback.addEventListener("playbackstate", (event) =>
-    updateTab("listen", {
-      currentStation: event.detail.callSign,
-      requestedStation: event.detail.requestedCallSign,
-      failedStation: event.detail.failedCallSign,
-    }),
   );
   localPlayback.addEventListener("error", (event) =>
     toastWarning("Local audio playback failed.", event.detail),
@@ -322,7 +320,7 @@ export function createControlActions({ localPlayback, control }) {
       return loadRadioDial(url, "listen");
     },
 
-    async clickStation(tabName, callSign) {
+    clickStation(tabName, callSign) {
       if (tabName === "listen") {
         const station = listenStore
           .get()
@@ -335,7 +333,7 @@ export function createControlActions({ localPlayback, control }) {
       control.startPlayback(callSign);
     },
 
-    async stopStation(tabName) {
+    stopStation(tabName) {
       if (tabName === "listen") {
         return localPlayback.stop();
       }

@@ -18,7 +18,7 @@ function createWebAudioPlayer(station, onStatus, onError) {
 
   return {
     play: () => audio.play(),
-    stop() {
+    async stop() {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -89,21 +89,8 @@ function createNativeAudioPlayer() {
     },
     start: () => AudioPlayer.play(audioRef),
     async stop() {
-      const previousStatusChanged = statusChanged;
-      ready = null;
-      statusChanged = null;
       await setup?.catch(() => {});
-      // Setup can complete after cancellation. Its callbacks must stay disarmed.
-      ready = null;
-      statusChanged = null;
-      if (initialized) {
-        try {
-          await AudioPlayer.stop(audioRef);
-        } catch (error) {
-          statusChanged = previousStatusChanged;
-          throw error;
-        }
-      }
+      if (initialized) await AudioPlayer.stop(audioRef);
     },
   };
 }
@@ -111,10 +98,11 @@ function createNativeAudioPlayer() {
 export class LocalPlayback extends EventTarget {
   constructor() {
     super();
-    this.native = Capacitor.isNativePlatform();
     this.session = null;
     this.cleanup = Promise.resolve(true);
-    this.nativePlayer = this.native ? createNativeAudioPlayer() : null;
+    this.nativePlayer = Capacitor.isNativePlatform()
+      ? createNativeAudioPlayer()
+      : null;
   }
 
   publish(callSign = null, requestedCallSign = null, failedCallSign = null) {
@@ -132,16 +120,13 @@ export class LocalPlayback extends EventTarget {
   release() {
     const session = this.session;
     this.session = null;
-    session?.cancel?.();
+    if (session) {
+      session.cancelled = true;
+      clearTimeout(session.timeout);
+    }
     if (!session?.player) return this.cleanup;
     // Complete native setup/stop before reusing the notification player for another station.
-    let stopping;
-    try {
-      stopping = session.player.stop();
-    } catch (error) {
-      stopping = Promise.reject(error);
-    }
-    this.cleanup = Promise.resolve(stopping).then(
+    this.cleanup = session.player.stop().then(
       () => true,
       (error) => {
         this.reportError(error);
@@ -151,18 +136,14 @@ export class LocalPlayback extends EventTarget {
     return this.cleanup;
   }
 
-  async play(station) {
-    if (!station?.stream_url) return false;
+  // Commands publish acknowledgements and failures through events.
+  play(station) {
+    if (!station?.stream_url) {
+      this.reportError(new Error("Station has no audio stream."));
+      return;
+    }
     const previousCleanup = this.release();
-    let cancel;
-    const cancelled = new Promise((resolve) => {
-      cancel = () => resolve(false);
-    });
     const session = {
-      cancel() {
-        session.cancelled = true;
-        cancel();
-      },
       cancelled: false,
       callSign: station.call_sign,
       currentStation: null,
@@ -185,40 +166,34 @@ export class LocalPlayback extends EventTarget {
     };
     this.publish(null, station.call_sign);
 
-    let timeout;
     const start = async () => {
-      if (this.native) await previousCleanup;
-      if (!mayStart()) return false;
+      if (this.nativePlayer) await previousCleanup;
+      if (!mayStart()) return;
       session.player =
         this.nativePlayer || createWebAudioPlayer(station, onStatus, fail);
-      if (this.native) await session.player.prepare(station, onStatus);
+      if (this.nativePlayer) await session.player.prepare(station, onStatus);
       else await session.player.play();
-      if (!mayStart()) return false;
-      if (this.native) await session.player.start();
-      if (!mayStart()) return false;
+      if (!mayStart()) return;
+      if (this.nativePlayer) await session.player.start();
+      if (!mayStart()) return;
       session.started = true;
       session.currentStation = station.call_sign;
       // Web play() confirms playback. Native acknowledges the selected source/play commands
       // after an unqualified ready signal; the plugin cannot prove audible output or source identity.
       this.publish(station.call_sign);
-      return true;
     };
-    const starting = start().catch((error) => {
-      if (mayStart()) fail(error);
-      return false;
-    });
-    if (this.native) {
+    if (this.nativePlayer) {
       // The plugin has no stream-error callback; a source may otherwise never become ready.
-      timeout = setTimeout(
+      session.timeout = setTimeout(
         () => fail(new Error("Audio stream did not become ready in time.")),
         NATIVE_START_TIMEOUT_MS,
       );
     }
-    try {
-      return await Promise.race([starting, cancelled]);
-    } finally {
-      clearTimeout(timeout);
-    }
+    start()
+      .catch((error) => {
+        if (mayStart()) fail(error);
+      })
+      .finally(() => clearTimeout(session.timeout));
   }
 
   async stop() {
