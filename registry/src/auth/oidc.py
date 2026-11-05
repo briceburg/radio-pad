@@ -45,7 +45,7 @@ class _SigningKeys(PyJWKClient):
         # Keep key selection, synchronization, caching and rotation in PyJWT.
         try:
             return super().get_signing_keys(refresh)
-        except (PyJWTError, ValueError) as error:
+        except (PyJWTError, ValueError, TypeError) as error:
             raise _ProviderError("OIDC signing keys unavailable") from error
 
 

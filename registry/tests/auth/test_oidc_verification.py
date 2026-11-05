@@ -170,6 +170,7 @@ def test_symmetric_and_unsigned_tokens_are_rejected_before_discovery(provider: P
         (_JWKS, 200, b"{"),
         (_JWKS, 200, {"keys": []}),
         (_JWKS, 200, {"keys": [{"kty": "RSA", "kid": "current", "n": None, "e": "AQAB"}]}),
+        (_JWKS, 200, {"keys": [{"kty": "RSA", "kid": "current", "alg": ["RS256"]}]}),
     ],
 )
 def test_provider_failures_are_generic_internal_errors(
